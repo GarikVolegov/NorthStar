@@ -4,7 +4,8 @@
  * (fuse da test RIASEC + try-a-day + diario indizi) e i prossimi passi.
  */
 import { useCompass, type CompassStage, type CompassBlockType } from "@/features/compass/useCompass";
-import { Compass, Sparkles, Target, Zap, ArrowRight, HelpCircle } from "lucide-react";
+import { CommittedActionPlan } from "@/features/compass/CommittedActionPlan";
+import { Compass, Sparkles, Target, Zap, ArrowRight, HelpCircle, Swords, FlaskConical } from "lucide-react";
 import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -52,6 +53,9 @@ export default function BussolaPage() {
           </p>
         </div>
       </header>
+
+      {/* Il ponte verso il lavoro vero (solo se direzione confermata / committed) */}
+      <CommittedActionPlan />
 
       {/* Stage progress */}
       <section className="rounded-xl border bg-card p-5">
@@ -148,6 +152,32 @@ export default function BussolaPage() {
             <span>
               <span className="block font-medium">Cosa ti blocca</span>
               <span className="block text-xs text-muted-foreground">Diamo un nome all'indecisione</span>
+            </span>
+          </span>
+          <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-1" />
+        </button>
+        <button
+          onClick={() => setLocation(`${BASE}bussola/torneo`)}
+          className="group flex items-center justify-between rounded-xl border bg-card p-4 text-left transition hover:border-primary/50"
+        >
+          <span className="flex items-center gap-2">
+            <Swords className="h-5 w-5 text-primary" />
+            <span>
+              <span className="block font-medium">Il Torneo</span>
+              <span className="block text-xs text-muted-foreground">Scegli per sottrazione: quale ti tira di più?</span>
+            </span>
+          </span>
+          <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-1" />
+        </button>
+        <button
+          onClick={() => setLocation(`${BASE}bussola/spike`)}
+          className="group flex items-center justify-between rounded-xl border bg-card p-4 text-left transition hover:border-primary/50"
+        >
+          <span className="flex items-center gap-2">
+            <FlaskConical className="h-5 w-5 text-primary" />
+            <span>
+              <span className="block font-medium">Mettila alla prova</span>
+              <span className="block text-xs text-muted-foreground">Uno spike di 2 settimane, reversibile</span>
             </span>
           </span>
           <ArrowRight className="h-4 w-4 text-muted-foreground transition group-hover:translate-x-1" />
