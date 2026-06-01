@@ -4,7 +4,7 @@
  * Usato in staging per evitare costi LLM.
  * Importato dall'AI router quando process.env.AI_MOCK_MODE === 'true'.
  *
- * SICUREZZA: vedi AI_RULES.md — nessuna API key loggata.
+ * SICUREZZA: vedi .brain/40_Agent_Context/rules/AI_RULES.md — nessuna API key loggata.
  */
 
 export const MOCK_CHAT_RESPONSE = {

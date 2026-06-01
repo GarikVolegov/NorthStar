@@ -9,7 +9,7 @@
  * I tool di scrittura vengono testati con writeMode=true e poi il dato viene eliminato.
  */
 
-import "dotenv/config";
+import "./load-env";
 import { executeToolCall } from "@workspace/ai-server";
 
 const TEST_USER_ID = 1;  // sostituire con un userId valido nel DB di sviluppo

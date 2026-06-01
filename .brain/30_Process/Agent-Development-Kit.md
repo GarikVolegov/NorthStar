@@ -10,37 +10,38 @@ updated: 2026-05-28
 
 # Agent Development Kit
 
-NorthStar usa un Agent Development Kit a 5 layer per rendere gli agenti piu
-prevedibili, sincronizzati con il progetto e collegati al cervello `.brain`.
+NorthStar usa un Agent Development Kit consolidato dentro `.brain` per rendere
+gli agenti piu prevedibili, sincronizzati con il progetto e collegati allo
+stesso contesto operativo.
 
 ## Layer
 
 | Layer | Percorso | Ruolo |
 |---|---|---|
-| L1 Memory | `.claude/CLAUDE.md` | Costituzione del progetto, mappa repo, regole operative |
-| L2 Skills | `.claude/skills/` | Conoscenza modulare invocabile on demand |
-| L3 Hooks | `.claude/settings.json`, `.claude/hooks/` | Guardrail deterministici sugli eventi agente |
-| L4 Subagents | `.claude/agents/` | Deleghe con contesto e responsabilita isolate |
-| L5 Plugins | `plugins/northstar-agent-kit/` | Bundle futuro per distribuire lo stack al team |
+| L1 Memory | `.brain/40_Agent_Context/AGENT_CONTEXT.md` | Costituzione comune per qualunque AI |
+| L2 Rules | `.brain/40_Agent_Context/rules/` | Regole operative per API, DB, frontend, AI, git e security |
+| L3 Skills | `.brain/40_Agent_Context/claude/skills/`, `.brain/40_Agent_Context/agent-skills/skills/` | Conoscenza modulare invocabile on demand |
+| L4 Hooks/Subagents | `.brain/40_Agent_Context/claude/hooks/`, `.brain/40_Agent_Context/claude/agents/` | Guardrail e deleghe archiviate in un solo posto |
+| L5 Plugins/Workflows | `.brain/40_Agent_Context/plugins/`, `.brain/40_Agent_Context/custom-workflows/` | Bundle, workflow e report agentici |
 
 ## Sincronizzazione
 
-- `.claude/` e' la sorgente primaria per Claude Code.
-- `.brain/` e' la memoria navigabile e runtime; questo nodo sintetico e'
-  `runtime: true` per Wendy.
-- `.claude/skills/agent-browser.md` e' la skill runtime-operativa per browser
+- `.brain/40_Agent_Context/` e' la sorgente primaria per Claude, Codex,
+  OpenCode e strumenti affini.
+- Il file ponte in root (`AGENTS.md`) rimanda allo stesso contesto per tutti.
+- `.brain/40_Agent_Context/claude/skills/agent-browser.md` e' la skill runtime-operativa per browser
   QA, screenshot, form flow, test esplorativi e dashboard dogfooding; usa la
   guida aggiornata del CLI `agent-browser skills get core`.
-- `.agents/skills/` resta una libreria di skill pesanti gia versionate, senza
-  duplicazione dentro `.claude/skills/`.
-- Cartographer propone diff tra `.planning`, `.brain`, `.claude/skills`,
-  `.claude/agents` e community Graphify.
+- `.brain/40_Agent_Context/agent-skills/skills/` conserva le skill pesanti gia
+  versionate senza disperderle in cartelle tool-specific.
+- Cartographer propone diff tra planning in Brain, skill, agenti e community
+  Graphify.
 
 ## Guardrail
 
-- Non editare `.brain/90_Code/**`.
-- Non editare `.claude/worktrees/**`.
-- Non attraversare `.opencode/node_modules/**`.
+- Non editare output Graphify generati.
+- Non editare worktree temporanei se `git worktree list --porcelain` li mostra attivi.
+- Non attraversare `node_modules/**` o scratch dir ricreati localmente.
 - Non salvare profili, auth state, screenshot sensibili o output
   `agent-browser` in percorsi tracciati.
 - Nessun hook deve scrivere nel repo senza consenso esplicito.

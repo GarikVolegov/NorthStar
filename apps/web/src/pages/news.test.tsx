@@ -1,10 +1,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import News from "./news";
 
 const getJsonMock = vi.hoisted(() => vi.fn());
+const i18nLanguageMock = vi.hoisted(() => ({ value: "it" }));
 
 vi.mock("@/lib/apiClient", () => ({
   getJson: getJsonMock,
@@ -37,6 +39,10 @@ vi.mock("@/lib/seo", () => ({
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key,
+    i18n: {
+      language: i18nLanguageMock.value,
+      resolvedLanguage: i18nLanguageMock.value,
+    },
   }),
 }));
 
@@ -63,9 +69,27 @@ function renderNews() {
   );
 }
 
+function newsItem(id: string, title: string) {
+  return {
+    id,
+    title,
+    description: `${title} description`,
+    source: "NorthStar News",
+    url: `https://example.com/news/${id}`,
+    publishedAt: "2026-05-31T08:00:00.000Z",
+    image: null,
+    category: "general",
+    sector: null,
+    tags: [],
+    relevance: 80,
+    plan: "free" as const,
+  };
+}
+
 describe("News page reliability states", () => {
   beforeEach(() => {
     getJsonMock.mockReset();
+    i18nLanguageMock.value = "it";
   });
 
   it("shows an API error state instead of the empty-news state when the feed fails", async () => {
@@ -135,5 +159,82 @@ describe("News page reliability states", () => {
     expect(screen.getByText(/Controlla chiavi e limiti provider/i)).toBeInTheDocument();
     expect(screen.getByText("Fonti degradate")).toBeInTheDocument();
     expect(screen.getByText(/Ultimo errore refresh: quota exceeded/i)).toBeInTheDocument();
+  });
+
+  it("loads the next cursor page and appends articles to the current feed", async () => {
+    const user = userEvent.setup();
+    const firstPageItem = newsItem("1", "Prima news");
+    const secondPageItem = newsItem("2", "Seconda news");
+
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("cursor=cursor-1")) {
+        return Promise.resolve({
+          news: [secondPageItem],
+          nextCursor: null,
+          source: "live",
+          status: "ok",
+        });
+      }
+
+      return Promise.resolve({
+        news: [firstPageItem],
+        nextCursor: "cursor-1",
+        source: "live",
+        status: "ok",
+      });
+    });
+
+    renderNews();
+
+    expect(await screen.findByText("Prima news")).toBeInTheDocument();
+
+    await user.click(await screen.findByRole("button", { name: /Carica altre notizie|news\.loadMore/i }));
+
+    expect(await screen.findByText("Seconda news")).toBeInTheDocument();
+    expect(screen.getByText("Prima news")).toBeInTheDocument();
+    expect(getJsonMock.mock.calls.some(([url]) => String(url).includes("cursor=cursor-1"))).toBe(true);
+  });
+
+  it("requests news using the selected interface language", async () => {
+    i18nLanguageMock.value = "en";
+    getJsonMock.mockResolvedValue({
+      news: [newsItem("1", "English feed request")],
+      nextCursor: null,
+      source: "live",
+      status: "ok",
+    });
+
+    renderNews();
+
+    expect(await screen.findByText("English feed request")).toBeInTheDocument();
+    expect(getJsonMock.mock.calls.some(([url]) => String(url).includes("locale=en"))).toBe(true);
+  });
+
+  it("keeps loaded articles visible when loading another page fails", async () => {
+    const user = userEvent.setup();
+    const firstPageItem = newsItem("1", "News gia caricata");
+
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("cursor=cursor-1")) {
+        return Promise.reject(new Error("load_more_failed"));
+      }
+
+      return Promise.resolve({
+        news: [firstPageItem],
+        nextCursor: "cursor-1",
+        source: "live",
+        status: "ok",
+      });
+    });
+
+    renderNews();
+
+    expect(await screen.findByText("News gia caricata")).toBeInTheDocument();
+
+    await user.click(await screen.findByRole("button", { name: /Carica altre notizie|news\.loadMore/i }));
+
+    expect(await screen.findByText("News gia caricata")).toBeInTheDocument();
+    expect(await screen.findByText("news.loadMoreError")).toBeInTheDocument();
+    expect(screen.queryByText("news.loadError")).not.toBeInTheDocument();
   });
 });

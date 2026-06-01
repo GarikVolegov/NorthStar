@@ -1,0 +1,43 @@
+$ knip
+[93m[4mUnused files[24m[39m (9)
+apps/server/src/lib/routine-schedule.ts                               
+apps/web/src/components/dashboard/DashboardCalendar.tsx               
+apps/web/src/components/dashboard/DashboardPersonalisationPanel.tsx   
+apps/web/src/components/diary/DiaryPreviewWidget.tsx                  
+apps/web/src/components/dashboard/widgets/InsightsWidget.tsx          
+apps/web/src/components/dashboard/widgets/JobFeedWidget.tsx           
+apps/web/src/components/dashboard/widgets/MindsetStreakWidget.tsx     
+apps/web/src/components/dashboard/widgets/ProgressObjectivesWidget.tsx
+packages/ai-server/src/tools/index.ts                                 
+[33m[4mConfiguration hints[24m (31)[39m
+**/dist/**                                              knip.json  [90mRemove from [97mignore[90m[39m                 
+**/node_modules/**                                      knip.json  [90mRemove from [97mignore[90m[39m                 
+**/build/**                                             knip.json  [90mRemove from [97mignore[90m[39m                 
+**/.turbo/**                                            knip.json  [90mRemove from [97mignore[90m[39m                 
+scripts/preinstall.js                                   knip.json  [90mRemove from [97mignore[90m[39m                 
+src/vendor.d.ts              apps/server                knip.json  [90mRemove from [97mignore[90m[39m                 
+src/__tests__/**             apps/web                   knip.json  [90mRemove from [97mignore[90m[39m                 
+@radix-ui/react-slider                                  knip.json  [90mRemove from [97mignoreDependencies[90m[39m     
+@testing-library/user-event                             knip.json  [90mRemove from [97mignoreDependencies[90m[39m     
+next-themes                  apps/web                   knip.json  [90mRemove from [97mignoreDependencies[90m[39m     
+docker                                                  knip.json  [90mRemove from [97mignoreBinaries[90m[39m         
+concurrently                                            knip.json  [90mRemove from [97mignoreBinaries[90m[39m         
+src/index.tsx                packages/api-client-react  knip.json  [90mRefine [97mentry[90m pattern (no matches)[39m  
+src/index.tsx                packages/ai-server         knip.json  [90mRefine [97mentry[90m pattern (no matches)[39m  
+src/index.tsx                packages/ws-server         knip.json  [90mRefine [97mentry[90m pattern (no matches)[39m  
+[src/index.ts, …]            packages/design-tokens     knip.json  [90mRefine [97mentry[90m pattern (no matches)[39m  
+src/index.tsx                packages/ml-client         knip.json  [90mRefine [97mentry[90m pattern (no matches)[39m  
+[src/index.ts, …]            packages/api-spec          knip.json  [90mRefine [97mentry[90m pattern (no matches)[39m  
+src/index.tsx                packages/api-zod           knip.json  [90mRefine [97mentry[90m pattern (no matches)[39m  
+src/index.tsx                packages/db                knip.json  [90mRefine [97mentry[90m pattern (no matches)[39m  
+[src/**/*.{ts,tsx}]          packages/design-tokens     knip.json  [90mRefine [97mproject[90m pattern (no matches)[39m
+[src/**/*.{ts,tsx}]          packages/api-spec          knip.json  [90mRefine [97mproject[90m pattern (no matches)[39m
+src/index.ts                 apps/server                knip.json  [90mRemove redundant [97mentry[90m pattern[39m     
+src/main.tsx                 apps/web                   knip.json  [90mRemove redundant [97mentry[90m pattern[39m     
+src/index.ts                 packages/api-client-react  knip.json  [90mRemove redundant [97mentry[90m pattern[39m     
+src/index.ts                 packages/ai-server         knip.json  [90mRemove redundant [97mentry[90m pattern[39m     
+src/index.ts                 packages/ws-server         knip.json  [90mRemove redundant [97mentry[90m pattern[39m     
+src/index.ts                 packages/ml-client         knip.json  [90mRemove redundant [97mentry[90m pattern[39m     
+src/index.ts                 packages/api-zod           knip.json  [90mRemove redundant [97mentry[90m pattern[39m     
+src/index.ts                 packages/db                knip.json  [90mRemove redundant [97mentry[90m pattern[39m     
+[ELIFECYCLE] Command failed with exit code 1.

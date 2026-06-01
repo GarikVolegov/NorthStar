@@ -5,7 +5,7 @@
  *   pnpm --filter @workspace/scripts run backfill:embeddings
  */
 
-import "dotenv/config";
+import "./load-env";
 import { isNull, eq } from "drizzle-orm";
 import { db, sectorsTable, professionsTable } from "@workspace/db";
 import OpenAI from "openai";

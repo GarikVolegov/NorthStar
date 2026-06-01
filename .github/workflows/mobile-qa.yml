@@ -22,7 +22,7 @@ on:
       - "apps/web/**"
       - "lib/api-client-react/**"
       - ".github/workflows/mobile-qa.yml"
-      - "lighthouserc.json"
+      - "config/lighthouse/lighthouserc.json"
   pull_request:
     branches: [main]
     paths:
@@ -79,7 +79,7 @@ jobs:
       - name: Run Lighthouse CI (mobile)
         run: |
           lhci autorun \
-            --config=lighthouserc.json \
+            --config=config/lighthouse/lighthouserc.json \
             --collect.startServerCommand="pnpm --filter @northstar/web run serve -- --port 5173" \
             --collect.url="http://localhost:5173" \
             --collect.url="http://localhost:5173/test" \

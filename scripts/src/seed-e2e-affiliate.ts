@@ -20,7 +20,7 @@
  *   - affiliateBalance=0, affiliateClicks=5, affiliateConversions=2 (dati demo)
  */
 
-import "dotenv/config";
+import "./load-env";
 import * as crypto from "crypto";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";

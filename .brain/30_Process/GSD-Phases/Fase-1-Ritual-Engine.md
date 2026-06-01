@@ -10,8 +10,8 @@ updated: 2026-05-28
 
 # Fase 1 — Ritual Engine + Dashboard Personalizzabile
 
-**Branch**: `feature/fase1-ritual-engine` · **Plan**: `.planning/PLAN.md`
-**Architettura ref**: `.claude/plans/voglio-rendere-la-mia-polished-cocke.md`
+**Branch**: `feature/fase1-ritual-engine` · **Plan**: `.brain/30_Process/Planning/`
+**Architettura ref**: contesto storico consolidato in `.brain/40_Agent_Context/`
 
 ## Obiettivo
 Trasformare NorthStar da SaaS reattivo a SaaS+AaaS con agenti autonomi user-level e dashboard personalizzabile.

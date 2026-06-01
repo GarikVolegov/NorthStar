@@ -12,65 +12,17 @@ import { logger } from "../logger";
 import { getLLMForRoute } from "../llm/client";
 import { selectModelFor } from "../model-router";
 import { hydrateMissingImages } from "./collector-preview";
-import type { RawItem } from "./collector-types";
 import { generateNewsImage } from "./news-image-generator";
 import { PUBLIC_NEWS_SOURCES, formatPublicNewsSource, isPublishableDiscoveryNews, normalize, shouldAutoPublishTrustedNews } from "./news-policy";
 import { mapWithConcurrency } from "../utils";
 import { computeCorroboration } from "./news-verifier";
 import { collectTrustedItalianNews } from "./collector-sources";
+import type { MissingNewsCoverage, NewsInsertRow, NewsPublisherResult, NewsRewriteInput, NewsRewriteOutput, PublishableItem } from "./news-publisher-types";
+
+export type { MissingNewsCoverage, NewsPublisherResult } from "./news-publisher-types";
 
 const MIN_RELEVANCE = 0.25;
 const MIN_ARTICLES_PER_SECTOR = 3;
-
-export interface MissingNewsCoverage {
-  sectorId: number;
-  sectorName: string;
-  realArticles: number;
-  needed: number;
-}
-
-export interface NewsPublisherResult {
-  transferred: number;
-  /** @deprecated Temporary compatibility: synthetic seeds are no longer generated. */
-  seeded: number;
-  missingCoverage: MissingNewsCoverage[];
-  durationMs: number;
-}
-
-interface NewsRewriteInput {
-  title: string;
-  source: string;
-  summary: string;
-  insightText: string | null;
-  sectorNames: string[];
-  publishedAt: Date | null;
-}
-
-interface NewsRewriteOutput {
-  preview: string;
-  content: string;
-}
-
-interface PublishableItem extends RawItem {
-  urlHash: string;
-  insightText: string | null;
-  relevanceScore: number;
-}
-
-type NewsInsertRow = {
-  title: string;
-  url: string;
-  urlHash: string;
-  source: string;
-  summary: string;
-  imageUrl: string | null;
-  content: string;
-  publishedAt: Date;
-  sectorNames: string[];
-  category: string;
-  relevanceScore: number;
-  searchQuery: string | undefined;
-};
 
 function cleanText(value: string | null | undefined): string {
   return String(value ?? "")
@@ -94,17 +46,17 @@ function fallbackRewrite(input: NewsRewriteInput): NewsRewriteOutput {
   const preview = limitText(summary, 240);
 
   const content = [
-    "### Cosa e successo",
+    "### Per chi è",
+    `Per chi sta valutando ${sectors}, competenze collegate e prossime scelte professionali.`,
+    "",
+    "### Cosa è successo",
     summary,
     "",
-    "### Perche conta per NorthStar",
+    "### Perché conta per te",
     insight,
     "",
-    "### Impatto pratico",
-    `Per chi sta pianificando lavoro, business o formazione, questa notizia e un segnale da leggere dentro il contesto ${sectors}. Aiuta a capire quali competenze, ruoli o decisioni potrebbero diventare piu importanti nei prossimi mesi.`,
-    "",
-    "### Cosa osservare",
-    "Monitora evoluzione della fonte, reazioni del settore, nuove opportunita professionali e possibili effetti su formazione, salario, domanda di skill e modelli di lavoro.",
+    "### Cosa fare adesso",
+    "Confronta il segnale con il tuo percorso, scegli una competenza da verificare e decidi se cambia una priorità concreta nelle prossime settimane.",
   ].join("\n");
 
   return { preview, content };
@@ -131,7 +83,8 @@ async function rewriteNewsForNorthStar(input: NewsRewriteInput): Promise<NewsRew
           "Rielabora segnali da fonti esterne senza copiare l'articolo originale.",
           "Rispondi solo JSON con preview e content.",
           "preview: massimo 240 caratteri, italiano chiaro.",
-          "content: markdown breve con sezioni: Cosa e successo, Perche conta per NorthStar, Impatto pratico, Cosa osservare.",
+          "content: markdown breve con sezioni: Per chi è, Cosa è successo, Perché conta per te, Cosa fare adesso.",
+          "La sezione finale deve essere pratica e verificabile: un piccolo uso concreto della notizia per percorso, competenze o decisioni.",
           "Non inventare dati non presenti.",
         ].join(" "),
       },

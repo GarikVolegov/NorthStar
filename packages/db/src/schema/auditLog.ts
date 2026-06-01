@@ -1,7 +1,7 @@
 /**
  * auditLog — log immutabile di tutte le azioni sensibili.
  *
- * ⚠️  REGOLA 0 — vedi DB_RULES.md prima di modificare.
+ * ⚠️  REGOLA 0 — vedi .brain/40_Agent_Context/rules/DB_RULES.md prima di modificare.
  *
  * REGOLA CRITICA: questa tabella è INSERT ONLY — append-only by design.
  * Non eseguire mai UPDATE o DELETE su audit_log, nemmeno in migration.
@@ -82,7 +82,7 @@ export const auditLogTable = pgTable(
 
     /**
      * Tipo di azione — stringa libera ma usa le costanti in
-     * artifacts/api-server/src/lib/audit/actions.ts
+     * apps/server/src/lib/audit/actions.ts
      */
     action: text('action').notNull(),
 

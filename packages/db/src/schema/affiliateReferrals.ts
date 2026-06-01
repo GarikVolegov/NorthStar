@@ -1,7 +1,7 @@
 /**
  * affiliateReferrals — relazione CONFERMATA referrer → referred.
  *
- * ⚠️  REGOLA 0 — vedi DB_RULES.md prima di modificare.
+ * ⚠️  REGOLA 0 — vedi .brain/40_Agent_Context/rules/DB_RULES.md prima di modificare.
  *
  * Una riga per utente referito (UNIQUE su referred_user_id).
  * Un utente può essere referito da un solo affiliato — integrità garantita

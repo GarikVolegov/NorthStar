@@ -1,32 +1,16 @@
-import { coachMemoryFactsTable, coachMemoryPatternsTable, db, type CoachMemoryFact, type CoachMemoryPattern } from "@workspace/db";
+import { coachMemoryFactsTable, coachMemoryPatternsTable, db } from "@workspace/db";
 import { eq, and, isNull } from "drizzle-orm";
 import { openai } from "../client";
 import { embedText } from "./embedder";
 import { logger } from "../logger";
 import { selectModelFor } from "../model-router";
 import { wendyConfig } from "../config/wendy";
+import type { ExtractedMemory, UserMemory } from "./memory-types";
+
+export { buildMemorySection } from "./memory-section";
+export type { ExtractedMemory, MemoryFact, MemoryPattern, UserMemory } from "./memory-types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
-
-export interface MemoryFact {
-  key: string;
-  value: string;
-}
-
-export interface MemoryPattern {
-  patternType: "limiting_belief" | "strength" | "recurring_theme" | "emotional_trigger" | "growth_edge";
-  description: string;
-}
-
-export interface ExtractedMemory {
-  facts: MemoryFact[];
-  patterns: MemoryPattern[];
-}
-
-export interface UserMemory {
-  facts: CoachMemoryFact[];
-  patterns: CoachMemoryPattern[];
-}
 
 // ── Confidence ladder ────────────────────────────────────────────────────────
 
@@ -410,51 +394,3 @@ export async function loadMemory(userId: number): Promise<UserMemory> {
  * Serialises the user's memory into a system prompt section.
  * Only included if there's actually something to say.
  */
-export function buildMemorySection(memory: UserMemory): string {
-  const hasFacts = memory.facts.length > 0;
-  const hasPatterns = memory.patterns.length > 0;
-
-  if (!hasFacts && !hasPatterns) return "";
-
-  const lines: string[] = ["## Memoria persistente — quello che sai già di questo utente"];
-
-  // ── Session goals banner ──────────────────────────────────────────────
-  const mainGoal = memory.facts.find((f) => f.key === "goal_main");
-  const secondaryGoal = memory.facts.find((f) => f.key === "goal_secondary");
-  if (mainGoal) {
-    lines.push(
-      "",
-      `### Obiettivo principale di sessione: ${mainGoal.value}`,
-      secondaryGoal ? `Obiettivo secondario: ${secondaryGoal.value}` : "",
-      "Tieni la risposta allineata a questi obiettivi. Se l'utente si allontana, riconducilo gentilmente.",
-    );
-  }
-
-  if (hasFacts) {
-    lines.push("\n### Fatti biografici (dichiarati dall'utente in sessioni precedenti)");
-    for (const f of memory.facts) {
-      lines.push(`- **${f.key}**: ${f.value}`);
-    }
-  }
-
-  if (hasPatterns) {
-    lines.push("\n### Pattern comportamentali osservati (confidence ≥ 0.5)");
-    for (const p of memory.patterns) {
-      const confidenceLabel =
-        p.confidence >= 0.80 ? "alta" :
-        p.confidence >= 0.65 ? "media" : "bassa";
-      lines.push(
-        `- [${p.patternType}, ${confidenceLabel} confidence] ${p.description}`,
-      );
-    }
-  }
-
-  lines.push(
-    "\nUSA questa memoria per personalizzare la risposta." ,
-    "Se pertinente e c'è una connessione chiara, cita 1-2 fatti della memoria dell'utente per mostrare che ricordi la sua storia.",
-    "Esempi di citazione naturale: 'So che stavi lavorando su X…', 'La scorsa sessione mi dicevi che…', 'Visto che il tuo obiettivo è Y…'",
-    "Non esagerare — basta 1 citazione per risposta, solo quando aggiunge valore.",
-  );
-
-  return lines.join("\n");
-}

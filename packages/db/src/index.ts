@@ -8,8 +8,10 @@ import type { QueryResult } from "pg";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from the root of the monorepo
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+// Load the versioned template first, then local secrets if present.
+const repoRoot = path.resolve(__dirname, "../../..");
+dotenv.config({ path: path.join(repoRoot, ".env") });
+dotenv.config({ path: path.join(repoRoot, ".env.local"), override: true });
 
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./schema";

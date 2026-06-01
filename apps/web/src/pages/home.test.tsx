@@ -109,10 +109,6 @@ vi.mock("@/features/home/TrendingMobileStrip", () => ({
   TrendingMobileStrip: () => null,
 }));
 
-vi.mock("@/features/home/TrendingSectorCard", () => ({
-  TrendingSectorCard: () => <article />,
-}));
-
 vi.mock("@/features/home/HomeNewsCard", () => ({
   HomeNewsCard: () => <article />,
 }));

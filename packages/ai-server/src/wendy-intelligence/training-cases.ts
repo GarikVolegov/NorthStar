@@ -4,11 +4,11 @@ import type {
   WendyDecision,
   WendyTrainingCase,
   WendyTrainingCaseResult,
-  WendyTrainingCategory,
-  WendyTrainingCoverage,
   WendyTrainingEvaluation,
-  WendyTrainingResponseShapeResult,
 } from "./types";
+
+export { getWendyTrainingCoverage } from "./training-coverage";
+export { evaluateWendyTrainingResponseShape } from "./training-response-shape";
 
 export const WENDY_TRAINING_CASES: WendyTrainingCase[] = [
   {
@@ -310,34 +310,6 @@ export function runWendyTrainingEvaluation(cases: WendyTrainingCase[] = WENDY_TR
   };
 }
 
-export function getWendyTrainingCoverage(cases: WendyTrainingCase[] = WENDY_TRAINING_CASES): WendyTrainingCoverage {
-  const byCategory: Record<WendyTrainingCategory, number> = {
-    social: 0,
-    market: 0,
-    memory: 0,
-    routine: 0,
-    action: 0,
-    agent: 0,
-    emotional: 0,
-  };
-
-  for (const trainingCase of cases) {
-    for (const category of inferTrainingCategories(trainingCase)) {
-      byCategory[category] += 1;
-    }
-  }
-
-  const missingCategories = (Object.keys(byCategory) as WendyTrainingCategory[]).filter(
-    (category) => byCategory[category] === 0,
-  );
-
-  return {
-    passed: missingCategories.length === 0,
-    byCategory,
-    missingCategories,
-  };
-}
-
 export function buildWendyTrainingPromptSection(
   decision: WendyDecision,
   cases: WendyTrainingCase[] = WENDY_TRAINING_CASES,
@@ -373,34 +345,6 @@ export function buildWendyTrainingPromptSection(
   ].join("\n");
 }
 
-export function evaluateWendyTrainingResponseShape(
-  trainingCase: WendyTrainingCase,
-  responseText: string,
-): WendyTrainingResponseShapeResult {
-  const normalized = normalize(responseText);
-  const reasons: string[] = [];
-
-  for (const pattern of trainingCase.badPatterns ?? []) {
-    if (normalized.includes(normalize(pattern))) {
-      reasons.push(`bad pattern: ${pattern}`);
-    }
-  }
-
-  const expectedShape = normalize(trainingCase.expectedResponseShape ?? "");
-  if (expectedShape.includes("font") && !/\b(fonte|fonti|rag|tool|dati|search_rag)\b/i.test(responseText)) {
-    reasons.push("shape: missing source/tool language");
-  }
-  if (expectedShape.includes("conferma") && !/\b(conferma|ok|procedo|vuoi che)\b/i.test(responseText)) {
-    reasons.push("shape: missing confirmation language");
-  }
-
-  return {
-    id: trainingCase.id,
-    passed: reasons.length === 0,
-    reasons,
-  };
-}
-
 function getTrainingCaseRank(trainingCase: WendyTrainingCase, decision: WendyDecision): number {
   let rank = trainingCase.expectedMode === decision.mode ? 10 : 0;
   const meaningfulCapabilities = (trainingCase.expectedCapabilities ?? []).filter(
@@ -424,43 +368,4 @@ function collectCoveredCapabilities(
     for (const capability of trainingCase.expectedCapabilities ?? []) capabilities.add(capability);
   }
   return [...capabilities].sort();
-}
-
-function inferTrainingCategories(trainingCase: WendyTrainingCase): WendyTrainingCategory[] {
-  const categories = new Set<WendyTrainingCategory>();
-  const capabilities = trainingCase.expectedCapabilities ?? [];
-  const text = `${trainingCase.id} ${trainingCase.message} ${trainingCase.expectedResponseShape ?? ""}`.toLowerCase();
-
-  if (trainingCase.expectedMode === "reply_now" || capabilities.includes("social_presence")) {
-    categories.add("social");
-  }
-  if (trainingCase.expectedMode === "agent_task" || capabilities.includes("operator_layer")) {
-    categories.add("agent");
-  }
-  if (trainingCase.expectedMode === "routine" || capabilities.includes("routine_scheduler")) {
-    categories.add("routine");
-  }
-  if (trainingCase.expectedMode === "memory_update" || capabilities.includes("long_term_memory")) {
-    categories.add("memory");
-  }
-  if (capabilities.includes("northstar_actions")) {
-    categories.add("action");
-  }
-  if (capabilities.includes("market_intelligence")) {
-    categories.add("market");
-  }
-  if (/\b(emotion|frustrat|bloccato|perso|iniziare)\b/i.test(text)) {
-    categories.add("emotional");
-  }
-
-  return [...categories];
-}
-
-function normalize(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[^\p{Letter}\p{Number}]+/gu, " ")
-    .trim();
 }

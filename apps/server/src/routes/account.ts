@@ -29,13 +29,64 @@ function sendAccountPersistenceError(
   return true;
 }
 
+function safeProfileExport(
+  user: typeof usersTable.$inferSelect,
+  profile: typeof userProfileSettingsTable.$inferSelect | undefined,
+) {
+  return {
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatarUrl: user.avatarUrl,
+      role: user.role,
+      emailVerified: user.emailVerified,
+      isPremium: user.isPremium,
+      isAdmin: user.isAdmin,
+      testSessionId: user.testSessionId,
+      onboardingCompleted: user.onboardingCompleted,
+      journeyType: user.journeyType,
+      lastActiveAt: user.lastActiveAt,
+      streakDays: user.streakDays,
+      voiceStreak: user.voiceStreak,
+      totalXp: user.totalXp,
+      lastVoiceSessionAt: user.lastVoiceSessionAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    },
+    settings: profile
+      ? {
+          username: profile.username,
+          bannerUrl: profile.bannerUrl,
+          sectorId: profile.sectorId,
+          isPublic: profile.isPublic,
+          timezone: profile.timezone,
+          workPreference: profile.workPreference,
+          autonomyPreference: profile.autonomyPreference,
+          stabilityPreference: profile.stabilityPreference,
+          userMode: profile.userMode,
+          horizon: profile.horizon,
+          onboardingStep: profile.onboardingStep,
+          wendyTonePreference: profile.wendyTonePreference,
+          city: profile.city,
+          bio: profile.bio,
+          activeLogoPreset: profile.activeLogoPreset,
+          activeBackgroundId: profile.activeBackgroundId,
+          backgroundAppearance: profile.backgroundAppearance,
+          isAffiliate: profile.isAffiliate,
+          createdAt: profile.createdAt,
+          updatedAt: profile.updatedAt,
+        }
+      : null,
+  };
+}
+
 async function getUserRelatedData(userId: number) {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
   if (!user) {
     throw new Error("Utente non trovato");
   }
   const [profile] = await db.select().from(userProfileSettingsTable).where(eq(userProfileSettingsTable.userId, userId)).limit(1);
-  const userWithProfile = { ...user, ...(profile ?? {}) };
   const objectives = await db.select().from(userObjectivesTable).where(eq(userObjectivesTable.userId, userId));
   const coachSessions = await db.select().from(coachSessionsTable).where(eq(coachSessionsTable.userId, userId));
   const voiceSessions = await db.select().from(voiceSessionsTable).where(eq(voiceSessionsTable.userId, userId));
@@ -66,7 +117,7 @@ async function getUserRelatedData(userId: number) {
   }
 
   return {
-    profile: userWithProfile,
+    profile: safeProfileExport(user, profile),
     objectives,
     coachSessions,
     voiceSessions,

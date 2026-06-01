@@ -1,25 +1,6 @@
-/**
- * model-router.ts — Centralized model selection for every agent / task.
- * GOAL: each agent picks the cheapest model that still delivers the required
- * quality for its task. Free-first strategy:
- *
- *   - NANO     →  Groq llama-3.1-8b-instant      (≈ free, 14k tok/s)
- *                 routing, classification, gating, micro-extraction
- *   - MICRO    →  Groq llama-3.3-70b-versatile   (free tier)
- *                 summarization, evaluation, supervisor, memory
- *   - STANDARD →  OpenRouter deepseek-chat-v3:free OR Groq llama-3.3-70b
- *                 user-facing chat, specialists, growth agent
- *   - REASONING → OpenRouter deepseek-r1:free
- *                 chain-of-thought, deep step-by-step
- *   - PREMIUM   → OpenAI gpt-4o (opt-in, only for paid users + deep complexity)
- *
- * Every default is overridable via env (MODEL_<ROLE>). Set AI_PROVIDER to
- * route the actual HTTP call (openrouter | groq | openai). See README of
- * packages/ai-server.
- */
-
 import { aiPlugins } from "./plugins/registry";
 import { resolveActiveProvider, type LlmProvider } from "./client";
+import type { AgentRole, RoleConfig } from "./model-router/policy";
 
 export type RequestComplexity = "simple" | "standard" | "deep";
 
@@ -27,37 +8,7 @@ export type RequestComplexity = "simple" | "standard" | "deep";
  * Logical role of the caller. Every agent / task that hits an LLM declares its
  * role here, and the router picks the matching model.
  */
-export type AgentRole =
-  // chat user-facing
-  | "growth-agent-chat"
-  | "growth-agent-voice"
-  | "specialist-chat"
-  // routing & gating
-  | "router-classify"
-  | "parallel-handoff-gate"
-  | "parallel-handoff-extract"
-  | "search-router"
-  | "interview-adapt"
-  | "knowledge-categorize"
-  // medium reasoning
-  | "supervisor-rewrite"
-  | "supervisor-pattern"
-  | "memory-extract"
-  | "session-summarize"
-  | "discovery-enrich"
-  | "interview-evaluate"
-  | "interview-generate"
-  | "knowledge-link"
-  | "knowledge-suggest"
-  | "wiki-chat"
-  | "wiki-suggest"
-  // deep reasoning
-  | "chain-of-thought"
-  // Security agent
-  | "security-scan"
-  | "security-fix"
-  // Search orchestrator
-  | "search-orchestrate";
+export type { AgentRole } from "./model-router/policy";
 
 export interface RouterOptions {
   isPremium?: boolean;
@@ -202,14 +153,6 @@ function routeForTier(tier: RoleConfig["tier"]): {
 }
 
 // ── Per-role configuration ────────────────────────────────────────────────────
-
-interface RoleConfig {
-  tier: "nano" | "micro" | "standard" | "reasoning";
-  temperature: number;
-  maxTokens: number;
-  /** If true, premium users with `complexity: "deep"` are upgraded to PREMIUM_OPENAI. */
-  upgradeOnPremiumDeep?: boolean;
-}
 
 const ROLE_CONFIG: Record<AgentRole, RoleConfig> = {
   // User-facing chat — highest quality among free, optional premium upgrade

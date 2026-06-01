@@ -137,7 +137,7 @@ function formatUptime(seconds: number): string {
   return `${s}s`;
 }
 
-// â”€â”€â”€ Integration setup guides â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Integration setup guides
 interface IntegrationGuide {
   vars: string[];
   icon: React.ReactNode;
@@ -154,7 +154,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <CreditCard size={16} />,
     name: "Stripe",
     what: "Abilita i pagamenti e gli abbonamenti premium (checkout, gestione piani, webhook).",
-    how: "1. Crea un account su stripe.com â†’ Dashboard â†’ Developers â†’ API Keys â†’ copia la Secret key.\n2. Per i webhook: Stripe CLI o dashboard â†’ Webhooks â†’ aggiungi l'endpoint `/api/stripe/webhook`.",
+    how: "1. Crea un account su stripe.com -> Dashboard -> Developers -> API Keys -> copia la Secret key.\n2. Per i webhook: Stripe CLI o dashboard -> Webhooks -> aggiungi l'endpoint `/api/stripe/webhook`.",
     docsUrl: "https://stripe.com/docs/keys",
     docsLabel: "Docs Stripe API Keys",
   },
@@ -163,7 +163,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <Globe size={16} />,
     name: "GNews",
     what: "Abilita il feed di notizie aggiornate relative al settore dell'utente.",
-    how: "1. Vai su gnews.io â†’ crea un account gratuito â†’ copia la tua API Key dal dashboard.",
+    how: "1. Vai su gnews.io -> crea un account gratuito -> copia la tua API Key dal dashboard.",
     docsUrl: "https://gnews.io/docs/v4",
     docsLabel: "Docs GNews API",
   },
@@ -172,7 +172,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <Search size={16} />,
     name: "Tavily",
     what: "Abilita la ricerca dinamica di articoli di crescita personale tramite AI (Growth Research Scheduler).",
-    how: "1. Vai su tavily.com â†’ crea un account â†’ copia la API Key dalla dashboard del tuo profilo.",
+    how: "1. Vai su tavily.com -> crea un account -> copia la API Key dalla dashboard del tuo profilo.",
     docsUrl: "https://tavily.com",
     docsLabel: "Tavily Dashboard",
   },
@@ -181,7 +181,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <Mail size={16} />,
     name: "Resend",
     what: "Abilita le email transazionali: verifica account, reset password, digest settimanale.",
-    how: "1. Vai su resend.com â†’ crea un account â†’ API Keys â†’ crea una nuova chiave â†’ aggiungila come segreto.",
+    how: "1. Vai su resend.com -> crea un account -> API Keys -> crea una nuova chiave -> aggiungila come segreto.",
     docsUrl: "https://resend.com/docs/introduction",
     docsLabel: "Docs Resend",
   },
@@ -190,7 +190,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <Bell size={16} />,
     name: "Web Push (VAPID)",
     what: "Abilita le notifiche push del browser per promemoria, scadenze obiettivi e aggiornamenti.",
-    how: "Genera le chiavi VAPID con il comando:\n`npx web-push generate-vapid-keys`\nCopia VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY. VAPID_EMAIL Ã¨ la tua email di contatto (es. admin@northstar.app).",
+    how: "Genera le chiavi VAPID con il comando:\n`npx web-push generate-vapid-keys`\nCopia VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY. VAPID_EMAIL è la tua email di contatto (es. admin@northstar.app).",
     docsUrl: "https://developer.mozilla.org/en-US/docs/Web/API/Push_API",
     docsLabel: "Web Push API MDN",
   },
@@ -199,7 +199,7 @@ const INTEGRATION_GUIDES: IntegrationGuide[] = [
     icon: <KeyRound size={16} />,
     name: "Google OAuth",
     what: "Abilita il login con Google per gli utenti (flusso OAuth2).",
-    how: "1. Vai su console.cloud.google.com â†’ API & Services â†’ Credentials â†’ Create OAuth 2.0 Client ID.\n2. Tipo: Web application. Aggiungi i redirect URI autorizzati (es. https://tuodominio.repl.co/api/auth/google/callback).",
+    how: "1. Vai su console.cloud.google.com -> API & Services -> Credentials -> Create OAuth 2.0 Client ID.\n2. Tipo: Web application. Aggiungi i redirect URI autorizzati (es. https://tuodominio.repl.co/api/auth/google/callback).",
     docsUrl: "https://developers.google.com/identity/protocols/oauth2",
     docsLabel: "Docs Google OAuth2",
   },
@@ -289,7 +289,7 @@ function IntegrationGuideCard({
               >
                 <ExternalLink size={11} /> {guide.docsLabel}
               </a>
-              <span className="text-muted-foreground text-xs">Â·</span>
+              <span className="text-muted-foreground text-xs">-</span>
               <a
                 href="https://docs.replit.com/replit-workspace/storing-sensitive-information-environment-variables"
                 target="_blank"
@@ -363,11 +363,11 @@ export default function AdminStatus() {
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 className="text-2xl font-bold">
-                NorthStar â€” Status & Setup
+                NorthStar - Status & Setup
               </h1>
               {lastRefresh && (
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Aggiornato: {lastRefresh.toLocaleTimeString("it-IT")} Â·
+                  Aggiornato: {lastRefresh.toLocaleTimeString("it-IT")} -
                   prossimo refresh in {countdown}s
                 </p>
               )}
@@ -401,12 +401,12 @@ export default function AdminStatus() {
                       {data.status === "ok"
                         ? "Tutto operativo"
                         : data.status === "degraded"
-                          ? "FunzionalitÃ  ridotte"
+                          ? "Funzionalità ridotte"
                           : "Errore critico"}
                     </p>
                     <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                       <Clock size={11} />
-                      Uptime: {formatUptime(data.uptimeSeconds)} Â·{" "}
+                      Uptime: {formatUptime(data.uptimeSeconds)} -{" "}
                       {new Date(data.timestamp).toLocaleString("it-IT")}
                     </p>
                   </div>
@@ -452,11 +452,11 @@ export default function AdminStatus() {
             ) : null}
           </div>
 
-          {/* Setup wizard â€” integrations */}
+          {/* Setup wizard - integrations */}
           <div>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                Setup Wizard â€” Integrazioni Opzionali
+                Setup Wizard - Integrazioni Opzionali
               </h2>
               {data && (
                 <div className="flex items-center gap-2">
@@ -542,17 +542,17 @@ export default function AdminStatus() {
           {/* Links */}
           <div className="flex gap-2 text-xs text-muted-foreground pt-2 flex-wrap">
             <a href="/admin" className="hover:underline">
-              â† Admin Home
+              Torna ad Admin Home
             </a>
-            <span>Â·</span>
+            <span>-</span>
             <a href="/admin/metriche" className="hover:underline">
               Metriche business
             </a>
-            <span>Â·</span>
+            <span>-</span>
             <a href="/admin/agenti" className="hover:underline">
               Agent Health
             </a>
-            <span>Â·</span>
+            <span>-</span>
             <a href="/admin/cataloghi" className="hover:underline">
               Cataloghi
             </a>

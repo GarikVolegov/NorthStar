@@ -5,20 +5,28 @@ import { db, newsArticlesTable } from "@workspace/db";
 import { PUBLIC_NEWS_SOURCES, runNewsPublisher } from "@workspace/ai-server";
 import { cacheGet, cacheSet } from "../lib/redis";
 import { clampContentLimit, readContentSearchQuery } from "../lib/content-search";
-import { mapNewsCategoryForUi, resolveNewsCategoryFilter } from "../lib/news-category";
+import { resolveNewsCategoryFilter } from "../lib/news-category";
 import {
   buildNewsProviderDiagnostics,
   type NewsProviderDiagnostics,
 } from "../lib/news-provider-diagnostics";
+import {
+  FALLBACK_IMAGE_THEMES,
+  escapeSvgText,
+  mapNewsDetail,
+  mapNewsItem,
+  readHexColor,
+  type NewsArticleRow,
+  type NewsLocale,
+} from "./news-presentation";
 
 const router = Router();
 
 const CACHE_TTL = 60; // 60s TTL as specified
 const NEWS_AUTO_REFRESH_STALE_MS = Number(process.env.NEWS_AUTO_REFRESH_STALE_MS) || 48 * 60 * 60 * 1000;
-const NEWS_AUTO_REFRESH_COOLDOWN_MS = process.env.NODE_ENV === "test"
+const NEWS_AUTO_REFRESH_COOLDOWN_MS = process.env.NODE_ENV === "test" || process.env.VITEST
   ? 0
   : Number(process.env.NEWS_AUTO_REFRESH_COOLDOWN_MS) || 5 * 60 * 1000;
-type NewsArticleRow = typeof newsArticlesTable.$inferSelect;
 type NewsFeedStatus = "ok" | "empty" | "partial" | "error";
 type NewsRefreshReason = "empty" | "stale";
 
@@ -75,6 +83,12 @@ function publicNewsWhere(extra?: SQL<unknown>): SQL<unknown> {
 
 function newsStatus(newsCount: number): NewsFeedStatus {
   return newsCount > 0 ? "ok" : "empty";
+}
+
+function readNewsLocale(value: unknown): NewsLocale {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const normalized = typeof raw === "string" ? raw.slice(0, 2).toLowerCase() : "it";
+  return ["it", "en", "es", "fr", "de"].includes(normalized) ? normalized as NewsLocale : "it";
 }
 
 function isStaleNewsRow(row: NewsArticleRow | undefined): boolean {
@@ -265,6 +279,7 @@ async function selectNewsRows(
 router.get("/", async (req, res) => {
   try {
     const { multi, categories, perCategory, category, limit } = req.query;
+    const locale = readNewsLocale(req.query.locale);
     const cursor = req.query.cursor as string | undefined;
     const search = readContentSearchQuery(req.query as Record<string, string | string[] | undefined>);
     const limitNum = clampContentLimit(limit as string | undefined, 20, 50);
@@ -310,11 +325,11 @@ router.get("/", async (req, res) => {
 
       let refresh: NewsRefreshResult | undefined;
       let results = await loadCategoryResults();
-      let news = results.flatMap((r) => r.articles).map(mapNewsItem);
+      let news = results.flatMap((r) => r.articles).map((article) => mapNewsItem(article, locale));
       if (!cursor && news.length === 0) {
         refresh = await runAutoNewsRefresh("empty", req.log);
         results = await loadCategoryResults();
-        news = results.flatMap((r) => r.articles).map(mapNewsItem);
+        news = results.flatMap((r) => r.articles).map((article) => mapNewsItem(article, locale));
       }
 
       const anyMore = results.some((r) => r.hasMore);
@@ -339,7 +354,7 @@ router.get("/", async (req, res) => {
 
     // Try cache first for non-filtered requests
     if (!category && !cursor && !search) {
-      const cacheKey = "news:recent:real:v3";
+      const cacheKey = `news:recent:real:v3:${locale}`;
       const cached = await cacheGet<ReturnType<typeof mapNewsItem>[]>(cacheKey);
       if (cached && cached.length > 0 && !isStaleMappedNewsItem(cached[0])) {
         const status = newsStatus(cached.length);
@@ -385,11 +400,11 @@ router.get("/", async (req, res) => {
     const hasMore = articles.length > limitNum;
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
 
-    const mapped = capped.map(mapNewsItem);
+    const mapped = capped.map((article) => mapNewsItem(article, locale));
 
     // Cache non-filtered first page
     if (!category && !cursor && !search) {
-      await cacheSet("news:recent:real:v3", mapped, CACHE_TTL);
+      await cacheSet(`news:recent:real:v3:${locale}`, mapped, CACHE_TTL);
     }
 
     const last = mapped[mapped.length - 1];
@@ -417,8 +432,35 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/fallback-image/:category.svg", (req, res) => {
+  const category = req.params.category ?? "general";
+  const theme = FALLBACK_IMAGE_THEMES[category] ?? FALLBACK_IMAGE_THEMES.general!;
+  const from = readHexColor(req.query.from, theme.from);
+  const to = readHexColor(req.query.to, theme.to);
+  const icon = escapeSvgText(req.query.icon ?? theme.icon);
+  const title = escapeSvgText(req.query.title ?? category);
+
+  res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+  res.send(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-label="${title}">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#${from}"/>
+      <stop offset="1" stop-color="#${to}"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#g)"/>
+  <circle cx="1010" cy="120" r="180" fill="#ffffff" opacity=".12"/>
+  <circle cx="150" cy="560" r="220" fill="#000000" opacity=".16"/>
+  <path d="M120 505h960" stroke="#fff" stroke-width="2" opacity=".22"/>
+  <text x="96" y="124" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700" opacity=".9">${icon}</text>
+  <text x="96" y="535" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="46" font-weight="800">NorthStar News</text>
+</svg>`);
+});
+
 router.get("/article/:id", async (req, res) => {
   try {
+    const locale = readNewsLocale(req.query.locale);
     const id = parseInt(req.params.id ?? "", 10);
     if (!Number.isFinite(id) || id <= 0) {
       res.status(400).json({ error: "Invalid news id" });
@@ -432,7 +474,7 @@ router.get("/article/:id", async (req, res) => {
       return;
     }
 
-    res.json({ article: mapNewsDetail(article) });
+    res.json({ article: mapNewsDetail(article, locale) });
   } catch (err) {
     req.log?.error?.({ err }, "news detail error");
     res.status(500).json({ error: "Unable to load news article" });
@@ -442,6 +484,7 @@ router.get("/article/:id", async (req, res) => {
 router.get("/sector/:sectorName", async (req, res) => {
   try {
     const { sectorName } = req.params;
+    const locale = readNewsLocale(req.query.locale);
     const limitNum = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
     const cursor = req.query.cursor as string | undefined;
 
@@ -456,7 +499,7 @@ router.get("/sector/:sectorName", async (req, res) => {
 
     const hasMore = articles.length > limitNum;
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
-    const mapped = capped.map(mapNewsItem);
+    const mapped = capped.map((article) => mapNewsItem(article, locale));
 
     const last = mapped[mapped.length - 1];
     const nextCursor = hasMore && last
@@ -481,56 +524,5 @@ router.get("/sector/:sectorName", async (req, res) => {
     await sendNewsUnavailable(res);
   }
 });
-
-function fallbackContent(a: typeof newsArticlesTable.$inferSelect): string {
-  const summary = a.summary?.trim() || a.title;
-  const sectors = a.sectorNames?.length ? a.sectorNames.join(", ") : "mercato del lavoro";
-  return [
-    "### Cosa e successo",
-    summary,
-    "",
-    "### Perche conta per NorthStar",
-    `Questa notizia e rilevante per chi sta osservando ${sectors} e vuole capire come cambiano lavoro, business, formazione e competenze richieste.`,
-    "",
-    "### Impatto pratico",
-    "Usala come segnale per aggiornare il tuo percorso, confrontare nuove opportunita e capire quali skill potrebbero diventare piu importanti.",
-    "",
-    "### Cosa osservare",
-    "Controlla la fonte originale e monitora eventuali aggiornamenti, reazioni del settore e impatti su ruoli, salari o domanda di competenze.",
-  ].join("\n");
-}
-
-function mapNewsItem(a: typeof newsArticlesTable.$inferSelect) {
-  const publishedAt = a.publishedAt instanceof Date
-    ? a.publishedAt.toISOString()
-    : (a.publishedAt ? String(a.publishedAt) : new Date().toISOString());
-  return {
-    id: String(a.id),
-    title: a.title,
-    preview: a.summary,
-    description: a.summary,
-    source: a.source,
-    sourceUrl: a.url,
-    url: a.url,
-    detailUrl: `/news/${a.id}`,
-    publishedAt,
-    image: a.imageUrl ?? null,
-    category: mapNewsCategoryForUi(a.category, a.sectorNames ?? []),
-    sector: a.sectorNames?.[0] ?? null,
-    tags: a.sectorNames ?? [],
-    relevance: a.relevanceScore,
-    plan: "free" as const,
-  };
-}
-
-function mapNewsDetail(a: typeof newsArticlesTable.$inferSelect) {
-  const item = mapNewsItem(a);
-  return {
-    ...item,
-    content: a.content?.trim() || fallbackContent(a),
-    sourceUrl: a.url,
-    url: a.url,
-  };
-}
 
 export default router;

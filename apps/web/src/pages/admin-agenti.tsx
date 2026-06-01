@@ -129,7 +129,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
           </div>
           <div className="text-center p-2 rounded-lg bg-muted/40">
             <p className="text-xl font-bold">
-              {agent.avgDurationMs ? `${agent.avgDurationMs}ms` : "â€”"}
+              {agent.avgDurationMs ? `${agent.avgDurationMs}ms` : "-"}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Latenza media
@@ -144,7 +144,7 @@ function AgentCard({ agent }: { agent: AgentStat }) {
               className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 mb-2"
             >
               <AlertTriangle size={11} className="text-warning" />
-              {agent.lastErrors.length} errori recenti â€”{" "}
+              {agent.lastErrors.length} errori recenti -{" "}
               {expanded ? "nascondi" : "mostra"}
             </button>
             {expanded && (
@@ -331,7 +331,7 @@ export default function AdminAgenti() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                  Chiamate per agente â€” ultimi 14 giorni
+                  Chiamate per agente - ultimi 14 giorni
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -392,13 +392,13 @@ export default function AdminAgenti() {
 
           <div className="flex gap-2 text-xs text-muted-foreground pt-2">
             <a href="/admin" className="hover:underline">
-              â† Admin Home
+              Torna ad Admin Home
             </a>
-            <span>Â·</span>
+            <span>-</span>
             <a href="/admin/metriche" className="hover:underline">
               Metriche
             </a>
-            <span>Â·</span>
+            <span>-</span>
             <a href="/admin/cataloghi" className="hover:underline">
               Cataloghi
             </a>

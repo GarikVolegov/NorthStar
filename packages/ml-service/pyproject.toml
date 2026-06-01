@@ -1,0 +1,27 @@
+[project]
+name = "northstar-ml-service"
+version = "0.1.0"
+description = "NorthStar FastAPI microservice for ML, embeddings, trend analysis, and weak signals."
+requires-python = ">=3.11"
+dependencies = [
+    # ── Web framework ──────────────────────────────────────────────────────────
+    "fastapi>=0.136.1",
+    "uvicorn[standard]>=0.46.0",
+    "pydantic>=2.13.3",
+    "python-dotenv>=1.2.2",
+    "httpx>=0.28.1",
+    # ── Database ───────────────────────────────────────────────────────────────
+    "asyncpg>=0.29.0",       # async PostgreSQL (stesso Neon DB del server Express)
+    # ── ML / Embeddings ────────────────────────────────────────────────────────
+    "sentence-transformers>=3.0.0",  # free embeddings multilingua (IT+EN)
+    "scikit-learn>=1.5.0",           # weak signal classifier, trend regressione
+    "numpy>=1.26.0",
+    "pandas>=2.2.0",
+    "joblib>=1.3.0",                 # model serialization
+    "torch>=2.3.0",                  # necessario per sentence-transformers
+    # ── LLM / AI (facoltativo, per futuri agenti Python) ─────────────────────
+    "langchain>=1.2.17",
+    "langchain-openai>=1.2.1",
+    "langgraph>=1.1.10",
+    "openai>=2.34.0",
+]

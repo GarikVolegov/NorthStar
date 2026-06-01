@@ -15,7 +15,7 @@ export function PrivacyCard({ userId }: { userId: number }) {
     queryKey: ["privacy-status", userId],
     queryFn: async () => {
       const d = await getJson<{ isPublic?: boolean }>(
-        `${BASE}api/users/${userId}/public?viewerId=${userId}`,
+        `${BASE}api/users/${userId}/public`,
       );
       setIsPublic(d.isPublic ?? false);
       return d.isPublic ?? false;

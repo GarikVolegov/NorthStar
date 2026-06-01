@@ -61,7 +61,7 @@ function fmtDate(iso: string) {
 
 export default function AdminMessaggi() {
   useEffect(() => {
-    document.title = "Admin Messaggi â€” NorthStar";
+    document.title = "Admin Messaggi - NorthStar";
   }, []);
 
   const { key, logout } = useAdminAuth();
@@ -145,7 +145,7 @@ export default function AdminMessaggi() {
                 <Inbox className="w-4 h-4 text-primary" />
               </div>
               <span className="font-serif font-bold text-foreground">
-                Admin Â· Messaggi
+                Admin - Messaggi
               </span>
               {unreadCount > 0 && (
                 <span className="bg-primary text-primary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
@@ -268,7 +268,7 @@ export default function AdminMessaggi() {
               ))}
               <div className="ml-auto">
                 <Input
-                  placeholder="Cerca nome, email, testoâ€¦"
+                  placeholder="Cerca nome, email, testo..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="h-8 text-xs rounded-xl w-52"
@@ -288,7 +288,7 @@ export default function AdminMessaggi() {
           {loading && messages.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 opacity-40" />
-              Caricamento messaggiâ€¦
+              Caricamento messaggi...
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
@@ -383,7 +383,7 @@ export default function AdminMessaggi() {
                       </p>
                       <div className="mt-4 pt-3 border-t flex items-center gap-3">
                         <a
-                          href={`mailto:${msg.email}?subject=Re: ${SUBJECTS[msg.subject] ?? msg.subject} â€” NorthStar`}
+                          href={`mailto:${msg.email}?subject=Re: ${SUBJECTS[msg.subject] ?? msg.subject} - NorthStar`}
                           className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                         >
                           <Mail className="w-3.5 h-3.5" />

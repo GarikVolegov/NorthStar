@@ -1,7 +1,7 @@
 /**
  * useAffiliateDashboard — Fase 4 Frontend Affiliate
- * FRONTEND_RULES.md: hook TanStack Query, nessun fetch diretto nei componenti.
- * API_RULES.md: token da AuthContext, endpoint /api/affiliate/*
+ * .brain/40_Agent_Context/rules/FRONTEND_RULES.md: hook TanStack Query, nessun fetch diretto nei componenti.
+ * .brain/40_Agent_Context/rules/API_RULES.md: token da AuthContext, endpoint /api/affiliate/*
  */
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';

@@ -17,45 +17,11 @@ import pRetry from "p-retry";
 import { logger } from "../logger";
 import { readToolCalls } from "./tool-call-parser";
 import { getOpenAIFallbackConfig, shouldFallbackToOpenAI, resolveActiveProvider } from "../client";
+import { createOpenAIProvider } from "./openai-provider";
+import { CHAT_ONCE_TIMEOUT, CHAT_TIMEOUT, normalizeFinishReason, withTimeout } from "./shared";
+import type { LLMProvider } from "./types";
 
-export interface LLMMessage {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  tool_call_id?: string;
-}
-
-export interface LLMConfig {
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-}
-
-export interface ToolCall {
-  id: string;
-  name: string;
-  arguments: Record<string, unknown>;
-}
-
-export interface ChatWithToolsResult {
-  content: string;
-  toolCalls: ToolCall[];
-  finishReason: "stop" | "tool_calls" | "length";
-}
-
-export type ToolDefinitionOpenAI = {
-  type: "function";
-  function: { name: string; description: string; parameters: object };
-};
-
-export interface LLMProvider {
-  chat(messages: LLMMessage[], config?: LLMConfig): Promise<AsyncIterable<string>>;
-  chatOnce(messages: LLMMessage[], config?: LLMConfig): Promise<string>;
-  chatWithTools(
-    messages: LLMMessage[],
-    tools: ToolDefinitionOpenAI[],
-    config?: LLMConfig,
-  ): Promise<ChatWithToolsResult>;
-}
+export type { ChatWithToolsResult, LLMConfig, LLMMessage, LLMProvider, ToolCall, ToolDefinitionOpenAI } from "./types";
 
 // ── Retry + timeout helpers ───────────────────────────────────────
 
@@ -64,121 +30,7 @@ export interface LLMProvider {
  * so the underlying HTTP request is actually cancelled on timeout (not left
  * running), and the timer is always cleared so no stray timers accumulate.
  */
-function withTimeout<T>(
-  factory: (signal: AbortSignal) => Promise<T>,
-  ms: number,
-  label: string,
-): Promise<T> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ms);
-  return factory(controller.signal)
-    .catch((err: unknown) => {
-      if (controller.signal.aborted) throw new Error(`${label} timeout after ${ms}ms`);
-      throw err;
-    })
-    .finally(() => clearTimeout(timer));
-}
-
-const CHAT_TIMEOUT = 30_000;
-const CHAT_ONCE_TIMEOUT = 15_000;
-
-/** Map a provider finish_reason to our narrow union, collapsing anything
- * unexpected (e.g. "content_filter", "function_call") to "stop". */
-function normalizeFinishReason(reason: string | null | undefined): ChatWithToolsResult["finishReason"] {
-  return reason === "tool_calls" || reason === "length" ? reason : "stop";
-}
-
 // ── OpenAI Provider ────────────────────────────────────────────────
-
-function createOpenAIProvider(): LLMProvider {
-  const fallback = getOpenAIFallbackConfig();
-  if (!fallback) {
-    throw new Error("OPENAI_API_KEY or AI_INTEGRATIONS_OPENAI_API_KEY must be set");
-  }
-  const client = new OpenAI({ apiKey: fallback.apiKey, baseURL: fallback.baseURL });
-
-  const DEFAULT_MODEL = fallback.model;
-
-  return {
-    async chat(messages, config = {}) {
-      const stream = await pRetry(
-        () => withTimeout(
-          (signal) => client.chat.completions.create({
-            model: config.model ?? DEFAULT_MODEL,
-            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-            stream: true,
-            temperature: config.temperature ?? 0.7,
-            max_tokens: config.maxTokens ?? 800,
-          }, { signal }),
-          CHAT_TIMEOUT,
-          "openai chat stream",
-        ),
-        {
-          retries: 2,
-          onFailedAttempt: (err) => {
-            logger.warn({ err, attempt: err.attemptNumber }, "LLM chat retry");
-          },
-        },
-      );
-
-      return {
-        async *[Symbol.asyncIterator]() {
-          for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta?.content;
-            if (delta) yield delta;
-          }
-        },
-      };
-    },
-
-    async chatOnce(messages, config = {}) {
-      const res = await pRetry(
-        () => withTimeout(
-          (signal) => client.chat.completions.create({
-            model: config.model ?? DEFAULT_MODEL,
-            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-            temperature: config.temperature ?? 0.7,
-            max_tokens: config.maxTokens ?? 800,
-          }, { signal }),
-          CHAT_ONCE_TIMEOUT,
-          "openai chatOnce",
-        ),
-        {
-          retries: 2,
-          onFailedAttempt: (err) => {
-            logger.warn({ err, attempt: err.attemptNumber }, "LLM chatOnce retry");
-          },
-        },
-      );
-      return res.choices[0]?.message?.content ?? "";
-    },
-
-    async chatWithTools(messages, tools, config = {}) {
-      const res = await pRetry(
-        () => withTimeout(
-          (signal) => client.chat.completions.create({
-            model: config.model ?? DEFAULT_MODEL,
-            messages: messages as OpenAI.Chat.ChatCompletionMessageParam[],
-            tools:       tools as OpenAI.Chat.ChatCompletionTool[],
-            tool_choice: "auto",
-            temperature: config.temperature ?? 0.1,
-            max_tokens:  config.maxTokens ?? 500,
-          }, { signal }),
-          CHAT_ONCE_TIMEOUT,
-          "openai chatWithTools",
-        ),
-        { retries: 2, onFailedAttempt: (err) => logger.warn({ err, attempt: err.attemptNumber }, "LLM chatWithTools retry") },
-      );
-      const msg = res.choices[0]?.message;
-      const toolCalls = readToolCalls(msg?.tool_calls);
-      return {
-        content:      msg?.content ?? "",
-        toolCalls,
-        finishReason: normalizeFinishReason(res.choices[0]?.finish_reason),
-      };
-    },
-  };
-}
 
 // ── Groq Provider ──────────────────────────────────────────────────
 

@@ -218,6 +218,29 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Search/Wendy usa input e CTA da 44px al breakpoint tablet, evitando il target da 40px emerso dal test.
 - `/lavori` usa target touch da 44px per filtri e link esterno dei segnali mercato.
 
+## Tranche 20 Applicata
+
+- News supporta scroll infinito via cursor su feed categoria e settore, mantenendo le notizie gia caricate se una pagina successiva fallisce.
+- La richiesta news include la lingua UI selezionata (`locale`), con cache separata per lingua e struttura semantica localizzata.
+- Ogni notizia espone `language`, `meaning` e un'immagine garantita: se manca `imageUrl`, il server serve una fallback SVG categoriale; se l'immagine esterna fallisce, la card mostra un fallback visuale.
+- Il dettaglio news non parla piu come se l'utente fosse l'app: usa sezioni `Per chi e`, `Cosa e successo`, `Perche conta per te` e `Cosa fare adesso` nella lingua selezionata.
+- Il publisher news usa lo stesso schema editoriale e non genera piu sezioni generiche `Impatto pratico` / `Cosa osservare` o riferimenti a `NorthStar` come destinatario.
+- Smoke sandbox locale conferma Vite su `5173`, backend su `3001`, `/dashboard` e `/news` 200, e `/api/news?locale=it` con immagine e meaning localizzato.
+
+## Tranche 21 Applicata
+
+- Il typecheck web torna verde dopo la reintroduzione del flusso dashboard adattivo.
+- La dashboard usa `deriveDashboardPhase` e `getAdaptiveSectionPresentation` per ordinare le sezioni e passare alla mappa chiarezza fase attiva, CTA e stato compatto.
+- `DashboardClarityPath` mostra fase corrente, conteggio step completati e prossima azione, cosi l'utente indeciso non vede solo una sequenza visiva senza direzione.
+- I contratti TypeScript di `DashboardClarityPath` e `AdaptiveDashboardInput` sono compatibili con `exactOptionalPropertyTypes`, evitando cast o props opzionali false.
+
+## Tranche 22 Applicata
+
+- L'audit mojibake passa di nuovo: i testi user-facing dei tool Wendy/Rabbit sono stati normalizzati da encoding corrotto a italiano leggibile.
+- Le guide Rabbit estratte in `tool-handlers-rabbit-care.ts` mantengono caratteri corretti per unita, accenti, trattini e simboli di misura.
+- `tool-handlers-rabbit.ts` non contiene piu sequenze mojibake nei messaggi di sicurezza alimentare, razze e note di cura.
+- La correzione e meccanica e non modifica il contratto dei tool; sono rimasti verdi typecheck e test Wendy/Rabbit mirati.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -378,8 +401,47 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `PLAYWRIGHT_RESPONSIVE_PROJECTS=1 pnpm exec playwright test e2e/mobile/tablet-critical-surfaces.mobile.spec.ts --project=tablet-chromium --workers=1`
 - `PLAYWRIGHT_RESPONSIVE_PROJECTS=1 pnpm exec playwright test e2e/mobile/mobile-nav.mobile.spec.ts --project=mobile-webkit --workers=1`
 
+## Verifica Tranche 20
+
+- `pnpm --filter @northstar/server test src/routes/news.test.ts`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web test src/pages/news.test.tsx`
+- `pnpm --filter @workspace/ai-server exec tsc -p tsconfig.json --noEmit`
+- `PLAYWRIGHT_SKIP_WEBSERVER=1 BASE_URL=http://127.0.0.1:5173 API_URL=http://127.0.0.1:3001 TEST_API_URL=http://127.0.0.1:3001 pnpm exec playwright test e2e/mobile/tablet-critical-surfaces.mobile.spec.ts --project=chromium --grep "news tablet" --workers=1`
+- `git diff --check -- apps/server/src/routes/news.ts apps/server/src/routes/news.test.ts packages/ai-server/src/discovery-agent/news-publisher.ts apps/web/src/pages/news.tsx apps/web/src/pages/news.test.tsx e2e/mobile/tablet-critical-surfaces.mobile.spec.ts`
+- Smoke locale: `GET http://localhost:5173/dashboard` -> 200 con root React; `GET http://localhost:5173/news` -> 200 con root React; `GET /api/news?locale=it&limit=1` -> 200 con `language=it`, immagine e `meaning`.
+
+## Verifica Tranche 21
+
+- `pnpm --filter @northstar/web test src/components/dashboard/DashboardClarityPath.test.tsx src/components/dashboard/dashboard-adaptive-flow.test.ts`
+- `pnpm --filter @northstar/web run typecheck`
+- `pnpm --filter @northstar/web test src/pages/dashboard.test.tsx src/components/dashboard/DashboardClarityPath.test.tsx src/components/dashboard/dashboard-adaptive-flow.test.ts src/pages/news.test.tsx`
+- Smoke locale: riavviati server `3001` e Vite `5173`; `GET /dashboard` e `GET /news` via Vite -> 200 con root React; `GET /api/news?locale=it&limit=1` -> 200 con immagine e `meaning.label=Per chi e`.
+
+## Verifica Tranche 22
+
+- `pnpm run audit:mojibake`
+- `pnpm --filter @workspace/ai-server exec tsc -p tsconfig.json --noEmit`
+- `pnpm --filter @workspace/ai-server test src/__tests__/rabbit-triage.test.ts src/wendy-router/tool-handlers.test.ts`
+- `git diff --check -- packages/ai-server/src/wendy-router/tool-handlers-rabbit.ts packages/ai-server/src/wendy-router/tool-handlers-rabbit-care.ts`
+
+## Verifica Tranche 23
+
+- `pnpm --filter @northstar/web test src/pages/calendar.test.tsx`
+- `pnpm --filter @northstar/web test src/pages/admin-text-encoding.test.ts`
+- `pnpm --filter @northstar/web test src/pages/calendar.test.tsx src/pages/admin-text-encoding.test.ts`
+- `pnpm --filter @northstar/web run typecheck`
+- `pnpm --filter @workspace/ai-server exec tsc -p tsconfig.json --noEmit`
+- `pnpm run audit:mojibake`
+- `git diff --check -- apps/web/src/pages/calendar.tsx apps/web/src/pages/calendar.test.tsx apps/web/src/pages/admin-text-encoding.test.ts apps/web/src/pages/admin-affiliazione.tsx apps/web/src/pages/admin-agenti.tsx apps/web/src/pages/admin-crescita.tsx apps/web/src/pages/admin-messaggi.tsx apps/web/src/pages/admin-status.tsx packages/ai-server/src/discovery-agent/collector-sources.ts`
+
+Esito: export calendario ora passa da `apiFetch` e quindi include il bearer token, con loading e alert di errore. Le pagine admin/status/messaggi/agenti/crescita/affiliazione e la fonte news YouTube non espongono piu testo mojibake nelle superfici verificate.
+
 ## Backlog Prossima Tranche
 
 1. Estendere E2E referral/affiliate a WebKit ora che il browser Safari-like locale e disponibile.
 2. Aggiungere audit operativo per rate-limit provider news e trend errori fonti nel tempo.
 3. Aggiungere smoke tablet per `/news` con diagnostica provider e tab categoria overflow-safe.
+4. Correggere `viewerId` spoofabile nei profili pubblici e allowlist export account.
+5. Correggere retry Wendy che puo perdere il turno utente e TTS voice endpoint non autenticato.
+6. Correggere eventi calendario multi-giorno/overlap e download CV verso route mancanti.

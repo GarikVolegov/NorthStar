@@ -97,7 +97,7 @@ export async function* runSecurityAgent(
     }
   }
 
-  // Update SECURITY_RULES.md
+  // Update .brain/40_Agent_Context/rules/SECURITY_RULES.md
   try {
     updateSecurityRules(repoRoot, findings, scannable.length);
     yield { type: "rules_updated" };

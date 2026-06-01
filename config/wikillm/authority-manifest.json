@@ -88,7 +88,7 @@
     {
       "id": "architecture-docs-core",
       "match": [
-        "ARCHITECTURE.md",
+        ".brain/20_Product/ARCHITECTURE.md",
         "docs/architecture/"
       ],
       "profiles": ["process", "docs"],

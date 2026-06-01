@@ -18,6 +18,7 @@
 
 import dotenv from "dotenv";
 dotenv.config();
+dotenv.config({ path: ".env.local", override: true });
 
 import { db, usersTable, nftCertificatesTable, coachSessionsTable, voiceSessionsTable, userObjectivesTable, businessIdeasTable, coachMemoryFactsTable, coachMemoryPatternsTable, sessionSummariesTable, conversations, messages, chatMessagesTable } from "@workspace/db";
 import { eq, lt, isNotNull, and, sql } from "drizzle-orm";

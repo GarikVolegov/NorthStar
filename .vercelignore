@@ -8,7 +8,7 @@ node_modules/
 .claude/
 .opencode/
 .tmp/
-.tools/
+.brain/40_Agent_Context/tools/
 playwright-report/
 test-results/
 coverage/
@@ -24,8 +24,7 @@ packages/graphify-out/
 .agents/
 cli-printing-press/
 
-# Local secrets
+# Local secrets. The root `.env` template is versioned, but deploy secrets come
+# from the hosting provider environment.
 .env
 .env.*
-!.env.example
-!.env.staging.example

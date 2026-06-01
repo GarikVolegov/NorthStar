@@ -2,328 +2,31 @@ import { NewsGridSkeleton } from "@/components/skeletons/NewsCardSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFavorites } from "@/hooks/useFavorites";
+import { NewsCard, NewsDiagnosticsPanel, UpgradeCTA } from "@/features/news/NewsCards";
+import {
+  CATEGORY_CONFIG,
+  NEWS_STALE_MS,
+  readDiagnosticsFromError,
+  type NewsFeedResponse,
+  type NewsSubscriptionsResponse,
+  type ProfileData,
+} from "@/features/news/newsModels";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { deleteJson, getJson, postJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertCircle, Bell, BellOff, Bookmark, BookmarkCheck, Clock, ExternalLink, Newspaper, RefreshCw, Sparkles, Tag } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell, BellOff, Newspaper, RefreshCw, Sparkles, Tag } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Link, useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-interface NewsItem {
-  id: string; title: string; preview?: string; description: string;
-  source: string; sourceUrl?: string; url: string; detailUrl?: string; publishedAt: string;
-  image: string | null; category: string; sector: string | null;
-  tags: string[]; relevance: number; plan: "free" | "premium";
-}
-
-interface ProfileData {
-  exploredSectors: Array<{ sectorId: number; name: string; icon: string; confirmed: boolean }>;
-}
-
-interface NewsSubscriptionsResponse {
-  subscriptions?: string[];
-}
-
-interface NewsFeedResponse {
-  news: NewsItem[];
-  source: "live" | "partial" | "static" | "error";
-  status?: "ok" | "empty" | "partial" | "error";
-  error?: string;
-  diagnostics?: {
-    providerStatus: "ready" | "degraded" | "never_run" | "stale" | "not_configured" | "unavailable";
-    lastAttemptAt: string | null;
-    enabledSources: number;
-    sourcesWithErrors: number;
-    refreshAction:
-      | "wait_for_next_refresh"
-      | "wait_for_startup_pipeline"
-      | "check_provider_keys"
-      | "configure_sources"
-      | "retry_later";
-    message: string;
-    lastRefreshError?: string;
-  };
-}
-
-const CATEGORY_CONFIG = [
-  { id: "general",    emoji: "🌍", gradient: "from-blue-500/20 to-blue-600/10" },
-  { id: "technology", emoji: "💻", gradient: "from-cyan-500/20 to-blue-600/10" },
-  { id: "business",   emoji: "📈", gradient: "from-emerald-500/20 to-green-600/10" },
-  { id: "science",    emoji: "🔬", gradient: "from-purple-500/20 to-violet-600/10" },
-  { id: "health",     emoji: "❤️", gradient: "from-rose-500/20 to-red-600/10" },
-  { id: "finance",    emoji: "💰", gradient: "from-amber-500/20 to-yellow-600/10" },
-  { id: "education",  emoji: "🎓", gradient: "from-indigo-500/20 to-blue-600/10" },
-] as const;
-
-const NEWS_STALE_MS = 15 * 60_000;
-
-const DIAGNOSTIC_ACTION_LABELS: Record<NonNullable<NewsFeedResponse["diagnostics"]>["refreshAction"], string> = {
-  wait_for_next_refresh: "Aggiornamento automatico in arrivo",
-  wait_for_startup_pipeline: "Pipeline in avvio",
-  check_provider_keys: "Controlla chiavi e limiti provider",
-  configure_sources: "Configura le fonti news",
-  retry_later: "Riprova tra poco",
-};
-
-const DIAGNOSTIC_STATUS_LABELS: Record<NonNullable<NewsFeedResponse["diagnostics"]>["providerStatus"], string> = {
-  ready: "Fonti operative",
-  degraded: "Fonti degradate",
-  never_run: "Mai eseguito",
-  stale: "Feed fermo",
-  not_configured: "Fonti da configurare",
-  unavailable: "Stato non disponibile",
-};
-
-function diagnosticTone(status: NonNullable<NewsFeedResponse["diagnostics"]>["providerStatus"]) {
-  if (status === "ready") return "border-success-muted bg-success-surface text-success";
-  if (status === "degraded" || status === "stale") return "border-warning-muted bg-warning-surface text-warning";
-  return "border-destructive/25 bg-destructive/10 text-destructive";
-}
-
-function readDiagnosticsFromError(error: unknown): NewsFeedResponse["diagnostics"] | undefined {
-  if (!error || typeof error !== "object") return undefined;
-  const body = (error as { body?: unknown }).body;
-  if (!body || typeof body !== "object") return undefined;
-  const diagnostics = (body as { diagnostics?: unknown }).diagnostics;
-  if (!diagnostics || typeof diagnostics !== "object") return undefined;
-  if (typeof (diagnostics as { message?: unknown }).message !== "string") return undefined;
-  return diagnostics as NewsFeedResponse["diagnostics"];
-}
-
-function timeAgoLabel(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const h = Math.floor(diff / 3600000);
-  if (h < 1) return t("news.timeAgo.lessThan1h");
-  if (h === 1) return t("news.timeAgo.1h");
-  if (h < 24) return t("news.timeAgo.hours", { h });
-  const d = Math.floor(h / 24);
-  return d === 1 ? t("news.timeAgo.yesterday") : t("news.timeAgo.days", { d });
-}
-
-function CategoryFallbackImage({ category, emoji }: { category: string; emoji: string }) {
-  const config = CATEGORY_CONFIG.find((c) => c.id === category);
-  return (
-    <div className={`aspect-video bg-gradient-to-br ${config?.gradient ?? "from-muted to-muted/50"} flex items-center justify-center`}>
-      <span className="text-4xl opacity-60">{emoji}</span>
-    </div>
-  );
-}
-
-function NewsDiagnosticsPanel({ diagnostics }: { diagnostics: NonNullable<NewsFeedResponse["diagnostics"]> }) {
-  const { t } = useTranslation();
-  const tone = diagnosticTone(diagnostics.providerStatus);
-
-  return (
-    <div className={cn("mx-auto mt-5 max-w-xl rounded-2xl border px-5 py-4 text-left", tone)} role="status">
-      <div className="flex items-start gap-3">
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-background/70 px-2.5 py-1 text-xs font-semibold">
-              {t(`news.diagnostics.status.${diagnostics.providerStatus}`, {
-                defaultValue: DIAGNOSTIC_STATUS_LABELS[diagnostics.providerStatus],
-              })}
-            </span>
-            <span className="rounded-full bg-background/70 px-2.5 py-1 text-xs font-medium">
-              {t(`news.diagnostics.${diagnostics.refreshAction}`, {
-                defaultValue: DIAGNOSTIC_ACTION_LABELS[diagnostics.refreshAction],
-              })}
-            </span>
-          </div>
-          <p className="mt-3 text-sm font-medium text-foreground">
-            {diagnostics.message}
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
-        <div className="rounded-lg bg-background/65 px-3 py-2">
-          <p className="text-muted-foreground">{t("news.diagnostics.enabledSources", { defaultValue: "Fonti attive" })}</p>
-          <p className="font-semibold text-foreground">{diagnostics.enabledSources}</p>
-        </div>
-        <div className="rounded-lg bg-background/65 px-3 py-2">
-          <p className="text-muted-foreground">{t("news.diagnostics.sourcesWithErrors", { defaultValue: "Con errori" })}</p>
-          <p className="font-semibold text-foreground">{diagnostics.sourcesWithErrors}</p>
-        </div>
-        <div className="rounded-lg bg-background/65 px-3 py-2">
-          <p className="text-muted-foreground">{t("news.diagnostics.lastAttempt", { defaultValue: "Ultimo tentativo" })}</p>
-          <p className="font-semibold text-foreground">
-            {diagnostics.lastAttemptAt
-              ? new Date(diagnostics.lastAttemptAt).toLocaleString("it-IT")
-              : t("news.diagnostics.noAttempt", { defaultValue: "Non registrato" })}
-          </p>
-        </div>
-      </div>
-      {diagnostics.lastRefreshError && (
-        <p className="mt-3 break-words rounded-lg bg-background/65 px-3 py-2 text-xs font-medium text-foreground">
-          {t("news.diagnostics.lastRefreshError", { defaultValue: "Ultimo errore refresh" })}: {diagnostics.lastRefreshError}
-        </p>
-      )}
-    </div>
-  );
-}
-
-export function SubscribeToggle({ category, subscribed, onToggle }: { category: string; subscribed: boolean; onToggle: () => void }) {
-  const { t } = useTranslation();
-  const config = CATEGORY_CONFIG.find((c) => c.id === category);
-
-  return (
-    <button
-      onClick={(e) => { e.stopPropagation(); onToggle(); }}
-      className={cn(
-        "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all border whitespace-nowrap",
-        subscribed
-          ? "bg-primary/10 text-primary border-primary/20"
-          : "bg-transparent text-muted-foreground/50 border-border/40 hover:border-primary/30 hover:text-primary"
-      )}
-    >
-      {subscribed ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
-      <span className="hidden sm:inline">{config?.emoji}</span>
-      {subscribed ? t("news.subscribed") : t("news.subscribe")}
-    </button>
-  );
-}
-
-function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boolean }) {
-  const { t } = useTranslation();
-  const [, navigate] = useLocation();
-  const { user } = useAuth();
-  const { isNewsFavorite, getNewsFavoriteId, addFavorite, removeFavorite, isLoading } = useFavorites();
-  const saved = isNewsFavorite(item.url);
-  const favId = getNewsFavoriteId(item.url);
-  const config = CATEGORY_CONFIG.find((c) => c.id === item.category);
-  const detailHref = item.detailUrl ?? `/news/${item.id}`;
-  const preview = item.preview ?? item.description;
-  const sourceHref = item.sourceUrl ?? item.url;
-
-  function toggleSave(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!user) return;
-    if (saved && favId !== undefined) {
-      removeFavorite(favId);
-    } else {
-      addFavorite({
-        type: "news",
-        articleUrl: item.url,
-        articleTitle: item.title,
-        articleDescription: item.description,
-        articleSource: item.source,
-        articleCategory: item.category,
-        ...(item.image ? { articleImage: item.image } : {}),
-      });
-    }
-  }
-
-  const catLabel = t(`news.categories.${item.category}`, { defaultValue: item.category });
-  const tr = (key: string, opts?: Record<string, unknown>) => opts ? t(key, opts) : t(key);
-
-  return (
-    <article
-      role="link"
-      tabIndex={0}
-      onClick={() => navigate(detailHref)}
-      onKeyDown={(e) => {
-        if (e.target !== e.currentTarget) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          navigate(detailHref);
-        }
-      }}
-      className="bg-card border border-border rounded-2xl overflow-hidden hover:border-primary/30 transition-all group flex flex-col cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-    >
-      {item.image ? (
-        <div className="aspect-video overflow-hidden shrink-0">
-          <img
-            src={item.image}
-            alt={item.title}
-            loading="lazy"
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
-        </div>
-      ) : (
-        <CategoryFallbackImage category={item.category} emoji={config?.emoji ?? "📰"} />
-      )}
-      <div className="p-5 flex flex-col flex-1">
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary" className="text-xs font-medium">{catLabel}</Badge>
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {timeAgoLabel(item.publishedAt, tr)}
-            </span>
-          </div>
-          {showSave && user && (
-            <button
-              onClick={toggleSave}
-              disabled={isLoading}
-              title={saved ? t("news.removeFromSaved") : t("news.saveArticle")}
-              className={cn(
-                "shrink-0 min-h-11 min-w-11 inline-flex items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                saved ? "text-primary bg-primary/10" : "text-muted-foreground hover:text-primary hover:bg-primary/5"
-              )}
-            >
-              {saved ? <BookmarkCheck className="h-4 w-4" /> : <Bookmark className="h-4 w-4" />}
-            </button>
-          )}
-        </div>
-        <h3 className="font-semibold text-foreground leading-snug mb-2 line-clamp-3 text-[1.05rem]">
-          {item.title}
-        </h3>
-        <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mb-4 flex-1">
-          {preview}
-        </p>
-        <div className="flex items-center justify-between mt-auto">
-          <span className="text-xs text-muted-foreground font-medium">{item.source}</span>
-          <a
-            href={sourceHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md px-2"
-          >
-            Fonte <ExternalLink className="h-3 w-3" />
-          </a>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-function UpgradeCTA() {
-  const { t } = useTranslation();
-  return (
-    <div className="bg-gradient-to-r from-primary/5 via-background to-primary/5 border border-primary/15 rounded-2xl p-8 text-center">
-      <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-2xl mb-4">
-        <Sparkles className="h-5 w-5 text-primary" />
-      </div>
-      <h3 className="font-serif font-bold text-xl text-foreground mb-2">{t("news.upgrade.title")}</h3>
-      <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto leading-relaxed">
-        {t("news.upgrade.desc")}
-      </p>
-      <div className="flex flex-col sm:flex-row gap-3 justify-center">
-        <Button asChild className="rounded-full font-medium">
-          <Link href="/premium"><Sparkles className="h-4 w-4 mr-1.5" />{t("news.upgrade.discoverPremium")}</Link>
-        </Button>
-        <Button asChild variant="outline" className="rounded-full font-medium">
-          <Link href="/test">{t("news.upgrade.takeTest")}</Link>
-        </Button>
-      </div>
-    </div>
-  );
-}
-
 export default function News() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const newsLocale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
 
   usePageMeta({
     title: t("seo.news.title"),
@@ -404,75 +107,79 @@ export default function News() {
   }
 
   // ── Prefetch ──────────────────────────────────────────────────
-  useEffect(() => {
-    CATEGORY_CONFIG.forEach(({ id }) => {
-      queryClient.prefetchQuery({
-        queryKey: ["news", id],
-        queryFn: () => getJson<NewsFeedResponse>(`${BASE}api/news?category=${id}&limit=12`),
-        staleTime: NEWS_STALE_MS,
-      });
-    });
-  }, []);
+  const feedMode = activeTab === "__sector__" ? "sector" : "category";
+  const feedSubject = feedMode === "sector" ? confirmedSector?.name ?? "" : activeTab;
+  const feedEnabled = feedMode === "category" || !!confirmedSector;
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
-  useEffect(() => {
-    if (!confirmedSector) return;
-    queryClient.prefetchQuery({
-      queryKey: ["news", "sector", confirmedSector.name],
-      queryFn: () => getJson<NewsFeedResponse>(
-        `${BASE}api/news/sector/${encodeURIComponent(confirmedSector.name)}?limit=12`,
-      ),
-      staleTime: NEWS_STALE_MS,
-    });
-  }, [confirmedSector?.name, queryClient]);
+  const feedQuery = useInfiniteQuery({
+    queryKey: ["news", "feed", feedMode, feedSubject, newsLocale],
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      const cursor = typeof pageParam === "string" ? pageParam : null;
+      const localeParam = `&locale=${encodeURIComponent(newsLocale)}`;
+      const cursorParam = cursor ? `&cursor=${encodeURIComponent(cursor)}` : "";
+      const endpoint = feedMode === "sector"
+        ? `${BASE}api/news/sector/${encodeURIComponent(confirmedSector!.name)}?limit=12${localeParam}${cursorParam}`
+        : `${BASE}api/news?category=${encodeURIComponent(activeTab)}&limit=12${localeParam}${cursorParam}`;
+      const response = await getJson<NewsFeedResponse>(endpoint);
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["news", activeTab],
-    queryFn: async () => {
-      const response = await getJson<NewsFeedResponse>(`${BASE}api/news?category=${activeTab}&limit=12`);
       if (response.status === "error" || response.source === "error") {
-        throw new Error(response.error ?? "news_unavailable");
+        throw Object.assign(new Error(response.error ?? "news_unavailable"), { body: response });
       }
+
       return response;
     },
-    enabled: activeTab !== "__sector__",
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    enabled: feedEnabled,
     staleTime: NEWS_STALE_MS,
-    placeholderData: keepPreviousData,
   });
 
-  const {
-    data: sectorNewsData,
-    isLoading: sectorLoading,
-    isError: sectorIsError,
-    error: sectorError,
-    refetch: refetchSectorNews,
-  } = useQuery({
-    queryKey: ["news", "sector", confirmedSector?.name],
-    queryFn: async () => {
-      const response = await getJson<NewsFeedResponse>(
-        `${BASE}api/news/sector/${encodeURIComponent(confirmedSector!.name)}?limit=12`,
-      );
-      if (response.status === "error" || response.source === "error") {
-        throw new Error(response.error ?? "news_unavailable");
-      }
-      return response;
-    },
-    enabled: !!confirmedSector,
-    staleTime: NEWS_STALE_MS,
-    placeholderData: keepPreviousData,
-  });
+  const displayNews = useMemo(() => {
+    const seen = new Set<string>();
+    return (feedQuery.data?.pages ?? []).flatMap((page) => page.news).filter((item) => {
+      if (seen.has(item.id)) return false;
+      seen.add(item.id);
+      return true;
+    });
+  }, [feedQuery.data?.pages]);
 
-  const displayNews = activeTab === "__sector__" ? (sectorNewsData?.news ?? []) : (data?.news ?? []);
-  const displaySource = activeTab === "__sector__" ? sectorNewsData?.source : data?.source;
-  const displayDiagnostics = activeTab === "__sector__" ? sectorNewsData?.diagnostics : data?.diagnostics;
-  const displayLoading = activeTab === "__sector__" ? (sectorLoading && !!confirmedSector) : isLoading;
-  const displayError = activeTab === "__sector__" ? sectorIsError : isError;
-  const displayErrorDiagnostics = activeTab === "__sector__"
-    ? readDiagnosticsFromError(sectorError)
-    : readDiagnosticsFromError(error);
-  const effectiveDiagnostics = displayDiagnostics ?? displayErrorDiagnostics;
-  const retryDisplayNews = activeTab === "__sector__" ? refetchSectorNews : refetch;
+  const feedPages = feedQuery.data?.pages ?? [];
+  const firstFeedPage = feedPages[0];
+  const latestFeedPage = feedPages[feedPages.length - 1];
+  const displaySource = latestFeedPage?.source ?? firstFeedPage?.source;
+  const displayDiagnostics = latestFeedPage?.diagnostics ?? firstFeedPage?.diagnostics;
+  const displayLoading = feedQuery.isLoading;
+  const displayError = feedQuery.isError && displayNews.length === 0;
+  const loadMoreError = feedQuery.isError && displayNews.length > 0 ? feedQuery.error : null;
+  const effectiveDiagnostics = displayDiagnostics ?? readDiagnosticsFromError(feedQuery.error);
+  const retryDisplayNews = feedQuery.refetch;
 
   const subscribedCategories = CATEGORY_CONFIG.filter((c) => subscriptions.includes(c.id));
+
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const node = loadMoreRef.current;
+    if (!node || !feedQuery.hasNextPage || feedQuery.isFetchingNextPage || displayLoading || displayError || loadMoreError) {
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        void feedQuery.fetchNextPage();
+      }
+    }, { rootMargin: "600px 0px" });
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [
+    displayError,
+    displayLoading,
+    feedQuery.fetchNextPage,
+    feedQuery.hasNextPage,
+    feedQuery.isFetchingNextPage,
+    loadMoreError,
+  ]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -512,7 +219,7 @@ export default function News() {
                     onClick={() => toggleSubscription(cat.id)}
                     disabled={subMutation.isPending}
                     className={cn(
-                      "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border",
+                      "flex min-h-11 items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold transition-all border",
                       isSubscribed
                         ? "bg-primary/10 text-primary border-primary/20"
                         : "bg-transparent text-muted-foreground border-border/40 hover:border-primary/30 hover:text-primary"
@@ -536,7 +243,7 @@ export default function News() {
           {confirmedSector && (
             <button
               onClick={() => setActiveTab("__sector__")}
-              className={`flex-none flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap border ${
+              className={`flex-none flex min-h-11 items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap border ${
                 activeTab === "__sector__"
                   ? "bg-primary text-white shadow-sm border-primary"
                   : "bg-primary/8 border-primary/20 text-primary hover:bg-primary/15"
@@ -551,7 +258,7 @@ export default function News() {
             <button
               key={cat.id}
               onClick={() => setActiveTab(cat.id)}
-              className={`flex-none flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
+              className={`flex-none flex min-h-11 items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap ${
                 activeTab === cat.id
                   ? "bg-primary text-white shadow-sm"
                   : "bg-card border border-border text-muted-foreground hover:border-primary/40 hover:text-primary"
@@ -594,11 +301,37 @@ export default function News() {
               </div>
             )
             : displayNews.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {displayNews.map((item) => (
-                  <NewsCard key={item.id} item={item} showSave={!!user} />
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {displayNews.map((item) => (
+                    <NewsCard key={item.id} item={item} showSave={!!user} />
+                  ))}
+                </div>
+                <div ref={loadMoreRef} className="mt-8 flex min-h-16 flex-col items-center justify-center gap-3">
+                  {loadMoreError && (
+                    <p className="text-sm font-medium text-destructive" role="alert">
+                      {t("news.loadMoreError")}
+                    </p>
+                  )}
+                  {feedQuery.hasNextPage ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => feedQuery.fetchNextPage()}
+                      disabled={feedQuery.isFetchingNextPage}
+                      className="min-h-11 rounded-full px-5"
+                    >
+                      {feedQuery.isFetchingNextPage
+                        ? t("news.loadingMore", { defaultValue: "Caricamento..." })
+                        : t("news.loadMore", { defaultValue: "Carica altre notizie" })}
+                    </Button>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      {t("news.feedComplete", { defaultValue: "Hai letto tutte le notizie disponibili." })}
+                    </p>
+                  )}
+                </div>
+              </>
             ) : (
               <div className="text-center py-12">
                 <Newspaper className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
@@ -616,7 +349,9 @@ export default function News() {
               ? t("news.sourceLabel.live")
               : displaySource === "partial"
                 ? t("news.sourceLabel.partial", { defaultValue: "Alcune fonti non sono disponibili: mostriamo le notizie caricate." })
-                : t("news.sourceLabel.static")}
+                : displaySource === "auto_refresh"
+                  ? t("news.sourceLabel.live")
+                  : t("news.sourceLabel.static")}
             {user && <span className="ml-2">· {t("news.bookmarkHint")}</span>}
           </p>
         )}

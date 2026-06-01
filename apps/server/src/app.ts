@@ -1,5 +1,10 @@
 import dotenv from "dotenv";
-dotenv.config();
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const appEnvDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+dotenv.config({ path: path.join(appEnvDir, ".env") });
+dotenv.config({ path: path.join(appEnvDir, ".env.local"), override: true });
 
 import "express-async-errors";
 process.on("unhandledRejection", (reason) => {

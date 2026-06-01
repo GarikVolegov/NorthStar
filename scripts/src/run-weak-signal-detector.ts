@@ -7,7 +7,7 @@
  * Eseguire con:
  *   pnpm --filter @workspace/scripts run rag:weak-signals
  */
-import "dotenv/config";
+import "./load-env";
 import { eq, desc } from "drizzle-orm";
 import { db, weakSignalsTable, jobPostingSnapshotsTable } from "@workspace/db";
 import { sql, and } from "drizzle-orm";

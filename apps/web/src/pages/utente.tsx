@@ -84,8 +84,7 @@ export default function Utente() {
   const { data: profile, isLoading } = useQuery<PublicProfile>({
     queryKey: ["public-profile", targetId, user?.id],
     queryFn: async () => {
-      const viewerParam = user?.id ? `?viewerId=${user.id}` : "";
-      return getJson<PublicProfile>(`${BASE}api/users/${targetId}/public${viewerParam}`);
+      return getJson<PublicProfile>(`${BASE}api/users/${targetId}/public`);
     },
     enabled: !isNaN(targetId),
   });

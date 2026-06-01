@@ -19,7 +19,6 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ApiClientError } from "@/lib/apiClient";
-import { cn } from "@/lib/utils";
 import type {
   CalendarEvent,
   EventCategory,
@@ -29,19 +28,13 @@ import type {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import {
-  BookOpen,
-  Crown,
-  ExternalLink,
-  Loader2,
-  Map,
-  Trash2,
-} from "lucide-react";
+import { Loader2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useTranslation } from "react-i18next";
 import { CalendarReminderFields, FREE_REMINDER_MINUTES, PREMIUM_REMINDER_MINUTES } from "./CalendarioEventoModal.reminders";
 import { buildCalendarEventPayload, eventFormSchema, type EventFormValues } from "./CalendarioEventoModal.schema";
+import { CalendarioSectorSuggestion } from "./CalendarioSectorSuggestion";
 import {
   fetchCalendarQuota,
   fetchObjectives,
@@ -483,76 +476,11 @@ export function CalendarioEventoModal({
 
           {/* Premium content suggestion when sector is selected */}
           {selectedSector && (
-            <div
-              className={cn(
-                "rounded-xl border p-3 space-y-2",
-                isPremium
-                  ? "bg-primary/5 border-primary/20"
-                  : "bg-muted/40 border-muted",
-              )}
-            >
-              {isPremium ? (
-                <>
-                  <p className="text-xs font-semibold text-primary flex items-center gap-1">
-                    <Crown className="h-3 w-3" />{" "}
-                    {t("calendar.suggestedContent", {
-                      name: selectedSector.name,
-                    })}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    <a
-                      href={`${BASE}wiki`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                      <BookOpen className="h-3 w-3" /> {t("calendar.wikiLabel")}
-                      <ExternalLink className="h-2.5 w-2.5" />
-                    </a>
-                    <a
-                      href={`${BASE}roadmap`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                      <Map className="h-3 w-3" /> {t("calendar.roadmapLabel")}
-                      <ExternalLink className="h-2.5 w-2.5" />
-                    </a>
-                    <a
-                      href={`${BASE}crescita`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    >
-                      <ExternalLink className="h-3 w-3" />{" "}
-                      {t("calendar.growthLabel")}
-                    </a>
-                  </div>
-                </>
-              ) : (
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Crown className="h-3 w-3 text-amber-500" />
-                  <span>
-                    {
-                      t("calendar.premiumNote", {
-                        name: selectedSector.name,
-                      }).split(selectedSector.name)[0]
-                    }
-                    <a
-                      href={`${BASE}premium`}
-                      className="font-semibold text-amber-600 hover:underline"
-                    >
-                      Premium
-                    </a>
-                    {
-                      t("calendar.premiumNote", {
-                        name: selectedSector.name,
-                      }).split("Premium")[1]
-                    }
-                  </span>
-                </p>
-              )}
-            </div>
+            <CalendarioSectorSuggestion
+              baseUrl={BASE}
+              isPremium={isPremium}
+              selectedSector={selectedSector}
+            />
           )}
 
           {/* Linked goal */}

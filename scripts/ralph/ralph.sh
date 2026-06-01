@@ -38,6 +38,10 @@ PRD_FILE="$SCRIPT_DIR/prd.json"
 PROGRESS_FILE="$SCRIPT_DIR/progress.txt"
 ARCHIVE_DIR="$SCRIPT_DIR/archive"
 LAST_BRANCH_FILE="$SCRIPT_DIR/.last-branch"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+AGENT_CONTEXT_FILE="$REPO_ROOT/AGENTS.md"
+RALPH_INSTRUCTIONS_FILE="$REPO_ROOT/.brain/40_Agent_Context/ralph/RALPH_INSTRUCTIONS.md"
+RALPH_PROMPT_FILE="$SCRIPT_DIR/.ralph-prompt.tmp"
 
 # Archive previous run if branch changed
 if [ -f "$PRD_FILE" ] && [ -f "$LAST_BRANCH_FILE" ]; then
@@ -88,12 +92,14 @@ for i in $(seq 1 $MAX_ITERATIONS); do
   echo "==============================================================="
 
   # Run the selected tool with the ralph prompt
+  cat "$AGENT_CONTEXT_FILE" "$RALPH_INSTRUCTIONS_FILE" > "$RALPH_PROMPT_FILE"
   if [[ "$TOOL" == "amp" ]]; then
-    OUTPUT=$(cat "$SCRIPT_DIR/prompt.md" | amp --dangerously-allow-all 2>&1 | tee /dev/stderr) || true
+    OUTPUT=$(amp --dangerously-allow-all < "$RALPH_PROMPT_FILE" 2>&1 | tee /dev/stderr) || true
   else
     # Claude Code: use --dangerously-skip-permissions for autonomous operation, --print for output
-    OUTPUT=$(claude --dangerously-skip-permissions --print < "$SCRIPT_DIR/CLAUDE.md" 2>&1 | tee /dev/stderr) || true
+    OUTPUT=$(claude --dangerously-skip-permissions --print < "$RALPH_PROMPT_FILE" 2>&1 | tee /dev/stderr) || true
   fi
+  rm -f "$RALPH_PROMPT_FILE"
   
   # Check for completion signal
   if echo "$OUTPUT" | grep -q "<promise>COMPLETE</promise>"; then

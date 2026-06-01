@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "../..");
 
-function loadEnvFile(filePath: string) {
+function loadEnvFile(filePath: string, override = false) {
   if (!fs.existsSync(filePath)) return;
 
   const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
@@ -20,12 +20,12 @@ function loadEnvFile(filePath: string) {
 
     const key = trimmed.slice(0, eqIndex).trim();
     const value = trimmed.slice(eqIndex + 1).trim().replace(/^['"]|['"]$/g, "");
-    if (!(key in process.env)) process.env[key] = value;
+    if (override || !(key in process.env)) process.env[key] = value;
   }
 }
 
 loadEnvFile(path.join(rootDir, ".env"));
-loadEnvFile(path.join(rootDir, "apps/server/.env"));
+loadEnvFile(path.join(rootDir, ".env.local"), true);
 
 const apply = process.argv.includes("--apply");
 const { db, newsArticlesTable } = await import("@workspace/db");

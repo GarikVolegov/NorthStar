@@ -11,6 +11,13 @@ import { COLUMNS, STATUS_META, type Application, type AppStatus, type NoteEntry 
 
 const BASE = import.meta.env.BASE_URL || "/";
 
+function getNoteErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Impossibile aggiornare il diario note. Riprova.";
+}
+
 export function AppCard({
   app, userId, onEdit, onDelete, onStatusChange, deleting,
   isDragging, onDragStart, onDragEnd, onCoverLetter,
@@ -36,6 +43,7 @@ export function AppCard({
 
   const [notesOpen, setNotesOpen] = useState(false);
   const [noteInput, setNoteInput] = useState("");
+  const [noteError, setNoteError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -48,9 +56,16 @@ export function AppCard({
         text,
       });
     },
+    onMutate: () => {
+      setNoteError(null);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["applications", userId] });
+      setNoteError(null);
       setNoteInput("");
+    },
+    onError: (error) => {
+      setNoteError(getNoteErrorMessage(error));
     },
   });
 
@@ -58,7 +73,16 @@ export function AppCard({
     mutationFn: async (index: number) => {
       await deleteJson(`${BASE}api/applications/${app.id}/notes/${index}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["applications", userId] }),
+    onMutate: () => {
+      setNoteError(null);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["applications", userId] });
+      setNoteError(null);
+    },
+    onError: (error) => {
+      setNoteError(getNoteErrorMessage(error));
+    },
   });
 
   function submitNote() {
@@ -224,6 +248,15 @@ export function AppCard({
           {notesLog.length === 0 && (
             <p className="text-[11px] text-muted-foreground italic mb-2.5">
               {t("candidature.noNotesYet")}
+            </p>
+          )}
+
+          {noteError && (
+            <p
+              role="alert"
+              className="mb-2 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-1.5 text-[11px] leading-snug text-destructive"
+            >
+              {noteError}
             </p>
           )}
 

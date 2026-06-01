@@ -200,7 +200,7 @@ La velocità di caricamento è un fattore SEO. Il progetto implementa:
 - **Manifest:** name, description, theme_color, display standalone, icon SVG maskable
 - **Include assets:** favicon.svg, hero.png, robots.txt
 
-#### Lighthouse CI (`lighthouserc.json`):
+#### Lighthouse CI (`config/lighthouse/lighthouserc.json`):
 - Threshold: Performance 0.70, Accessibility 0.85, Best Practices 0.85, PWA 0.70
 - Mobile emulation (Moto G Power)
 - Web Vitals targets: FCP < 3s, LCP < 4s, TBT < 600ms, CLS < 0.1
@@ -339,7 +339,7 @@ useEffect(() => {
 
 ## 4. Lighthouse CI
 
-**File:** `lighthouserc.json`
+**File:** `config/lighthouse/lighthouserc.json`
 
 | Categoria | Threshold | Tipo |
 |---|---|---|
@@ -421,7 +421,7 @@ Eseguito automaticamente nel workflow `mobile-qa.yml` (GitHub Actions).
 | `apps/web/public/robots.txt` | Robots.txt |
 | `apps/web/vite.config.ts` | PWA, chunk splitting, build optimization |
 | `apps/web/src/locales/*/translation.json` | Traduzioni SEO (seo.* keys) |
-| `lighthouserc.json` | Lighthouse CI thresholds |
+| `config/lighthouse/lighthouserc.json` | Lighthouse CI thresholds |
 | `.github/workflows/mobile-qa.yml` | Workflow Lighthouse CI |
 | `docs/PHASE2_PERFORMANCE_PWA.md` | Documentazione PWA |
 | `docs/LIGHTHOUSE_AUDIT_CHECKLIST.md` | Checklist audit Lighthouse |

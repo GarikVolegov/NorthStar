@@ -16,7 +16,7 @@ Founder e operator unico di [[Vision-NorthStar|NorthStar]].
 Solo-founder full-stack che costruisce con AI agents (Claude Code + GSD + BMAD + Ralph). Pensa il prodotto, scrive il codice, decide la roadmap.
 
 ## Modello di lavoro
-- **GSD-first**: ogni feature passa da `discuss → plan → execute → verify` (vedi `.claude/skills/gsd:*`)
+- **GSD-first**: ogni feature passa da `discuss → plan → execute → verify` (vedi `.brain/30_Process/`)
 - **AaaS mindset**: il prodotto non risponde solo, agisce in autonomia per l'utente
 - **Atomic commits**: un commit = un cambiamento verificabile, mai bypass dei hook
 

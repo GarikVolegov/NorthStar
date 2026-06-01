@@ -252,11 +252,11 @@ function ArticleCard({
               <p className="text-xs text-muted-foreground mt-0.5">
                 {article.category}
                 {article.subcategory ? ` / ${article.subcategory}` : ""}
-                {" Â· "}
+                {" - "}
                 <span className="flex items-center gap-0.5 inline-flex">
                   <Clock size={10} /> {article.readTimeMinutes} min
                 </span>
-                {" Â· "}
+                {" - "}
                 {new Date(article.createdAt).toLocaleDateString("it-IT")}
               </p>
             </div>
@@ -447,13 +447,13 @@ export default function AdminCrescita() {
 
           <div className="flex gap-2 text-xs text-muted-foreground pt-2">
             <a href="/admin" className="hover:underline">
-              â† Admin Home
+              Torna ad Admin Home
             </a>
-            <span>Â·</span>
+            <span>-</span>
             <a href="/admin/cataloghi" className="hover:underline">
               Cataloghi
             </a>
-            <span>Â·</span>
+            <span>-</span>
             <a href="/admin/agenti" className="hover:underline">
               Agent Health
             </a>

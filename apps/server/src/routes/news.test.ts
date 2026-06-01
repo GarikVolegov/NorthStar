@@ -132,6 +132,13 @@ describe("news routes", () => {
         id: "10",
         source: "GNews: La Stampa",
         preview: expect.stringContaining("competenze digitali"),
+        image: expect.stringContaining("/api/news/fallback-image/technology.svg"),
+        language: "it",
+        meaning: expect.objectContaining({
+          label: "Per chi è",
+          audience: expect.stringContaining("Tecnologia & Software"),
+          whyItMatters: expect.stringContaining("Questa notizia ti aiuta"),
+        }),
         category: "technology",
         sector: "Tecnologia & Software",
         tags: ["Tecnologia & Software"],
@@ -145,6 +152,56 @@ describe("news routes", () => {
         tags: ["Sanita & Life Sciences"],
       }),
     ]);
+  });
+
+  it("localizes the user-facing meaning contract to the requested news locale", async () => {
+    mockSelectRows([publishedRows[0]]);
+
+    const response = await request(app())
+      .get("/api/news?locale=en")
+      .expect(200);
+
+    expect(response.body.news[0]).toMatchObject({
+      language: "en",
+      image: expect.stringContaining("/api/news/fallback-image/technology.svg"),
+      meaning: expect.objectContaining({
+        label: "Who it's for",
+        audience: expect.stringContaining("people tracking Tecnologia & Software"),
+        whyItMatters: expect.stringContaining("This story helps you"),
+        practicalNextStep: expect.stringContaining("Compare"),
+      }),
+    });
+    expect(response.body.news[0].meaning.whyItMatters).not.toMatch(/NorthStar/i);
+  });
+
+  it("structures news detail around the user and concrete next steps", async () => {
+    mockSelectRows([{ ...publishedRows[0], content: null }]);
+
+    const response = await request(app())
+      .get("/api/news/article/10")
+      .expect(200);
+
+    expect(response.body.article.content).toContain("### Per chi è");
+    expect(response.body.article.content).toContain("### Cosa è successo");
+    expect(response.body.article.content).toContain("### Perché conta per te");
+    expect(response.body.article.content).toContain("### Cosa fare adesso");
+    expect(response.body.article.content).not.toContain("### Impatto pratico");
+    expect(response.body.article.content).not.toContain("### Cosa osservare");
+    expect(response.body.article.content).not.toMatch(/NorthStar/i);
+  });
+
+  it("localizes the detailed news structure for supported locales", async () => {
+    mockSelectRows([{ ...publishedRows[0], content: null }]);
+
+    const response = await request(app())
+      .get("/api/news/article/10?locale=es")
+      .expect(200);
+
+    expect(response.body.article.content).toContain("### Para quién es");
+    expect(response.body.article.content).toContain("### Qué pasó");
+    expect(response.body.article.content).toContain("### Por qué te importa");
+    expect(response.body.article.content).toContain("### Qué hacer ahora");
+    expect(response.body.article.content).not.toMatch(/NorthStar/i);
   });
 
   it("adds provider diagnostics when the feed is empty", async () => {

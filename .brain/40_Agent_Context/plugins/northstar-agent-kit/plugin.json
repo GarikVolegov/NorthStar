@@ -1,0 +1,23 @@
+{
+  "name": "northstar-agent-kit",
+  "version": "0.1.0",
+  "description": "Project-local Claude Code agent kit for NorthStar memory, skills, hooks, subagents, and future distribution.",
+  "private": true,
+  "layers": {
+    "memory": ".brain/40_Agent_Context/AGENT_CONTEXT.md",
+    "claudeMemory": ".brain/40_Agent_Context/claude/CLAUDE.md",
+    "skills": ".brain/40_Agent_Context/claude/skills",
+    "hooks": ".brain/40_Agent_Context/claude/hooks",
+    "subagents": ".brain/40_Agent_Context/claude/agents",
+    "brain": ".brain/30_Process/Agent-Development-Kit.md",
+    "rules": ".brain/40_Agent_Context/rules"
+  },
+  "includedSkills": [
+    "agent-browser",
+    "brain-runtime",
+    "cartographer",
+    "db-safety",
+    "ui-quality",
+    "wendy-rag"
+  ]
+}

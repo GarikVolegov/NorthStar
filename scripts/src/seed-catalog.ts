@@ -10,7 +10,7 @@
  *   POST /api/admin/agents/backfill  (richiede Bearer token admin)
  */
 
-import "dotenv/config";
+import "./load-env";
 import { eq, and } from "drizzle-orm";
 import { db, sectorsTable, professionsTable, educationPathsTable, professionEducationPathsTable } from "@workspace/db";
 

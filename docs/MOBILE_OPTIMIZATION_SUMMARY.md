@@ -105,7 +105,7 @@ pnpm --filter @northstar/web analyze
 
 ### File aggiunti
 - `.github/workflows/mobile-qa.yml`
-- `lighthouserc.json`
+- `config/lighthouse/lighthouserc.json`
 - `e2e/mobile/onboarding.mobile.spec.ts`
 - `e2e/mobile/mobile-nav.mobile.spec.ts`
 - `e2e/mobile/pwa-offline.mobile.spec.ts`

@@ -1,78 +1,42 @@
-import { getLLMForRoute, type LLMMessage, type ToolDefinitionOpenAI } from "../llm/client";
+import { getLLMForRoute, type LLMMessage } from "../llm/client";
 import { buildSystemPrompt, type UserContext } from "./prompt-builder";
-import { evaluateSelf, buildClarification, type EvalResult } from "./self-evaluator";
+import { evaluateSelf, buildClarification } from "./self-evaluator";
 import { routerAgent } from "./router-agent";
 import { buildRoutingHistorySummary } from "./router-memory";
 import { getSpecialist } from "./specialist-agent";
 import { supervisorAgent } from "./supervisor-agent";
 import { loadMemory, buildMemorySection, type UserMemory } from "./memory-manager";
-import { buildContextualMemorySection, searchMemory } from "./memory-search";
-import { buildWendyBrainContextSection, searchWendyBrain } from "../wendy-brain";
-import { buildWendyActivationContext, type WendyActivationContext } from "../wendy-neural";
+import { buildWendyActivationContext } from "../wendy-neural";
 import { runParallelHandoff } from "./parallel-handoff";
-import { UI_TOOLS, type UiToolName, type UiToolArgs } from "./ui-tools";
-import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
-import { executeToolCall, type ToolResult } from "../wendy-router/tool-handlers";
+import type { UiToolArgs, UiToolName } from "./ui-tools";
+import { executeToolCall } from "../wendy-router/tool-handlers";
 import { isClientSideToolData } from "./tool-args";
 import { toolRegistry } from "../tools/registry";
 import { scheduleMemorySave } from "./memory-save";
-import { buildUiDirectives, type UiDirectives } from "./ui-directives";
+import { buildUiDirectives } from "./ui-directives";
 import { loadResponseContext } from "./response-context";
 import { runVoiceFastPath } from "./voice-runner";
 import { normalizeInput } from "./input-normalizer";
-import type { WendyIntent } from "../wendy-router/types";
-import type { RetrievedChunk } from "./retriever";
-import type { CoTResult } from "./chain-of-thought";
-import type { RouteDecision } from "./router-agent";
-import type { SupervisorResult } from "./supervisor-agent";
 import { logger, type LoggerFields } from "../logger";
 import { recordRequest, recordError, recordLlmTokens } from "../metrics";
 import { wendyLatencySeconds } from "../metrics";
 import { startSpan } from "../tracing";
 import { FF } from "../feature-flags";
-import { selectModelFor, modelFor } from "../model-router";
+import { selectModelFor } from "../model-router";
 import { wendyConfig } from "../config/wendy";
 import { getWendyRecoveryFallbackReply } from "../wendy-router/fast-path-fallback";
+import { resolveGrowthContextSections } from "./context-sections";
+import { buildGrowthLlmMessages } from "./llm-message-builder";
+import { buildGrowthAgentTools } from "./tool-selection";
+import type { GrowthAgentEvent, GrowthAgentOptions } from "./agent-types";
+export { GROWTH_AGENT_MODEL, GROWTH_AGENT_VOICE_MODEL } from "./agent-models";
+export type { ChatMessage, GrowthAgentEvent, GrowthAgentOptions, GrowthAgentToolExecutor } from "./agent-types";
 import "./specialists/career-agent";
 import "./specialists/mindset-agent";
 import "./specialists/habits-agent";
 import "./specialists/trading-agent";
 import "./specialists/health-agent";
 
-export const GROWTH_AGENT_MODEL       = modelFor("growth-agent-chat");
-export const GROWTH_AGENT_VOICE_MODEL = modelFor("growth-agent-voice");
-export interface ChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
-  domain?: RouteDecision["domain"] | undefined;
-}
-export interface GrowthAgentOptions {
-  userId:           number;
-  sessionId?:       number | undefined;
-  userContext:      UserContext & { memorySection?: string | undefined };
-  history:          ChatMessage[];
-  userMessage:      string;
-  maxHistory?:      number | undefined;
-  memoryFactCount?: number | undefined;
-  voiceMode?:       boolean | undefined;
-  requestId?:       string | undefined;
-  wendyIntent?:     WendyIntent | undefined;   // passato da ai-wendy.ts per scegliere i tool di dominio
-  isPredefined?:    boolean | undefined;
-  neuralContext?:   WendyActivationContext | undefined;
-  executeExternalTool?: GrowthAgentToolExecutor | undefined;
-}
-export type GrowthAgentToolExecutor = (
-  name: string,
-  args: Record<string, unknown>,
-  userId: number,
-) => Promise<ToolResult>;
-export type GrowthAgentEvent =
-  | { type: "token"; value: string }
-  | { type: "status"; value: string; domain?: RouteDecision["domain"] | undefined }
-  | { type: "ui_tool"; name: UiToolName; args: UiToolArgs }
-  | { type: "tool_call"; name: string; result: unknown }
-  | { type: "done"; sources: RetrievedChunk[]; cot?: CoTResult | null | undefined; evalResult?: EvalResult | undefined; routeDecision?: RouteDecision | undefined; supervisorResult?: SupervisorResult | undefined; uiDirectives?: UiDirectives | undefined }
-  | { type: "error"; message: string };
 export async function* runGrowthAgent(
   opts: GrowthAgentOptions,
 ): AsyncGenerator<GrowthAgentEvent> {
@@ -141,23 +105,12 @@ export async function* runGrowthAgent(
     return null;
   });
 
-  const [contextualMemorySection, wendyBrainSection] = neuralContext
-    ? [neuralContext.memorySection ?? "", neuralContext.wendyBrainSection ?? ""]
-    : await Promise.all([
-        userId > 0
-          ? searchMemory(userId, normalizedMessage, 5).then(buildContextualMemorySection).catch((err) => {
-              logger.warn({ err, ...logFields }, "contextual memory search failed");
-              return "";
-            })
-          : Promise.resolve(""),
-        searchWendyBrain(normalizedMessage, {
-          limit: wendyConfig.brain.maxContextNodes,
-          includeCandidates: false,
-        }).then(buildWendyBrainContextSection).catch((err) => {
-          logger.warn({ err, ...logFields }, "wendy brain search failed");
-          return "";
-        }),
-      ]);
+  const [contextualMemorySection, wendyBrainSection] = await resolveGrowthContextSections({
+    neuralContext,
+    userId,
+    normalizedMessage,
+    logFields,
+  });
   const memorySection = contextualMemorySection || buildMemorySection({
     facts: userMemory.facts.filter((f) => f.key === "goal_main" || f.key === "pending_follow_up"),
     patterns: [],
@@ -182,9 +135,6 @@ export async function* runGrowthAgent(
     ? "Non hai abbastanza informazioni per classificare la richiesta dell'utente. Invece di rispondere direttamente, fai 1 domanda di chiarimento specifica per capire meglio di cosa ha bisogno. Non inventare risposte generiche."
     : undefined;
   let lastSupervisorScore: number | undefined;
-  // Skip persistence when there is no real session id — inventing Date.now()
-  // wrote memory rows under a bogus session that never coalesces on later turns,
-  // polluting coachMemoryFacts.sourceSessionId / coachMemoryPatterns.sessionIds.
   const saveAssistantMemory = (assistantResponse: string): void => {
     if (sessionId == null) return;
     scheduleMemorySave({ userId, sessionId, history, userMessage, assistantResponse, routeDecision, logFields, supervisorScore: lastSupervisorScore });
@@ -213,8 +163,6 @@ export async function* runGrowthAgent(
         endRagTimer();
         return;
       } catch (err) {
-        // Mirror the single-specialist path: a thrown specialist must not kill
-        // the turn — fall through to the generic growth agent instead.
         logger.warn({ err, ...logFields }, "parallel handoff failed, falling back to generic growth agent");
         yield { type: "status", value: "Cambio approccio..." };
       }
@@ -281,12 +229,7 @@ export async function* runGrowthAgent(
     pendingFollowUp,
   });
 
-  const recentHistory = history.slice(-maxHistory);
-  const messages: LLMMessage[] = [
-    { role: "system", content: systemPrompt },
-    ...recentHistory.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
-    { role: "user", content: userMessage },
-  ];
+  const messages = buildGrowthLlmMessages({ systemPrompt, history, maxHistory, userMessage });
 
   const temperature = evalResult.level === "low" ? wendyConfig.specialist.temperatureLow : wendyConfig.specialist.temperatureHigh;
 
@@ -302,13 +245,7 @@ export async function* runGrowthAgent(
     });
 
     const llm = getLLMForRoute({ provider: route.provider });
-    const wendyDomainTools = wendyIntent
-      ? toolsToOpenAIFormat(getToolsForIntent(wendyIntent))
-      : [];
-    const allTools: ToolDefinitionOpenAI[] = [
-      ...(FF.generativeUI ? (UI_TOOLS as unknown as ToolDefinitionOpenAI[]) : []),
-      ...(wendyDomainTools as ToolDefinitionOpenAI[]),
-    ];
+    const allTools = buildGrowthAgentTools(wendyIntent);
     const hasTools = allTools.length > 0;
 
     const result = await llm.chatWithTools(messages, hasTools ? allTools : [], {

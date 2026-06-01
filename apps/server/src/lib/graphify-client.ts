@@ -296,7 +296,7 @@ const LOW_SIGNAL_LABELS = new Set([
 ]);
 
 const NOISY_SOURCE_PATTERNS = [
-  /(^|[/\\])\.tools[/\\]printed-clis[/\\]/,
+  /(^|[/\\])\.brain[/\\]40_Agent_Context[/\\]tools[/\\]printed-clis[/\\]/,
   /(^|[/\\])apps[/\\]server[/\\]api[/\\]index\.(js|cjs)$/,
   /(^|[/\\])apps[/\\]web[/\\]src[/\\]locales[/\\]/,
   /(^|[/\\])cli-printing-press[/\\]/,

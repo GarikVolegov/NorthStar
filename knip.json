@@ -3,7 +3,7 @@
   "workspaces": {
     ".": {
       "entry": ["api/**/*.js"],
-      "ignore": ["scripts/preinstall.js", "cli-printing-press/**"]
+      "ignore": ["scripts/preinstall.js"]
     },
     "apps/web": {
       "entry": ["src/main.tsx", "index.html"],
@@ -89,8 +89,7 @@
     "concurrently",
     "serve",
     "wait-on",
-    "vite-bundle-visualizer",
-    "cli-printing-press/printing-press.exe"
+    "vite-bundle-visualizer"
   ],
   "ignoreIssues": {
     "**/*.{ts,tsx}": ["exports", "types", "duplicates"],

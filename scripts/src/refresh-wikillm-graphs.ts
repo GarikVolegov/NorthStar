@@ -26,10 +26,9 @@ const PROFILES: WikiLLMGraphProfile[] = ["code", "process", "docs"];
 const EXCLUDED_PREFIXES = [
   ".git/",
   ".tmp/",
-  ".tools/printed-clis/",
+  ".brain/40_Agent_Context/tools/printed-clis/",
   "apps/server/api/",
   "apps/web/src/locales/",
-  "cli-printing-press/",
   "coverage/",
   "dist/",
   "build/",
@@ -55,7 +54,7 @@ const EXCLUDED_SEGMENTS = new Set([
 
 const EXCLUDED_BASENAMES = new Set([
   "pnpm-lock.yaml",
-  "uv.lock",
+  "packages/ml-service/uv.lock",
   "package-lock.json",
   "yarn.lock",
   "skills-lock.json",
@@ -121,10 +120,13 @@ export function isWikiLLMCorpusPath(path: string): boolean {
   return (
     normalized.startsWith("apps/") ||
     normalized.startsWith("api/") ||
+    normalized.startsWith(".brain/40_Agent_Context/rules/") ||
     normalized.startsWith("docs/") ||
     normalized.startsWith("lib/") ||
     normalized.startsWith("packages/") ||
     normalized.startsWith("scripts/src/") ||
+    normalized.startsWith(".brain/20_Product/") ||
+    normalized.startsWith(".brain/30_Process/") ||
     /^[A-Z_]+\.md$/.test(normalized) ||
     normalized === "README.md" ||
     normalized === "package.json" ||
@@ -150,9 +152,10 @@ export function getWikiLLMProfilesForPath(path: string): WikiLLMGraphProfile[] {
     normalized.startsWith("scripts/src/") ||
     normalized.startsWith("docs/architecture/") ||
     normalized.startsWith("docs/ai-modules/") ||
+    normalized.startsWith(".brain/40_Agent_Context/rules/") ||
     normalized.endsWith("_RULES.md") ||
-    normalized === "ARCHITECTURE.md" ||
-    normalized === "RUNBOOK.md"
+    normalized === ".brain/20_Product/ARCHITECTURE.md" ||
+    normalized === ".brain/30_Process/RUNBOOK.md"
   ) {
     return ["process"];
   }
@@ -191,9 +194,8 @@ export function buildWikiLLMAudit(root: string, paths: string[]): WikiLLMAudit {
     .slice(0, 12);
   const warnings = excluded
     .filter((item) =>
-      item.path.startsWith(".tools/printed-clis/")
+      item.path.startsWith(".brain/40_Agent_Context/tools/printed-clis/")
       || item.path.startsWith("apps/web/src/locales/")
-      || item.path.startsWith("cli-printing-press/")
       || item.path.startsWith("packages/db/drizzle/meta/"),
     )
     .map((item) => `Excluded noisy source: ${item.path}`);

@@ -7,7 +7,7 @@
  *   Fast path (navigation/simple_qa): chiamata LLM diretta, risposta leggera.
  *   Full path (conversation/planning/deep_analysis): runGrowthAgent() completo con SSE.
  *
- * SECURITY: userId SEMPRE da req.user.id (JWT), mai dal body (SECURITY_RULES.md).
+ * SECURITY: userId SEMPRE da req.user.id (JWT), mai dal body (.brain/40_Agent_Context/rules/SECURITY_RULES.md).
  * PRIVACY: nessun contenuto integrale di messaggi nei log (PRIVACY_DESIGN.md).
  */
 import { Router, type Request, type Response } from "express";
@@ -23,105 +23,42 @@ import {
 import { cacheIncr } from "../lib/redis";
 import { agentRegistry } from "../lib/agent-registry";
 import {
-  runGrowthAgent,
-  loadMemory,
-  buildMemorySection,
-  loadRecentSummaries,
-  buildSessionHistorySection,
   resolveWendyRoute,
-  buildLightPrompt,
-  toolsToOpenAIFormat,
-  recordAiCall,
-  getLLMForRoute,
   estimateTokens,
-  estimateCost,
-  recordWendyCost,
-  recordQualityScore,
-  recordTtft,
   ensureWendyConfigFresh,
   wendyConfig,
-  buildWendyActivationContext,
-  persistActivationTrace,
-  reinforceCoActivations,
-  getFastPathFallbackReply,
   getWendyRecoveryFallbackReply,
-  shouldUseImmediateFastPathFallback,
-  shouldUseImmediateWendyRecoveryFallback,
   shouldUseWendyQuickActionFastPath,
-  getLlmUnavailableReply,
   isLlmConfigured,
   buildWendyIntelligenceDirectives,
   buildWendySuggestedPrompts,
-  evaluateWendyResponse,
   planWendyDecision,
 } from "@workspace/ai-server";
 import type { CompressedHistory, WendyActivationContext, WendyPageContext } from "@workspace/ai-server";
 import {
   buildWendyContextSources,
-  isClientSideToolData,
-  isDoneWithLowEval,
   WendyRequestSchema,
-  type WendyToolMessage,
 } from "./ai-wendy-shared";
-import { buildWikiLLMContext } from "../lib/wikillm-context-router";
-import { executeWendyToolCall } from "../lib/wendy-tool-executor";
-import { storeSemanticTurnInBackground } from "../lib/semantic-memory";
-import { withRouteTimeout } from "../lib/wendy-fast-path";
+import { runWendyFastPath } from "./ai-wendy-fast-path";
+import { runWendyFullPath } from "./ai-wendy-full-path";
+import {
+  finalizeWendyRequest,
+  type WendyResponseCategory,
+  type WendyRouteStatus,
+} from "./ai-wendy-finalize";
+import { handleWendyLocalQuickAction } from "./ai-wendy-quick-actions";
+import {
+  EMPTY_WENDY_PERSONAL_CONTEXT,
+  prepareWendyContext,
+  type WendyPersonalContext,
+} from "./ai-wendy-context";
 import { resolveWendyLocale } from "../lib/wendy-locale";
 import {
-  buildWendyDataBackedGuidedAction,
   buildWendyDataBackedSuggestedPrompts,
   classifyWendyDataBackedQuickAction,
-  formatWendyDataBackedQuickActionReply,
 } from "../lib/wendy-data-backed-quick-action";
 import { checkRabbitEmergency } from "@workspace/ai-server";
 const router = Router();
-
-function buildConfirmableClientAction(toolName: string, args: Record<string, unknown>) {
-  if (toolName === "set_filters") {
-    const filters = args.filters && typeof args.filters === "object" && !Array.isArray(args.filters)
-      ? args.filters as Record<string, unknown>
-      : {};
-    const listType = typeof args.listType === "string" ? args.listType : "sectors";
-    return {
-      clientSide: true,
-      action: "set_filters",
-      wendyAction: {
-        id: `wendy-set_filters-${randomUUID()}`,
-        type: "set_filters",
-        status: "needs_confirmation",
-        risk: "low",
-        label: "Preparare Esplora settori?",
-        description: "Applico i filtri quando confermi, cosi non interrompo la risposta.",
-        requiresConfirmation: true,
-        payload: { listType, filters },
-        preview: Object.entries(filters).slice(0, 4).map(([label, value]) => ({
-          label,
-          value: typeof value === "string" ? value : JSON.stringify(value),
-        })),
-      },
-    };
-  }
-
-  const viewId = typeof args.viewId === "string" ? args.viewId : "settori";
-  const targetRoute = viewId === "settori" ? "/settori" : "/dashboard";
-  return {
-    clientSide: true,
-    action: "navigate",
-    wendyAction: {
-      id: `wendy-navigate-${randomUUID()}`,
-      type: "navigate",
-      status: "needs_confirmation",
-      risk: "low",
-      label: "Aprire Esplora settori?",
-      description: "Apro la pagina quando confermi, senza tagliare la risposta di Wendy.",
-      requiresConfirmation: true,
-      targetRoute,
-      payload: { url: targetRoute, viewId },
-      preview: [{ label: "Destinazione", value: targetRoute }],
-    },
-  };
-}
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
@@ -288,11 +225,7 @@ router.post(
       }
     }
 
-    let personalContext: Awaited<ReturnType<typeof buildWikiLLMContext>> = {
-      context: "",
-      contexts: { semanticMemory: "", openHuman: "", graphify: "", wendyBrain: "" },
-      sources: [],
-    };
+    let personalContext: WendyPersonalContext = EMPTY_WENDY_PERSONAL_CONTEXT;
 
     // ── SSE headers ───────────────────────────────────────────────────────────
     res.setHeader("Content-Type", "text/event-stream");
@@ -350,12 +283,7 @@ router.post(
       "[ai/wendy] request started",
     );
 
-    let status:
-      | "success"
-      | "error_model"
-      | "error_timeout"
-      | "error_ratelimit"
-      | "error_internal" = "success";
+    let status: WendyRouteStatus = "success";
     let errorCode: string | undefined;
     let inputTokens = 0;
     let outputTokens = 0;
@@ -364,12 +292,7 @@ router.post(
 
     // Telemetria Step 5
     const toolsUsedInRequest: string[] = [];
-    let responseCategory:
-      | "success"
-      | "insufficient_data"
-      | "refused"
-      | "error_tool"
-      | "error_model" = "success";
+    let responseCategory: WendyResponseCategory = "success";
     let searchModeUsed: "semantic" | "keyword" | "none" = "none";
 
     // Telemetria Step 6 — RAG
@@ -493,457 +416,116 @@ router.post(
 
     const llmConfigured = isLlmConfigured();
 
-    const dataBackedQuickAction = classifyWendyDataBackedQuickAction(effectiveMessage);
-    if (dataBackedQuickAction) {
-      const [objectivesResult, contextResult] = await Promise.all([
-        executeWendyToolCall("get_user_objectives", {}, userId),
-        executeWendyToolCall("get_user_context", {}, userId),
-      ]);
-      send({
-        type: "tool_call",
-        name: "get_user_objectives",
-        args: {},
-        result: objectivesResult.ok ? objectivesResult.data : null,
-      });
-      send({
-        type: "tool_call",
-        name: "get_user_context",
-        args: {},
-        result: contextResult.ok ? contextResult.data : null,
-      });
-      const quickActionText = formatWendyDataBackedQuickActionReply({
-        kind: dataBackedQuickAction,
-        locale,
-        objectives: objectivesResult.ok ? objectivesResult.data : undefined,
-        userContext: contextResult.ok ? contextResult.data : undefined,
-      });
-      const guidedAction = buildWendyDataBackedGuidedAction({
-        kind: dataBackedQuickAction,
-        objectives: objectivesResult.ok ? objectivesResult.data : undefined,
-        userContext: contextResult.ok ? contextResult.data : undefined,
-      });
-      if (guidedAction) {
-        const guidedActionResult = guidedAction.confirmBeforeExecution
-          ? {
-              ok: true as const,
-              data: buildConfirmableClientAction(guidedAction.toolName, guidedAction.args),
-            }
-          : await executeWendyToolCall(
-              guidedAction.toolName,
-              guidedAction.args,
-              userId,
-            );
-        send({
-          type: "tool_call",
-          name: guidedAction.toolName,
-          args: guidedAction.args,
-          result: guidedActionResult.ok ? guidedActionResult.data : null,
-        });
-      }
-      outputTokens += estimateTokens(quickActionText);
-      assistantResponseForMemory += quickActionText;
-      if (ttftMs === null) ttftMs = Date.now() - startedAt;
-      send({ type: "token", value: quickActionText });
-      sendDoneOnce({
-        intent,
-        answerMode: "local-quick-action",
-        suggestedPrompts: buildWendyDataBackedSuggestedPrompts({
-          kind: dataBackedQuickAction,
-          locale,
-        }),
-        usage: {
-          model: "local-data-quick-action",
-          inputTokens: estimateTokens(message),
-          outputTokens,
-        },
-      });
-      if (!res.writableEnded) res.end();
-      markIdle();
-      return;
-    }
-
-    if (shouldUseImmediateWendyRecoveryFallback({ intent, message, llmConfigured })) {
-      const quickActionText = getWendyRecoveryFallbackReply({ intent, message, locale });
-      outputTokens += estimateTokens(quickActionText);
-      assistantResponseForMemory += quickActionText;
-      if (ttftMs === null) ttftMs = Date.now() - startedAt;
-      send({ type: "token", value: quickActionText });
-      sendDoneOnce({
-        intent,
-        answerMode: "local-quick-action",
-        ...dataBackedSuggestedPromptExtraFor(message),
-        usage: {
-          model: "local-quick-action",
-          inputTokens: estimateTokens(message),
-          outputTokens,
-        },
-      });
-      if (!res.writableEnded) res.end();
-      markIdle();
-      return;
-    }
-
-    if (shouldUseImmediateFastPathFallback({ intent, message })) {
-      const fallbackText = getFastPathFallbackReply({ intent, message, locale });
-      if (fallbackText) {
-        outputTokens += estimateTokens(fallbackText);
-        assistantResponseForMemory += fallbackText;
-        if (ttftMs === null) ttftMs = Date.now() - startedAt;
-        send({ type: "token", value: fallbackText });
-        sendDoneOnce({
-          intent,
-          answerMode: "local-fast-path",
-          usage: { model: "local-fast-path", inputTokens: estimateTokens(message), outputTokens },
-        });
+    const quickActionResult = await handleWendyLocalQuickAction({
+      effectiveMessage,
+      endStream: () => {
         if (!res.writableEnded) res.end();
         markIdle();
-        return;
-      }
-    }
-
-    // No chat LLM provider configured → degrade gracefully with a clear message
-    // instead of letting downstream LLM/embedding calls throw ("si è interrotta").
-    if (!llmConfigured) {
-      const msg = getLlmUnavailableReply(locale);
-      outputTokens += estimateTokens(msg);
-      assistantResponseForMemory += msg;
-      if (ttftMs === null) ttftMs = Date.now() - startedAt;
-      rootLogger.warn({ userId, requestId }, "[ai/wendy] no LLM provider configured — returning graceful notice");
-      send({ type: "token", value: msg });
-      sendDoneOnce({
-        intent,
-        answerMode: "unconfigured",
-        usage: { model: "unconfigured", inputTokens: estimateTokens(message), outputTokens },
-      });
-      if (!res.writableEnded) res.end();
-      markIdle();
+      },
+      intent,
+      llmConfigured,
+      locale,
+      logger: rootLogger,
+      message,
+      requestId,
+      send,
+      sendDoneOnce,
+      startedAt,
+      userId,
+    });
+    if (quickActionResult) {
+      outputTokens += quickActionResult.outputTokens;
+      assistantResponseForMemory += quickActionResult.assistantResponseForMemory;
+      ttftMs = quickActionResult.ttftMs;
       return;
     }
 
-    if (!useQuickActionLightPipeline) {
-      personalContext = await buildWikiLLMContext({
-        query: effectiveMessage,
-        userId,
-        userRole: user.role,
-        includePersonalMemory: true,
-        includeWendyBrain: false,
-        graphifyProfile: "auto",
-      }).catch((err) => {
-        rootLogger.warn({ err, userId, requestId }, "[ai/wendy] context build failed; continuing without personal context");
-        return {
-          context: "",
-          contexts: { semanticMemory: "", openHuman: "", graphify: "", wendyBrain: "" },
-          sources: [],
-        };
-      });
-
-      neuralContext = await buildWendyActivationContext({
-        requestId,
-        userId,
-        message: effectiveMessage,
-        intent,
-        domain: null,
-        pageContext: pageContext as WendyPageContext | undefined,
-      }).catch((err) => {
-        rootLogger.warn({ err, userId, requestId }, "[ai/wendy] neural activation failed");
-        return null;
-      });
-      if (neuralContext) {
-        await persistActivationTrace(neuralContext);
-      }
-    } else {
-      rootLogger.debug({ userId, requestId, intent }, "[ai/wendy] using lightweight quick-action path");
-    }
+    const preparedContext = await prepareWendyContext({
+      effectiveMessage,
+      intent,
+      logger: rootLogger,
+      ...(pageContext ? { pageContext: pageContext as WendyPageContext } : {}),
+      requestId,
+      useQuickActionLightPipeline,
+      userId,
+      userRole: user.role,
+    });
+    personalContext = preparedContext.personalContext;
+    neuralContext = preparedContext.neuralContext;
 
     try {
       // ── 2. Fast path: navigation / simple_qa ────────────────────────────
       const useLightPipeline = decision.skipFullPipeline || useQuickActionLightPipeline;
       if (useLightPipeline) {
-        const systemPrompt =
-          buildLightPrompt({
-            locale,
-            intent,
-            userMessage: effectiveMessage,
-            ...(pageContext
-              ? { pageContext: pageContext as WendyPageContext }
-              : {}),
-            ...(neuralContext?.promptSection
-              ? { neuralSection: neuralContext.promptSection }
-              : {}),
-          }) + personalContext.context + followUpPromptSection;
-
-        const openAiTools = toolsToOpenAIFormat(decision.toolsEnabled);
-        const llm = getLLMForRoute({
-          provider: decision.provider ?? "openrouter",
+        const result = await runWendyFastPath({
+          decision,
+          effectiveMessage,
+          fastPathTimeoutMs,
+          followUpContext,
+          followUpPromptSection,
+          intent,
+          locale,
+          logger: rootLogger,
+          message,
+          neuralContext,
+          ...(pageContext ? { pageContext: pageContext as WendyPageContext } : {}),
+          personalContext: personalContext.context,
+          requestId,
+          send,
+          sendDoneOnce,
+          startedAt,
+          userId,
         });
-
-        inputTokens = estimateTokens(systemPrompt + message + (followUpContext ?? ""));
-        send({ type: "status", value: intent === "navigation" ? "⚡" : "💬" });
-
-        // Tool calling loop — max 3 turni per evitare loop infiniti
-        const msgs: WendyToolMessage[] = [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message },
-        ];
-        const textOnlyMsgs: WendyToolMessage[] = [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message },
-        ];
-
-        const MAX_TOOL_TURNS = wendyConfig.fastPath.maxToolTurns;
-        let toolTurns = 0;
-        let finalText = "";
-
-        while (toolTurns < MAX_TOOL_TURNS) {
-          let result: Awaited<ReturnType<typeof llm.chatWithTools>>;
-          try {
-            result = await withRouteTimeout(
-              llm.chatWithTools(msgs, openAiTools, {
-                model: decision.model,
-                temperature: 0.1,
-                maxTokens: wendyConfig.fastPath.maxTokens,
-              }),
-              fastPathTimeoutMs,
-              "wendy fast path",
-            );
-          } catch (err) {
-            if (intent !== "simple_qa") throw err;
-            rootLogger.warn(
-              { err, userId, requestId },
-              "[ai/wendy] fast path tool call failed, retrying text-only",
-            );
-            try {
-              finalText = await withRouteTimeout(
-                llm.chatOnce(textOnlyMsgs, {
-                  model: decision.model,
-                  temperature: 0.2,
-                  maxTokens: wendyConfig.fastPath.maxTokens,
-                }),
-                fastPathTimeoutMs,
-                "wendy fast path text-only",
-              );
-            } catch (fallbackErr) {
-              const fallbackText = getFastPathFallbackReply({ intent, message, locale });
-              if (!fallbackText) throw fallbackErr;
-              rootLogger.warn(
-                { err: fallbackErr, userId, requestId },
-                "[ai/wendy] fast path text-only failed, using local simple_qa fallback",
-              );
-              finalText = fallbackText;
-            }
-            outputTokens += estimateTokens(finalText);
-            break;
-          }
-          outputTokens += estimateTokens(result.content);
-
-          if (result.toolCalls.length === 0 || result.finishReason === "stop") {
-            finalText = result.content;
-            break;
-          }
-
-          // Appende il messaggio assistant con tool_calls al thread
-          msgs.push({
-            role: "assistant",
-            content: result.content ?? "",
-            tool_calls: result.toolCalls.map((tc) => ({
-              id: tc.id,
-              type: "function",
-              function: {
-                name: tc.name,
-                arguments: JSON.stringify(tc.arguments),
-              },
-            })),
-          });
-
-          // Esegui ogni tool call e aggiungi i risultati al thread
-          for (const tc of result.toolCalls) {
-            const toolResult = await executeWendyToolCall(tc.name, tc.arguments, userId);
-            const toolData = toolResult.ok
-              ? toolResult.data
-              : { error: toolResult.message };
-            send({
-              type: "tool_call",
-              name: tc.name,
-              args: tc.arguments,
-              result: toolResult.ok ? toolData : null,
-            });
-
-            // Navigazione client-side — termina subito senza risposta testuale
-            if (toolResult.ok && isClientSideToolData(toolData)) {
-              sendDoneOnce({
-                intent,
-                answerMode: "llm-fast-path",
-                usage: { model: decision.model, inputTokens, outputTokens },
-              });
-              return;
-            }
-
-            msgs.push({
-              role: "tool",
-              content: JSON.stringify(toolData),
-              tool_call_id: tc.id,
-            });
-          }
-
-          toolTurns++;
+        inputTokens = result.inputTokens;
+        outputTokens += result.outputTokens;
+        assistantResponseForMemory += result.assistantResponseForMemory;
+        if (result.ttftMs !== null) ttftMs = result.ttftMs;
+        if (result.status !== "success") status = result.status;
+        if (result.responseCategory !== "success") {
+          responseCategory = result.responseCategory;
         }
-
-        if (!finalText && intent === "simple_qa") {
-          try {
-            finalText = await withRouteTimeout(
-              llm.chatOnce(textOnlyMsgs, {
-                model: decision.model,
-                temperature: 0.2,
-                maxTokens: wendyConfig.fastPath.maxTokens,
-              }),
-              fastPathTimeoutMs,
-              "wendy fast path text-only",
-            );
-          } catch (fallbackErr) {
-            const fallbackText = getFastPathFallbackReply({ intent, message, locale });
-            if (!fallbackText) throw fallbackErr;
-            rootLogger.warn(
-              { err: fallbackErr, userId, requestId },
-              "[ai/wendy] empty fast path failed, using local simple_qa fallback",
-            );
-            finalText = fallbackText;
-          }
-          outputTokens += estimateTokens(finalText);
-        }
-
-        if (finalText) {
-          assistantResponseForMemory += finalText;
-          if (ttftMs === null) ttftMs = Date.now() - startedAt;
-          send({ type: "token", value: finalText });
-        }
-        if (!finalText && !terminalDoneSent) {
-          sendRecoveryFallbackOnce("empty_fast_path", "error_model");
-        } else {
-          sendDoneOnce({
-            intent,
-            answerMode: "llm-fast-path",
-            usage: { model: decision.model, inputTokens, outputTokens },
-          });
-        }
+        if (result.shouldReturn) return;
       } else {
-        // ── 3. Full path: growth agent completo ──────────────────────────
-        const FULL_PATH_TIMEOUT_MS = parseInt(process.env.WENDY_FULL_PATH_TIMEOUT_MS ?? "12000");
-        let fullPathTimedOut = false;
-        const fullPathTimeout = setTimeout(() => {
-          fullPathTimedOut = true;
-          aborted = true;
-          status = "error_timeout";
-          responseCategory = "error_model";
-          if (assistantResponseForMemory.trim()) {
-            sendDoneOnce({
-              intent,
-              answerMode: "llm-full-path",
-              usage: { model: decision.model, inputTokens, outputTokens },
-              recovery: { reason: "full_path_timeout_after_tokens", status: "error_timeout" },
-            });
-          } else {
-            sendRecoveryFallbackOnce("full_path_timeout", "error_timeout");
-          }
-          if (!res.writableEnded) res.end();
-        }, FULL_PATH_TIMEOUT_MS);
-
-        const [userMemory, recentSummaries] = await Promise.all([
-          loadMemory(userId),
-          loadRecentSummaries(userId).catch(() => []),
-        ]);
-        const memorySection =
-          buildMemorySection(userMemory) +
-          buildSessionHistorySection(recentSummaries) +
-          personalContext.contexts.semanticMemory +
-          personalContext.contexts.openHuman +
-          `\n\n${wendyIntelligenceDirectives}` +
-          followUpPromptSection;
-
-        // Flatten compressed history per il growth agent
-        const flatHistory = [
-          ...(compressedHistory?.summary
-            ? [
-                {
-                  role: "assistant" as const,
-                  content: `[Riepilogo sessione precedente]\n${compressedHistory.summary}`,
-                },
-              ]
-            : []),
-          ...(compressedHistory?.recentMessages ?? []),
-        ];
-
-        inputTokens = estimateTokens(
-          memorySection + message + flatHistory.map((m) => m.content).join(" "),
-        );
-
-        try {
-          for await (const event of runGrowthAgent({
-            userId,
-            sessionId: threadId ? Number(threadId) : undefined,
-            userContext: {
-              isPremium,
-              memorySection,
-              codeGraphSection: personalContext.contexts.graphify,
-              locale,
-              journeyType: pageContext?.journeyType,
-              pageContext: pageContext as Record<string, unknown> | undefined,
-            },
-            history: flatHistory,
-            userMessage: effectiveMessage,
-            requestId,
-            wendyIntent: intent, // abilita i Wendy domain tools nel full path
-            isPredefined,
-            ...(neuralContext ? { neuralContext } : {}),
-            executeExternalTool: executeWendyToolCall,
-          })) {
-            if (aborted) break;
-            if (event.type === "done") {
-              sendDoneOnce({
-                answerMode: "llm-full-path",
-                ...(event as Record<string, unknown>),
-              });
-            } else if (event.type === "error") {
-              status = "error_model";
-              errorCode = "GROWTH_AGENT_ERROR";
-              responseCategory = "error_model";
-              if (assistantResponseForMemory.trim()) {
-                sendDoneOnce({
-                  intent,
-                  answerMode: "recovery-fallback",
-                  usage: { model: decision.model, inputTokens, outputTokens },
-                  recovery: { reason: "growth_agent_error_after_tokens", status: "error_model" },
-                });
-              } else {
-                sendRecoveryFallbackOnce("growth_agent_error", "error_model");
-              }
-            } else {
-              send(event);
-            }
-            if (event.type === "token") {
-              if (ttftMs === null) ttftMs = Date.now() - startedAt;
-              outputTokens += estimateTokens(event.value);
-              assistantResponseForMemory += event.value;
-            }
-            if (event.type === "done") {
-              domainForLog = event.routeDecision?.domain ?? null;
-              supervisorScoreForLog = event.supervisorResult?.score ?? null;
-              wasRewrittenForLog = event.supervisorResult?.rewritten ?? false;
-            }
-            if (event.type === "done" || event.type === "error") {
-              // Rileva insufficient_data dal done event dell'agente
-              if (isDoneWithLowEval(event)) {
-                responseCategory = "insufficient_data";
-              }
-              break;
-            }
-          }
-        } finally {
-          clearTimeout(fullPathTimeout);
-          if (fullPathTimedOut) {
-            status = "error_timeout";
-            errorCode = "FULL_PATH_TIMEOUT";
-          }
-        }
+        const result = await runWendyFullPath({
+          ...(compressedHistory
+            ? { compressedHistory: compressedHistory as CompressedHistory }
+            : {}),
+          decision,
+          effectiveMessage,
+          endStream: () => {
+            if (!res.writableEnded) res.end();
+          },
+          followUpPromptSection,
+          getAborted: () => aborted,
+          intent,
+          isPremium,
+          isPredefined,
+          locale,
+          message,
+          neuralContext,
+          ...(pageContext ? { pageContext: pageContext as WendyPageContext } : {}),
+          personalContext,
+          requestId,
+          send,
+          sendDoneOnce,
+          setAborted: (value) => {
+            aborted = value;
+          },
+          startedAt,
+          ...(threadId ? { threadId } : {}),
+          userId,
+          wendyIntelligenceDirectives,
+        });
+        inputTokens = result.inputTokens;
+        outputTokens += result.outputTokens;
+        assistantResponseForMemory += result.assistantResponseForMemory;
+        status = result.status;
+        if (result.errorCode) errorCode = result.errorCode;
+        responseCategory = result.responseCategory;
+        domainForLog = result.domainForLog;
+        supervisorScoreForLog = result.supervisorScoreForLog;
+        wasRewrittenForLog = result.wasRewrittenForLog;
+        if (result.ttftMs !== null) ttftMs = result.ttftMs;
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -972,92 +554,37 @@ router.post(
         sendRecoveryFallbackOnce("unhandled_error", status);
       }
     } finally {
-      // Inferisci responseCategory da status se non già impostato
-      if (responseCategory === "success" && status !== "success") {
-        responseCategory = status.includes("tool")
-          ? "error_tool"
-          : "error_model";
-      }
-      // Se ci sono stati tool failure e responseCategory è ancora success, segnalalo
-      if (
-        toolsUsedInRequest.length > 0 &&
-        responseCategory === "success" &&
-        toolsUsedInRequest.some((t) => t === "__failed")
-      ) {
-        responseCategory = "error_tool";
-      }
-
-      const latencyMs = Date.now() - startedAt;
-      if (status === "success" || assistantResponseForMemory.trim()) {
-        storeSemanticTurnInBackground({
-          userId,
-          userMessage: message,
-          assistantResponse: assistantResponseForMemory,
-        });
-        if (neuralContext) {
-          void reinforceCoActivations({
-            userId,
-            requestId,
-            items: neuralContext.activeItems,
-          });
-        }
-      }
-      const wendySelfCheck = evaluateWendyResponse({
-        userMessage: message,
-        responseText: assistantResponseForMemory,
-        decision: wendyDecisionPlan,
-        contextSources: [
-          ...new Set([
-            ...toolsUsedInRequest.filter((tool) => tool !== "__failed"),
-            ...ragSourcesUsed,
-            ...(ragChunksRetrieved > 0 ? ["search_rag"] : []),
-          ]),
-        ],
-      });
-      if (!wendySelfCheck.ok) {
-        rootLogger.warn(
-          {
-            userId,
-            requestId,
-            score: wendySelfCheck.score,
-            issues: wendySelfCheck.issues.map((issue) => issue.code),
-          },
-          "[ai/wendy] self-check issues detected",
-        );
-      }
-      const costUsdEst = estimateCost(decision.model, inputTokens, outputTokens);
-      recordAiCall({
-        requestId,
-        userId,
-        ...(threadId ? { threadId } : {}),
-        intent: intent,
-        tier: decision.tier,
-        model: decision.model,
-        inputTokens,
-        outputTokens,
-        costUsdEst,
-        latencyMs,
-        totalTurns: compressedHistory?.totalTurns ?? 0,
-        status,
+      finalizeWendyRequest({
+        assistantResponseForMemory,
+        ...(compressedHistory
+          ? { compressedHistory: compressedHistory as CompressedHistory }
+          : {}),
+        decision,
+        domainForLog,
         ...(errorCode ? { errorCode } : {}),
+        inputTokens,
+        intent,
         locale,
-        toolCallsCount: toolsUsedInRequest.length,
-        toolsUsed: [...new Set(toolsUsedInRequest)],
-        responseCategory,
-        searchMode: searchModeUsed,
+        logger: rootLogger,
+        message,
+        neuralContext,
+        outputTokens,
         ragChunksRetrieved,
+        ragSourcesUsed,
         ragTopSimilarity,
-        ragSourcesUsed: [...new Set(ragSourcesUsed)],
-        domain: domainForLog,
-        supervisorScore: supervisorScoreForLog,
-        wasRewritten: wasRewrittenForLog,
+        requestId,
+        responseCategory,
+        searchModeUsed,
+        startedAt,
+        status,
+        supervisorScoreForLog,
+        ...(threadId ? { threadId } : {}),
+        toolsUsedInRequest,
         ttftMs,
+        userId,
+        wasRewrittenForLog,
+        wendyDecisionPlan,
       });
-      recordWendyCost(decision.model, costUsdEst);
-      if (supervisorScoreForLog !== null && domainForLog) {
-        recordQualityScore(domainForLog, intent, supervisorScoreForLog);
-      }
-      if (ttftMs !== null) recordTtft(ttftMs / 1000);
 
       if (!res.writableEnded) res.end();
       markIdle();

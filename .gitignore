@@ -16,10 +16,10 @@ node_modules
 .pnpm-store/
 
 # ── Environment & secrets ──────────────────────────────────────────────────
-.env
+# `.env` is the only versioned env template. Real local values live in `.env.local`.
 .env.*
-!.env.example
-!.env.staging.example
+**/.env
+!/.env
 *.pem
 *.key
 *.crt
@@ -50,8 +50,7 @@ graphify-out/
 apps/graphify-out/
 packages/graphify-out/
 
-# .brain/90_Code is a Windows junction to graphify-out/obsidian-vault/90_Code/
-# (auto-generated graph nodes/communities, not versioned)
+# Generated graph nodes/communities are rebuilt on demand, not versioned.
 .brain/90_Code/
 
 # ── Temporary & backup files ───────────────────────────────────────────────
@@ -87,23 +86,21 @@ Thumbs.db
 apps/server/api/index.js
 apps/server/api/index.cjs
 
-# Go CLI — source e binari (strumenti esterni, non codice NorthStar)
-cli-printing-press/
-.tools/printed-clis/*/bin/
-.tools/printed-clis/*/cmd/
-.tools/printed-clis/*/internal/
-.tools/printed-clis/*/go.mod
-.tools/printed-clis/*/go.sum
-.tools/printed-clis/*/.golangci.yml
-.tools/printed-clis/*/.goreleaser.yaml
-.tools/printed-clis/*/northstar-pp-*.exe
+# Go CLI agentici — sorgenti generati e binari locali
+.brain/40_Agent_Context/tools/printed-clis/*/bin/
+.brain/40_Agent_Context/tools/printed-clis/*/cmd/
+.brain/40_Agent_Context/tools/printed-clis/*/internal/
+.brain/40_Agent_Context/tools/printed-clis/*/go.mod
+.brain/40_Agent_Context/tools/printed-clis/*/go.sum
+.brain/40_Agent_Context/tools/printed-clis/*/.golangci.yml
+.brain/40_Agent_Context/tools/printed-clis/*/.goreleaser.yaml
+.brain/40_Agent_Context/tools/printed-clis/*/*-pp-*.exe
 
 # Go local installations
 go-install/
 go123-install/
 
 docs/attached_assets/
-skills-lock.json
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
@@ -113,3 +110,18 @@ agent-browser-state*.json
 *.agent-browser-state.json
 browser-data/
 agent-browser.json
+
+# Tool-specific AI folders are local/runtime only.
+# Canonical agent context lives in .brain/40_Agent_Context/.
+.agents/
+.codex/
+.codex-dev/
+.opencode/
+.superpowers/
+custom-agents/
+custom-workflows/
+plugins/northstar-agent-kit/
+scripts/ralph/.ralph-prompt.tmp
+
+# Claude may recreate runtime state here; tracked Claude context lives in Brain.
+.claude/

@@ -1,9 +1,9 @@
 /**
  * ⚠️  REGOLA 0 — Prima di modificare questo file o qualsiasi schema leggi:
- *   → DB_RULES.md  (Database Change Policy: naming, migration, seed, FK, rollback)
+ *   → .brain/40_Agent_Context/rules/DB_RULES.md  (Database Change Policy: naming, migration, seed, FK, rollback)
  *
  * Qualsiasi aggiunta di tabella, colonna, indice o relazione
- * richiede la Pre-Flight Checklist presente in DB_RULES.md.
+ * richiede la Pre-Flight Checklist presente in .brain/40_Agent_Context/rules/DB_RULES.md.
  * Non esistono modifiche "piccole" che non richiedano quel controllo.
  *
  * ⚠️  DUAL SERVER NOTA: api-server (8080) e northstar-server (3001) condividono

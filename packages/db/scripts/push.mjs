@@ -5,7 +5,9 @@ import { execSync } from "child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbDir = resolve(__dirname, "..");
-dotenv.config({ path: resolve(__dirname, "../../../.env") });
+const repoRoot = resolve(__dirname, "../../..");
+dotenv.config({ path: resolve(repoRoot, ".env") });
+dotenv.config({ path: resolve(repoRoot, ".env.local"), override: true });
 
 execSync("drizzle-kit push --config ./drizzle.config.ts", {
   stdio: "inherit",

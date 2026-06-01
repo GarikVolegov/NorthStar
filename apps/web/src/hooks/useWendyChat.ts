@@ -7,14 +7,12 @@ import { useSSEStream } from './useSSEStream.js';
 import { useSTT } from './useSTT.js';
 import { useTTS } from './useTTS.js';
 import {
-  normalizeWendyAction,
   useWendyActionExecutor,
   type WendyAction,
 } from './useWendyActionExecutor';
 import { buildCompressedHistory, compactPageData } from './useWendyHistoryCompression';
 import { useWendyOpenAITTS } from './useWendyOpenAITTS.js';
 import {
-  parseWendySseEvent,
   readNumberField,
   readStringField,
   type WendyContextSource,
@@ -35,22 +33,13 @@ import {
   type WendyHistoryEntry,
 } from './wendyPersistence';
 import { useWendyTabRemoteSync } from './useWendyTabRemoteSync';
-import { FATAL_ERRORS, THINKING_LABELS } from './wendy.config';
+import { createWendyRawChunkHandler } from './useWendyChatStreamHandler';
+import { THINKING_LABELS } from './wendy.config';
 import { withWendySuggestedPromptFallback } from './wendySuggestedPrompts';
+import { friendlyWendyError, isNonRetryableWendyStreamError } from './wendyErrors';
 
 const RECONNECT_DELAY_MS = [1000, 2000, 4000] as const;
 const WENDY_PAGE_ENTITY_TYPES = new Set(['sector', 'profession', 'article', 'news']);
-const AUTH_SESSION_ERROR_PATTERNS = [
-  '401',
-  '403',
-  'UNAUTHORIZED',
-  'FORBIDDEN',
-  'TOKEN',
-  'SESSION_EXPIRED',
-  'SESSION EXPIRED',
-  'AUTH',
-] as const;
-
 function readSupportedWendyEntityType(record: Record<string, unknown> | undefined): string | undefined {
   const entityType = readStringField(record, 'entityType');
   return entityType && WENDY_PAGE_ENTITY_TYPES.has(entityType) ? entityType : undefined;
@@ -137,136 +126,27 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const { start: startStream, stop: stopSSEStream, isStreaming } = useSSEStream({
     timeoutMs: streamTimeoutMs,
     resetTimeoutOnChunk: true,
-    onRawChunk: (raw: string) => {
-      const event = parseWendySseEvent(raw);
-      if (event.type === 'status') {
-          if (!firstChunkReceivedRef.current) {
-            setThinking((current) => ({
-              active: true,
-              label: event.value,
-              startedAt: current.startedAt || Date.now(),
-            }));
-          }
-          return true;
-        }
-        if (event.type === 'gate') {
-          hasNonTextOutputRef.current = true;
-          hasTerminalErrorRef.current = true;
-          streamedContentRef.current = event.message;
-          setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
-          setStreamError(new Error('WENDY_GATE'));
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsgIdRef.current
-                ? { ...m, role: 'error', content: event.message, isStreaming: false }
-                : m,
-            ),
-          );
-          return true;
-        }
-        if (event.type === 'error') {
-          const message = event.message || 'Wendy si è interrotta. Riprova.';
-          hasNonTextOutputRef.current = true;
-          hasTerminalErrorRef.current = true;
-          streamedContentRef.current = message;
-          setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
-          setStreamError(new Error(event.message));
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsgIdRef.current
-                ? { ...m, role: 'error', content: message, isStreaming: false }
-                : m,
-            ),
-          );
-          return true;
-        }
-        if (event.type === 'rag_citations') {
-          pendingCitationsRef.current = event.citations;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsgIdRef.current
-                ? { ...m, citations: event.citations }
-                : m,
-            ),
-          );
-          return true;
-        }
-        if (event.type === 'done') {
-          receivedDoneRef.current = true;
-          if (event.requestId) lastRequestIdRef.current = event.requestId;
-          contextSourcesRef.current = event.contextSources;
-          answerModeRef.current = event.answerMode;
-          recoveryRef.current = event.recovery;
-          adaptiveReasoningRef.current = event.adaptiveReasoning;
-          suggestedPromptsRef.current = event.suggestedPrompts;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsgIdRef.current
-                ? {
-                    ...m,
-                    requestId: event.requestId,
-                    toolsUsed: [...toolsUsedRef.current],
-                    contextSources: event.contextSources,
-                    answerMode: event.answerMode,
-                    recovery: event.recovery,
-                    adaptiveReasoning: event.adaptiveReasoning,
-                    suggestedPrompts: event.suggestedPrompts,
-                  }
-                : m,
-            ),
-          );
-          return true;
-        }
-        if (event.type === 'tool_call') {
-          hasNonTextOutputRef.current = true;
-          toolsUsedRef.current = [...toolsUsedRef.current, event.name];
-          const action = normalizeWendyAction({
-            name: event.name,
-            args: event.args,
-            result: event.result,
-          });
-          if (action) {
-            const nextAction = action.requiresConfirmation ? action : actionExecutor.executeImmediate(action);
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantMsgIdRef.current
-                  ? { ...m, actions: [...(m.actions ?? []), nextAction] }
-                  : m,
-              ),
-            );
-          }
-          return true;
-        }
-        if (event.type === 'ui_tool') {
-          hasNonTextOutputRef.current = true;
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsgIdRef.current
-                ? {
-                    ...m,
-                    uiTool: { name: event.name, args: event.args },
-                  }
-                : m,
-            ),
-          );
-          return true;
-        }
-        if (event.type === 'token') {
-          streamedContentRef.current += event.value;
-          if (!firstChunkReceivedRef.current) {
-            firstChunkReceivedRef.current = true;
-            setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
-          }
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsgIdRef.current
-                ? { ...m, content: streamedContentRef.current }
-                : m,
-            ),
-          );
-        }
-      return false; // gestisci normalmente
-    },
+    onRawChunk: createWendyRawChunkHandler({
+      defaultThinkingLabel,
+      actionExecutor,
+      assistantMsgIdRef,
+      firstChunkReceivedRef,
+      pendingCitationsRef,
+      lastRequestIdRef,
+      toolsUsedRef,
+      contextSourcesRef,
+      answerModeRef,
+      recoveryRef,
+      adaptiveReasoningRef,
+      suggestedPromptsRef,
+      streamedContentRef,
+      hasNonTextOutputRef,
+      hasTerminalErrorRef,
+      receivedDoneRef,
+      setThinking,
+      setStreamError,
+      setMessages,
+    }),
 
     onComplete: (finalContent) => {
       if (!receivedDoneRef.current && !hasTerminalErrorRef.current) {
@@ -286,7 +166,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgIdRef.current
-              ? { ...m, role: 'error', content: _friendlyError(interrupted), isStreaming: false }
+              ? { ...m, role: 'error', content: friendlyWendyError(interrupted), isStreaming: false }
               : m,
           ),
         );
@@ -404,7 +284,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     },
 
     onError: (err) => {
-      const isFatal = _isNonRetryableStreamError(err);
+      const isFatal = isNonRetryableWendyStreamError(err);
       if (!isFatal && retriesRef.current < maxRetries) {
         retriesRef.current += 1;
         setRetryState({ active: true, attempt: retriesRef.current, max: maxRetries });
@@ -417,7 +297,7 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       setThinking({ active: false, label: defaultThinkingLabel, startedAt: 0 });
       setMessages((prev) => {
         const assistantId = assistantMsgIdRef.current;
-        const errorContent = _friendlyError(err);
+        const errorContent = friendlyWendyError(err);
         const suggestedPrompts = withWendySuggestedPromptFallback(undefined, errorContent, wendyCtx?.pageContext);
         if (assistantId && prev.some((message) => message.id === assistantId && message.isStreaming)) {
           return prev.map((message) =>
@@ -471,25 +351,6 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   }, [stopSSEStream, setWendyPhase, defaultThinkingLabel, maxRetries, broadcastUnlessRemote]);
 
   // Helpers
-
-  function _friendlyError(err: Error): string {
-    if (err.message.includes('504') || err.message.includes('408'))
-      return 'Wendy non risponde. Controlla la connessione e riprova.';
-    if (err.message.includes('503'))
-      return 'Il servizio AI è momentaneamente non disponibile. Riprova tra qualche istante.';
-    if (_isAuthSessionError(err))
-      return 'Sessione scaduta. Effettua nuovamente il login.';
-    return 'Wendy si è interrotta. Riprova.';
-  }
-
-  function _isAuthSessionError(err: Error): boolean {
-    const message = err.message.toUpperCase();
-    return AUTH_SESSION_ERROR_PATTERNS.some((pattern) => message.includes(pattern));
-  }
-
-  function _isNonRetryableStreamError(err: Error): boolean {
-    return _isAuthSessionError(err) || FATAL_ERRORS.some((code) => err.message.includes(code));
-  }
 
   async function _doStream(text: string, contextPrompt?: string, isPredefined = false) {
     const msgId = `assistant-${Date.now()}`;

@@ -10,7 +10,7 @@
 | File | Tipo | Scopo |
 |------|------|-------|
 | `.github/workflows/mobile-qa.yml` | Workflow GHA | Lighthouse CI + Playwright mobile |
-| `lighthouserc.json` | Config | Soglie e emulazione Pixel 5 |
+| `config/lighthouse/lighthouserc.json` | Config | Soglie e emulazione Pixel 5 |
 | `e2e/mobile/onboarding.mobile.spec.ts` | Test E2E | Onboarding su Pixel 5 + iPhone 12 |
 | `e2e/mobile/mobile-nav.mobile.spec.ts` | Test E2E | Drawer, BottomNav, scroll, overflow |
 | `e2e/mobile/pwa-offline.mobile.spec.ts` | Test E2E | Service Worker, manifest, offline |
@@ -24,7 +24,7 @@
 - Ogni PR verso `main`
 - `workflow_dispatch` manuale
 
-### Emulazione mobile configurata (`lighthouserc.json`)
+### Emulazione mobile configurata (`config/lighthouse/lighthouserc.json`)
 
 | Parametro | Valore | Equivale a |
 |-----------|--------|------------|
@@ -115,7 +115,7 @@ Ogni PR riceve un commento con tabella dei risultati Lighthouse:
 # Solo Lighthouse (richiede build)
 pnpm --filter @northstar/web build
 pnpm --filter @northstar/web preview &
-npx lhci autorun --config=lighthouserc.json \
+npx lhci autorun --config=config/lighthouse/lighthouserc.json \
   --collect.url="http://localhost:5173"
 
 # Solo Playwright mobile

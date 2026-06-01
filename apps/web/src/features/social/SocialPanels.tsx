@@ -361,7 +361,7 @@ export function PublicProfilePreview({
         city?: string | null;
         journeyType?: string | null;
         isPublic?: boolean | null;
-      }>(await apiFetch(`${BASE}api/users/${userId}/public?viewerId=${userId}`)),
+      }>(await apiFetch(`${BASE}api/users/${userId}/public`)),
     enabled: !!userId,
   });
 

@@ -152,6 +152,67 @@ async function mockWendySearch(page: Page) {
   });
 }
 
+async function mockNewsFeed(page: Page) {
+  await page.route("**/api/news?**", async (route) => {
+    const requestUrl = new URL(route.request().url());
+    const category = requestUrl.searchParams.get("category") ?? "general";
+
+    if (category === "general") {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          news: [],
+          nextCursor: null,
+          source: "error",
+          status: "error",
+          error: "news_unavailable",
+          diagnostics: {
+            providerStatus: "degraded",
+            lastAttemptAt: "2026-05-31T08:01:00.000Z",
+            enabledSources: 2,
+            sourcesWithErrors: 2,
+            refreshAction: "check_provider_keys",
+            message: "GNews e Tavily hanno restituito errori: controlla chiavi provider o quota.",
+            lastRefreshError: "quota exceeded",
+          },
+        }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        news: [
+          {
+            id: `tablet-${category}`,
+            title: category === "education"
+              ? "Academy tablet deterministica"
+              : `News tablet ${category}`,
+            preview: "Card mockata per verificare tab e layout tablet senza provider reali.",
+            description: "Card mockata per verificare tab e layout tablet senza provider reali.",
+            source: "NorthStar QA",
+            sourceUrl: "https://example.com/source",
+            url: "https://example.com/news/tablet",
+            detailUrl: "/news/tablet-deterministica",
+            publishedAt: "2026-05-31T08:00:00.000Z",
+            image: null,
+            category,
+            sector: null,
+            tags: ["tablet", "qa"],
+            relevance: 90,
+            plan: "free",
+          },
+        ],
+        source: "static",
+        status: "ok",
+      }),
+    });
+  });
+}
+
 test.describe("Tablet Critical Visual QA", () => {
   test("candidature tablet mantiene kanban, dialog e controlli touch nel viewport", async ({ page }) => {
     await loginViaApi(page);
@@ -201,6 +262,34 @@ test.describe("Tablet Critical Visual QA", () => {
     await expect(page.getByRole("region", { name: "Chat Wendy" })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/Wendy resta leggibile anche al breakpoint tablet/i)).toBeVisible({ timeout: 10_000 });
     await expectTouchTarget(page.getByRole("button", { name: /Invia a Wendy|Interrompi Wendy/i }).last(), "controllo invio Wendy tablet");
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test("news tablet mostra diagnostica provider e tab categoria touch-safe", async ({ page }) => {
+    await mockNewsFeed(page);
+
+    await page.goto("/news", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByRole("heading", { level: 1, name: /news|notizie/i })).toBeVisible({ timeout: 15_000 });
+    const overviewTab = page.getByRole("button", { name: /panoramica|overview|general/i });
+    const technologyTab = page.getByRole("button", { name: /tecnologia|technology/i });
+    const educationTab = page.getByRole("button", { name: /formazione|education/i });
+
+    await expectTouchTarget(overviewTab, "tab news panoramica");
+    await expectTouchTarget(technologyTab, "tab news tecnologia");
+    await expectTouchTarget(educationTab, "tab news formazione");
+
+    await expect(page.getByRole("status")).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(/GNews e Tavily/i)).toBeVisible();
+    await expect(page.getByText(/Controlla chiavi e limiti provider/i)).toBeVisible();
+    await expect(page.getByText(/Fonti degradate/i)).toBeVisible();
+    await expect(page.getByText(/quota exceeded/i)).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await educationTab.click();
+    await expect(page.getByRole("heading", { level: 3, name: /Academy tablet deterministica/i })).toBeVisible({
+      timeout: 15_000,
+    });
     await expectNoHorizontalOverflow(page);
   });
 });

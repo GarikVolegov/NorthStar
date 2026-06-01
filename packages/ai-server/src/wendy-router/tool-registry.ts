@@ -5,6 +5,7 @@
  * Le descrizioni sono formulate per essere non ambigue (disambiguazione obbligatoria).
  */
 import type { WendyIntent, ToolDefinition } from "./types";
+import { INTENT_TOOLS } from "./tool-registry-data";
 
 // ── Catalogo completo ─────────────────────────────────────────────────────────
 
@@ -316,111 +317,6 @@ const ALL_TOOLS: Record<string, ToolDefinition> = {
 };
 
 // ── Matrice intent → tool abilitati ──────────────────────────────────────────
-
-const INTENT_TOOLS: Record<WendyIntent, string[]> = {
-  navigation: [
-    "open_view",
-    "set_filters",
-  ],
-  simple_qa: [
-    "get_sector_detail",
-    "list_sectors",
-    "get_profession_detail",
-    "search_professions",
-    "get_news_summary",
-    "search_rag",          // Step 6: grounding RAG per domande su trend/ruoli
-    "search_brain",        // Brain runtime: NorthStar identity/product/process
-    "get_weak_signals",    // Step 6: segnali emergenti
-    "recall_semantic_memory",     // Plugin memory: recall conversazionale
-    "ask_openhuman_memory",       // Personal Intelligence: memoria utente
-    "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
-    "search_code_graph",
-    "get_rabbit_care_guide",      // Rabbit: guide cura
-    "check_food_safety",          // Rabbit: sicurezza alimenti
-    "get_breed_info",             // Rabbit: info razze
-    "search_rabbit_kb",           // Rabbit: knowledge base
-  ],
-  conversation: [
-    "open_view",
-    "get_sector_detail",
-    "list_sectors",
-    "get_profession_detail",
-    "generate_day_scene",
-    "search_professions",
-    "get_user_objectives",
-    "update_objective_progress",
-    "get_news_summary",
-    "get_market_trend",
-    "get_user_context",
-    "search_memory_graph",
-    "get_growth_articles",
-    "add_calendar_event",
-    "save_memory_fact",
-    "search_rag",          // Step 6: grounding su domande di mercato
-    "search_brain",        // Brain runtime: NorthStar identity/product/process
-    "get_weak_signals",    // Step 6: anticipare trend nel settore utente
-    "recall_semantic_memory",     // Plugin memory: recall conversazionale
-    "ask_openhuman_memory",       // Personal Intelligence: memoria utente
-    "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
-    "search_code_graph",
-    "get_rabbit_care_guide",      // Rabbit: guide cura
-    "check_food_safety",          // Rabbit: sicurezza alimenti
-    "get_breed_info",             // Rabbit: info razze
-    "search_rabbit_kb",           // Rabbit: knowledge base
-  ],
-  planning: [
-    "get_sector_detail",
-    "list_sectors",
-    "get_profession_detail",
-    "search_professions",
-    "get_user_objectives",
-    "save_objective",
-    "update_objective_progress",
-    "get_growth_articles",
-    "get_learning_paths",
-    "get_market_trend",
-    "save_business_idea",
-    "add_calendar_event",
-    "save_memory_fact",
-    "get_user_context",
-    "search_memory_graph",
-    "search_rag",                // Step 6: grounding per piano basato su dati reali
-    "search_brain",              // Brain runtime: piani su NorthStar identity/product/process
-    "get_weak_signals",          // Step 6: ruoli emergenti rilevanti per il piano
-    "get_job_posting_trend",     // Step 6: trend domanda per il ruolo target
-    "get_skill_cooccurrences",   // Step 6: skill complementari per il piano
-    "recall_semantic_memory",    // Plugin memory: recall conversazionale
-    "get_rabbit_care_guide",     // Rabbit: guide cura per pianificazione setup
-    "search_rabbit_kb",          // Rabbit: knowledge base approfondito
-  ],
-  deep_analysis: [
-    "get_sector_detail",
-    "list_sectors",
-    "get_profession_detail",
-    "generate_day_scene",
-    "search_professions",
-    "compare_sectors",
-    "get_market_trend",
-    "get_growth_articles",
-    "get_user_context",
-    "search_memory_graph",
-    "get_user_objectives",
-    "search_rag",                // Step 6: analisi profonda con fonti autorevoli
-    "search_brain",              // Brain runtime: NorthStar identity/product/process
-    "get_weak_signals",          // Step 6: segnali emergenti nel settore
-    "get_job_posting_trend",     // Step 6: confronto periodi e crescita domanda
-    "get_skill_cooccurrences",   // Step 6: mappa skill correlate
-    "recall_semantic_memory",     // Plugin memory: recall conversazionale
-    "ask_openhuman_memory",       // Personal Intelligence: memoria utente
-    "explain_app_with_graphify",  // Personal Intelligence: spiegare l'app
-    "search_code_graph",
-    "explain_code_node",
-    "get_rabbit_care_guide",      // Rabbit: guide cura
-    "check_food_safety",          // Rabbit: sicurezza alimenti
-    "get_breed_info",             // Rabbit: info razze
-    "search_rabbit_kb",           // Rabbit: knowledge base
-  ],
-};
 
 // ── API pubblica ──────────────────────────────────────────────────────────────
 

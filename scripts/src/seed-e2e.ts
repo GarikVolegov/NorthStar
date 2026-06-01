@@ -11,7 +11,7 @@
  *   E2E_USER_PASSWORD     — password in chiaro (required)
  */
 
-import "dotenv/config";
+import "./load-env";
 import { sql } from "drizzle-orm";
 import { db } from "@workspace/db";
 import * as crypto from "crypto";

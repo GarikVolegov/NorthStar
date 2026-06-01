@@ -8,6 +8,7 @@ const __dirname = path.dirname(__filename);
 
 // Load environment variables from the root of the monorepo
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../../.env.local'), override: true });
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {

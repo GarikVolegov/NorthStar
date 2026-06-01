@@ -9,7 +9,7 @@ const SEVERITY_EMOJI: Record<string, string> = {
 };
 
 /** Neutralize LLM-generated text before writing it into the tracked
- * SECURITY_RULES.md: strip control chars (incl. newlines), defuse markdown
+ * Security rules updater: strip control chars (incl. newlines), defuse markdown
  * backticks, and cap length so a finding can't inject structure or bloat the
  * file unbounded. */
 function sanitizeField(value: string, max = 500): string {
@@ -29,7 +29,7 @@ export function updateSecurityRules(
   findings:  SecurityFinding[],
   scannedFiles: number,
 ): void {
-  const mdPath  = join(repoRoot, "SECURITY_RULES.md");
+  const mdPath  = join(repoRoot, ".brain", "40_Agent_Context", "rules", "SECURITY_RULES.md");
   const date    = new Date().toISOString().slice(0, 10);
   const existing = existsSync(mdPath) ? readFileSync(mdPath, "utf-8") : "";
 

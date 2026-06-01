@@ -46,6 +46,9 @@ Ruolo DDL: northstar_migrator → DATABASE_URL_MIGRATOR
 
 ## Step 2 — Configura GitHub Environment "staging"
 
+NorthStar mantiene un solo template env versionato in root: `.env`.
+Per staging non esiste piu un template duplicato: crea un `.env.staging` locale solo se ti serve testare il deploy manualmente, partendo da `.env` e applicando i valori staging sotto.
+
 1. Vai su **GitHub → Repo → Settings → Environments**
 2. Crea un environment chiamato esattamente `staging`
 3. Aggiungi i seguenti **Secret** (valori reali da non condividere):
@@ -59,6 +62,11 @@ Ruolo DDL: northstar_migrator → DATABASE_URL_MIGRATOR
 | `RAILWAY_STAGING_API_TOKEN` | Railway → Account → API Tokens → New Token |
 | `RAILWAY_STAGING_SERVICE_ID` | Railway → Servizio → Settings → Service ID |
 | `SLACK_WEBHOOK_URL` | Slack → Incoming Webhooks (opzionale) |
+| `STRIPE_SECRET_KEY` | Stripe test mode, formato `sk_test_*` |
+| `STRIPE_WEBHOOK_SECRET` | Webhook endpoint staging in Stripe |
+| `GNEWS_API_KEY` | Provider news test/staging |
+| `TAVILY_API_KEY` | Provider ricerca test/staging |
+| `SENTRY_DSN` | Progetto Sentry `northstar-staging` |
 
 4. Aggiungi le seguenti **Variables** (non secret, visibili nei log):
 
@@ -66,6 +74,10 @@ Ruolo DDL: northstar_migrator → DATABASE_URL_MIGRATOR
 |---|---|
 | `STAGING_URL` | `https://northstar-staging.up.railway.app` |
 | `SLACK_NOTIFY` | `true` o `false` |
+| `AI_MOCK_MODE` | `true` per evitare costi LLM |
+| `ENVIRONMENT` | `staging` |
+| `ALLOWED_ORIGINS` | URL frontend staging |
+| `VITE_API_URL` | URL API staging con `/api` |
 
 ---
 
@@ -76,7 +88,7 @@ Ruolo DDL: northstar_migrator → DATABASE_URL_MIGRATOR
 3. Crea un nuovo webhook endpoint:
    - URL: `https://northstar-staging-api.up.railway.app/api/webhooks/stripe`
    - Events: `invoice.paid`, `customer.subscription.deleted`, `payment_intent.payment_failed`
-4. Copia il **Webhook signing secret** → `STRIPE_WEBHOOK_SECRET` in `.env.staging`
+4. Copia il **Webhook signing secret** → `STRIPE_WEBHOOK_SECRET` nei secret/variables di staging
 5. Usa `sk_test_*` come `STRIPE_SECRET_KEY` — mai `sk_live_*` in staging
 
 ### Test pagamento finto con Stripe CLI
@@ -110,7 +122,7 @@ Cosa cambia con mock mode attivo:
 
 Per testare l'AI reale in staging:
 ```bash
-# Nel .env.staging locale:
+# In `.env.staging` locale, oppure nelle variables dell'environment staging:
 AI_MOCK_MODE=false
 OPENAI_API_KEY=sk-proj-REAL_KEY_HERE
 ```

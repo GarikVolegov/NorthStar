@@ -9,9 +9,10 @@ updated: 2026-05-28
 
 # L3 — Product
 
-Come NorthStar è realizzato. Ogni sottosistema linka al codice in `90_Code/Nodes/`. Ogni pipeline corrisponde a una voce di `.planning/pipeline-registry.json`.
+Come NorthStar e realizzato. Ogni sottosistema linka al codice applicativo nei workspace `apps/` e `packages/`.
 
 ## Sottosistemi
+- [[ARCHITECTURE]] - architettura generale, confini e flussi runtime
 - [[Subsystems/Wendy]] — chat agent (RAG + tool calling)
 - [[Subsystems/AAaS-Ritual]] — engine di routine schedulate user-level
 - [[Subsystems/RAG-Pipeline]] — grounding su job market reale
@@ -32,4 +33,4 @@ Come NorthStar è realizzato. Ogni sottosistema linka al codice in `90_Code/Node
 | [[Pipelines/tech-debt]] | internal | mensile |
 
 Risale a → [[../10_Domain/_MOC|L2 Domain]]
-Discende a → [[../30_Process/_MOC|L3.5 Process]] · [[../90_Code/README|L4 Code]]
+Discende a [[../30_Process/_MOC|L3.5 Process]]

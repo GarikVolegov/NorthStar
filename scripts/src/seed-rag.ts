@@ -13,7 +13,7 @@
  *   - 3 skill_cooccurrences di esempio
  */
 
-import "dotenv/config";
+import "./load-env";
 import { eq, and } from "drizzle-orm";
 import {
   db,

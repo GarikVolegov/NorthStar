@@ -10,11 +10,11 @@ Prima di modificare qualsiasi area del progetto, apri **sempre** il file di rego
 
 | Area di lavoro                                     | File da leggere                            |
 | -------------------------------------------------- | ------------------------------------------ |
-| Backend API / Express / router / middleware / auth | [`API_RULES.md`](./API_RULES.md)           |
-| Database / Drizzle ORM / migrations / seed         | [`DB_RULES.md`](./DB_RULES.md)             |
-| Frontend React / UI / Tailwind / Vite              | [`FRONTEND_RULES.md`](./FRONTEND_RULES.md) |
-| AI agent / OpenAI / Wendy / prompt                 | [`AI_RULES.md`](./AI_RULES.md)             |
-| Git / branching / commit / PR                      | [`GIT_RULES.md`](./GIT_RULES.md)           |
+| Backend API / Express / router / middleware / auth | [`.brain/40_Agent_Context/rules/API_RULES.md`](./.brain/40_Agent_Context/rules/API_RULES.md)           |
+| Database / Drizzle ORM / migrations / seed         | [`.brain/40_Agent_Context/rules/DB_RULES.md`](./.brain/40_Agent_Context/rules/DB_RULES.md)             |
+| Frontend React / UI / Tailwind / Vite              | [`.brain/40_Agent_Context/rules/FRONTEND_RULES.md`](./.brain/40_Agent_Context/rules/FRONTEND_RULES.md) |
+| AI agent / OpenAI / Wendy / prompt                 | [`.brain/40_Agent_Context/rules/AI_RULES.md`](./.brain/40_Agent_Context/rules/AI_RULES.md)             |
+| Git / branching / commit / PR                      | [`.brain/40_Agent_Context/rules/GIT_RULES.md`](./.brain/40_Agent_Context/rules/GIT_RULES.md)           |
 
 Per capire dove posizionare file, script e documentazione, consulta anche
 [`docs/REPOSITORY_STRUCTURE.md`](./docs/REPOSITORY_STRUCTURE.md).
@@ -31,7 +31,7 @@ NorthStar è una piattaforma SaaS modulare composta da:
 | -------------------- | ----------------------------- | ----- | ------------------------------ |
 | **PostgreSQL**       | postgres:16-alpine            | 5432  | Database principale            |
 | **Redis**            | redis:7-alpine                | 6379  | Cache + rate limiting          |
-| **AI Agents (ML)**   | Python FastAPI (`main.py`)    | 8000  | ML training/predizione modelli |
+| **AI Agents (ML)**   | Python FastAPI (`packages/ml-service/`)    | 8000  | ML training/predizione modelli |
 | **NorthStar Server** | Express + TS (`apps/server/`) | 3001  | API REST principale            |
 | **Frontend**         | React + Vite (`apps/web/`)    | 5173  | SPA frontend                   |
 | **Jaeger**           | jaegertracing/all-in-one      | 16686 | Distributed tracing UI         |
@@ -76,17 +76,17 @@ NorthStar è una piattaforma SaaS modulare composta da:
 ### Setup in 3 comandi
 
 ```bash
-cp .env.example .env   # compila i valori in .env
+cp .env .env.local     # compila i valori reali in .env.local
 pnpm install            # installa dipendenze
 pnpm dev                # avvia Docker (postgres, redis) + northstar-server :3001 + frontend :5173
 ```
 
 ### Variabili d'Ambiente
 
-Copiare `.env.example` in `.env` e compilare:
+Il template versionato e' `.env`. Copiarlo in `.env.local` e compilare solo il file locale:
 
 ```bash
-cp .env.example .env
+cp .env .env.local
 ```
 
 Le variabili necessarie includono:
@@ -103,9 +103,9 @@ Opzionali:
 - `RESEND_API_KEY` — Chiave API Resend per email
 - `GNEWS_API_KEY` — Chiave API GNews
 
-> ⚠️ **NESSUNA** di queste chiavi deve essere committata nel repository.
+> ⚠️ **NESSUNA** di queste chiavi deve essere committata nel repository. `.env.local` e gli altri `.env.*` restano ignorati.
 
-### Regole di Sicurezza (vedi `GIT_RULES.md`)
+### Regole di Sicurezza (vedi `.brain/40_Agent_Context/rules/GIT_RULES.md`)
 
 - Controlli pre-commit impediscono l'aggiunta di segreti
 - Usare `git diff --staged | grep -iE '(sk-|password|secret|key)=.'` per verificare
@@ -152,14 +152,14 @@ Ogni servizio ha un health check configurato:
 
 ### Posizione
 
-Il microservizio AI vive in root come servizio FastAPI indipendente, montato da `docker-compose.yml`.
+Il microservizio AI vive in `packages/ml-service/` come servizio FastAPI indipendente, montato da `docker-compose.yml`.
 
 ### File Correlati
 
-- `main.py`: punto di ingresso del server
-- `pyproject.toml`: definisce le dipendenze e i metadati
-- `uv.lock`: file di blocco delle dipendenze generato da `uv`
-- `.python-version`: specifica la versione di Python (3.11)
+- `packages/ml-service/main.py`: punto di ingresso del server
+- `packages/ml-service/pyproject.toml`: definisce le dipendenze e i metadati
+- `packages/ml-service/uv.lock`: file di blocco delle dipendenze generato da `uv`
+- `packages/ml-service/Dockerfile`: immagine sandbox/compose del servizio
 
 ### Dipendenze Principali
 
@@ -360,7 +360,7 @@ Retry con backoff esponenziale (max 3 tentativi, 1s/2s/4s) su errori transitori 
 | `wendy_llm_tokens_total`            | Counter   | model          |
 | `wendy_router_confidence_histogram` | Histogram | domain, intent |
 
-### Python ML Service (`main.py`)
+### Python ML Service (`packages/ml-service/main.py`)
 
 Microservizio FastAPI per training e predizione di modelli ML (scikit-learn):
 
@@ -482,9 +482,9 @@ Gli script in `scripts/` gestiscono:
 
 ### Percorso nuovo contributor
 
-1. Leggi `CONTRIBUTING.md` per setup locale, comandi obbligatori e checklist PR.
-2. Leggi `ARCHITECTURE.md` per flussi web, server, AI/RAG, DB e auth.
-3. Usa `RUNBOOK.md` per rollback, hotfix e risposta incident.
+1. Leggi `.brain/30_Process/CONTRIBUTING.md` per setup locale, comandi obbligatori e checklist PR.
+2. Leggi `.brain/20_Product/ARCHITECTURE.md` per flussi web, server, AI/RAG, DB e auth.
+3. Usa `.brain/30_Process/RUNBOOK.md` per rollback, hotfix e risposta incident.
 
 ## 📝 Note Importanti
 
@@ -497,15 +497,15 @@ Gli script in `scripts/` gestiscono:
 
 ## 📚 Risorse Correlate
 
-- [`API_RULES.md`](./API_RULES.md) — Dettagli su autenticazione, rate limiting, struttura rotte
-- [`CONTRIBUTING.md`](./CONTRIBUTING.md) — Setup contributor, checklist PR e gate locali
-- [`SECURITY.md`](./SECURITY.md) — Responsible disclosure pubblico
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — Overview C4, flussi runtime e pattern di sviluppo
-- [`RUNBOOK.md`](./RUNBOOK.md) — Incident response, rollback e hotfix
-- [`DB_RULES.md`](./DB_RULES.md) — Schema DB, convenzioni naming, indicazioni su migrazioni
-- [`FRONTEND_RULES.md`](./FRONTEND_RULES.md) — Componenti UI, stato globale, styling guidelines
-- [`AI_RULES.md`](./AI_RULES.md) — Architettura AI agent, provider LLM, feature flags
-- [`GIT_RULES.md`](./GIT_RULES.md) — Convenzioni commit, strategie branching, PR template
+- [`.brain/40_Agent_Context/rules/API_RULES.md`](./.brain/40_Agent_Context/rules/API_RULES.md) — Dettagli su autenticazione, rate limiting, struttura rotte
+- [`.brain/30_Process/CONTRIBUTING.md`](./.brain/30_Process/CONTRIBUTING.md) — Setup contributor, checklist PR e gate locali
+- [`.brain/30_Process/SECURITY.md`](./.brain/30_Process/SECURITY.md) — Responsible disclosure pubblico
+- [`.brain/20_Product/ARCHITECTURE.md`](./.brain/20_Product/ARCHITECTURE.md) — Overview C4, flussi runtime e pattern di sviluppo
+- [`.brain/30_Process/RUNBOOK.md`](./.brain/30_Process/RUNBOOK.md) — Incident response, rollback e hotfix
+- [`.brain/40_Agent_Context/rules/DB_RULES.md`](./.brain/40_Agent_Context/rules/DB_RULES.md) — Schema DB, convenzioni naming, indicazioni su migrazioni
+- [`.brain/40_Agent_Context/rules/FRONTEND_RULES.md`](./.brain/40_Agent_Context/rules/FRONTEND_RULES.md) — Componenti UI, stato globale, styling guidelines
+- [`.brain/40_Agent_Context/rules/AI_RULES.md`](./.brain/40_Agent_Context/rules/AI_RULES.md) — Architettura AI agent, provider LLM, feature flags
+- [`.brain/40_Agent_Context/rules/GIT_RULES.md`](./.brain/40_Agent_Context/rules/GIT_RULES.md) — Convenzioni commit, strategie branching, PR template
 - [`docs/ai-modules/`](./docs/ai-modules/) — Documentazione dettagliata moduli AI
 - [`docs/SEO-GEO-SEM.md`](./docs/SEO-GEO-SEM.md) — SEO, Generative Engine Optimization, SEM
 - [`docs/staging-setup.md`](./docs/staging-setup.md) — Setup ambiente staging

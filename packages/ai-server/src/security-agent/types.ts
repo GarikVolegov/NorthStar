@@ -56,7 +56,7 @@ export interface SecurityScanOptions {
   applyFixes?: boolean;
   /** User id initiating the scan (for cost tracking). */
   userId:      number;
-  /** Repo root — used to resolve relative paths and update SECURITY_RULES.md. */
+  /** Repo root — used to resolve relative paths and update .brain/40_Agent_Context/rules/SECURITY_RULES.md. */
   repoRoot:    string;
 }
 

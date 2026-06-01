@@ -28,7 +28,7 @@ const BASE = import.meta.env.BASE_URL || "/";
 const PARTNER_LABELS: Record<string, string> = {
   scuola_media: "Scuola media",
   scuola_superiore: "Scuola superiore",
-  universita: "UniversitÃ ",
+  universita: "Università",
   agenzia_lavoro: "Agenzia per il lavoro",
   centro_formazione: "Centro di formazione",
   ente_pubblico: "Ente pubblico",
@@ -87,7 +87,7 @@ function fmtDate(iso: string) {
 
 export default function AdminAffiliazione() {
   useEffect(() => {
-    document.title = "Admin Affiliazione â€” NorthStar";
+    document.title = "Admin Affiliazione - NorthStar";
   }, []);
 
   const { key, logout } = useAdminAuth();
@@ -180,7 +180,7 @@ export default function AdminAffiliazione() {
   const newCount = leads.filter((l) => !l.read).length;
   const activeCount = leads.filter((l) => l.status === "attivo").length;
 
-  // â”€â”€ Main panel â”€â”€
+  // Main panel
   return (
     <AdminAuthGate
       title="Admin Affiliazione"
@@ -195,7 +195,7 @@ export default function AdminAffiliazione() {
                 <Handshake className="w-4 h-4 text-primary" />
               </div>
               <span className="font-serif font-bold">
-                Admin Â· Affiliazione
+                Admin - Affiliazione
               </span>
               {newCount > 0 && (
                 <span className="bg-primary text-primary-foreground text-xs font-bold px-2 py-0.5 rounded-full">
@@ -328,7 +328,7 @@ export default function AdminAffiliazione() {
               ))}
               <div className="ml-auto">
                 <Input
-                  placeholder="Cerca istituzione, referente, emailâ€¦"
+                  placeholder="Cerca istituzione, referente, email..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="h-8 text-xs rounded-xl w-56"
@@ -348,7 +348,7 @@ export default function AdminAffiliazione() {
           {loading && leads.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
               <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-3 opacity-40" />
-              Caricamento leadâ€¦
+              Caricamento lead...
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center py-16 text-muted-foreground">
@@ -530,7 +530,7 @@ export default function AdminAffiliazione() {
                       {/* Actions */}
                       <div className="pt-3 border-t flex flex-wrap items-center gap-3">
                         <a
-                          href={`mailto:${lead.email}?subject=Partnership NorthStar â€” ${lead.institutionName}`}
+                          href={`mailto:${lead.email}?subject=Partnership NorthStar - ${lead.institutionName}`}
                           className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                         >
                           <Mail className="w-3.5 h-3.5" />

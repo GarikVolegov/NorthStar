@@ -53,7 +53,7 @@
 }
 ```
 Disabilita il `backdrop-filter` su mobile (GPU deboli), allineato con
-`FRONTEND_RULES.md §3.3`.
+`.brain/40_Agent_Context/rules/FRONTEND_RULES.md §3.3`.
 
 ---
 

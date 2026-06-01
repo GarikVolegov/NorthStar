@@ -3,11 +3,11 @@
 # NorthStar — Generatore di secret per il deploy
 #
 # Genera JWT_SECRET, ADMIN_KEY e le chiavi VAPID, poi stampa un blocco
-# pronto da copiare in Replit Secrets o nel tuo file .env.
+# pronto da copiare in Replit Secrets o nel tuo file .env.local.
 #
 # Utilizzo:
 #   pnpm run secrets              # stampa i valori pronti da copiare
-#   pnpm run secrets:env          # salva anche in .env (non committare!)
+#   pnpm run secrets:env          # salva anche in .env.local (non committare!)
 # Oppure direttamente:
 #   bash scripts/generate-secrets.sh
 #   bash scripts/generate-secrets.sh --env
@@ -54,7 +54,7 @@ VAPID_PRIVATE=$(echo "$VAPID_OUTPUT" | node -e "process.stdout.write(JSON.parse(
 # ── Output ────────────────────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Copia questi valori nei Replit Secrets (o nel tuo .env):"
+echo "  Copia questi valori nei Replit Secrets (o nel tuo .env.local):"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "JWT_SECRET=$JWT_SECRET"
@@ -65,7 +65,7 @@ echo "VAPID_PRIVATE_KEY=$VAPID_PRIVATE"
 echo "VAPID_EMAIL=support@example.com   # <-- sostituisci con il tuo indirizzo"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "  Variabili da configurare manualmente (vedi .env.example):"
+echo "  Variabili da configurare manualmente (vedi .env):"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "  DATABASE_URL            — Replit PostgreSQL (Tools → Database)"
@@ -79,12 +79,12 @@ echo "  GOOGLE_CLIENT_ID        — https://console.cloud.google.com"
 echo "  AI_INTEGRATIONS_OPENAI_* — Replit: Tools → Integrations → OpenAI"
 echo ""
 
-# ── Salva in .env (opzionale) ─────────────────────────────────────
+# ── Salva in .env.local (opzionale) ───────────────────────────────
 if [[ "$SAVE_ENV" == true ]]; then
-  ENV_FILE=".env"
+  ENV_FILE=".env.local"
   echo "  Scrittura in $ENV_FILE..."
 
-  # Aggiorna o aggiunge le variabili nel file .env
+  # Aggiorna o aggiunge le variabili nel file .env.local
   update_env() {
     local key="$1"
     local val="$2"
@@ -104,6 +104,6 @@ if [[ "$SAVE_ENV" == true ]]; then
 
   echo "  ✓ Valori scritti in $ENV_FILE"
   echo ""
-  echo "  ⚠  Non committare mai il file .env — aggiungilo al .gitignore."
+  echo "  ⚠  Non committare mai il file .env.local: contiene secret reali."
   echo ""
 fi

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { apiFetch } from "@/lib/api-fetch";
 import { ApiClientError, deleteJson, getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -124,6 +125,8 @@ export default function Calendario() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [showPushBanner, setShowPushBanner] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   useEffect(() => {
     const dismissed = localStorage.getItem("push_banner_dismissed");
@@ -172,6 +175,32 @@ export default function Calendario() {
     else setCurrentDate(dir === 1 ? addDays(currentDate, 1) : subDays(currentDate, 1));
   };
 
+  const handleExportCalendar = async () => {
+    setExportError(null);
+    setIsExporting(true);
+
+    try {
+      const response = await apiFetch(`${BASE}api/calendar/export.ics`);
+      if (!response.ok) {
+        throw new Error(`calendar export failed: ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = "northstar-calendar.ics";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(href);
+    } catch {
+      setExportError("Non siamo riusciti a esportare il calendario. Riprova tra poco.");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   useEffect(() => {
     if (!isLoggedIn) routerNavigate("/");
   }, [isLoggedIn, routerNavigate]);
@@ -213,18 +242,30 @@ export default function Calendario() {
               </button>
             ))}
           </div>
-          <a
-            href={`${BASE}api/calendar/export.ics`}
+          <button
+            type="button"
+            onClick={() => void handleExportCalendar()}
+            disabled={isExporting}
             title="Esporta in Google Calendar / iCal"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border hover:border-primary/30 rounded-full px-3 py-1.5 transition-all"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border hover:border-primary/30 rounded-full px-3 py-1.5 transition-all disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Download className="h-3.5 w-3.5" /> Esporta .ics
-          </a>
+            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+            Esporta .ics
+          </button>
           <Button size="sm" className="rounded-full gap-1" onClick={() => { setEditingEvent(null); setSelectedDate(new Date()); setModalOpen(true); }}>
             <Plus className="h-4 w-4" /> Nuovo evento
           </Button>
         </div>
       </div>
+
+      {exportError && (
+        <div
+          role="alert"
+          className="mb-4 rounded-xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+        >
+          {exportError}
+        </div>
+      )}
 
       {/* Calendar navigation */}
       <div className="flex items-center justify-between mb-4">

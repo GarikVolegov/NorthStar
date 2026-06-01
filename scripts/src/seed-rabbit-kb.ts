@@ -10,7 +10,7 @@
  *        Ministero della Salute IT, ANMVI linee guida esotici.
  */
 
-import "dotenv/config";
+import "./load-env";
 import { eq, and } from "drizzle-orm";
 import { db, knowledgeNodesTable } from "@workspace/db";
 import { ingestText } from "@workspace/ai-server";

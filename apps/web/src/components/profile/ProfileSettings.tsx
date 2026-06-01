@@ -6,6 +6,8 @@ import { LogoPicker } from "@/components/profile/LogoPicker";
 import { MonthlyRitualSettings } from "@/components/profile/MonthlyRitualSettings";
 import { NftCertificateGallery } from "@/components/NftCertificateGallery";
 import { NotificationSettings } from "@/components/profile/NotificationSettings";
+import { CapsuleTrigger } from "@/components/profile/CapsuleTrigger";
+import { BADGE_DEFS, WENDY_TONES, type CompletionData } from "@/components/profile/profile-settings-data";
 import { PrivacyCard } from "@/components/profile/settings/PrivacyCard";
 import {
   Accordion,
@@ -45,7 +47,6 @@ import {
   Trophy,
   User,
   Volume2,
-  type LucideIcon,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
@@ -63,39 +64,6 @@ function apiErrorMessage(error: unknown, fallback: string) {
   return error instanceof ApiClientError ? error.message : error instanceof Error ? error.message : fallback;
 }
 
-type CompletionData = {
-  hasTestSession: boolean;
-  hasConfirmedSector: boolean;
-  hasWorkPreference: boolean;
-  hasCv: boolean;
-  isPublic: boolean;
-  streakDays: number;
-  totalObjectives: number;
-  completedObjectives: number;
-} | null;
-
-const BADGE_DEFS: Array<{
-  id: string;
-  emoji: string;
-  label: string;
-  check: (d: NonNullable<CompletionData>) => boolean;
-}> = [
-  { id: "test",        emoji: "🧠", label: "Primo test",        check: (d) => d.hasTestSession },
-  { id: "sector",      emoji: "🎯", label: "Settore scelto",    check: (d) => d.hasConfirmedSector },
-  { id: "cv",          emoji: "📄", label: "CV caricato",       check: (d) => d.hasCv },
-  { id: "shared",      emoji: "🌐", label: "Profilo pubblico",  check: (d) => d.isPublic },
-  { id: "objectives",  emoji: "🏆", label: "5 obiettivi fatti", check: (d) => d.completedObjectives >= 5 },
-  { id: "streak",      emoji: "🔥", label: "Streak 3 giorni",   check: (d) => d.streakDays >= 3 },
-];
-
-const WENDY_TONES: Array<{ value: string; label: string; description: string }> = [
-  { value: "auto",     label: "Automatico",  description: "Wendy adatta il tono al contesto" },
-  { value: "concise",  label: "Conciso",     description: "Risposte brevi e dirette" },
-  { value: "detailed", label: "Dettagliato", description: "Spiegazioni approfondite" },
-  { value: "formal",   label: "Formale",     description: "Tono professionale e strutturato" },
-  { value: "casual",   label: "Informale",   description: "Conversazione rilassata" },
-];
-
 interface ProfileSettingsProps {
   user: AuthUser;
   createdAt?: string;
@@ -105,31 +73,6 @@ interface ProfileSettingsProps {
   username?: string | null | undefined;
   wendyTonePreference?: string | null | undefined;
   journeySections?: ReactNode;
-}
-
-function CapsuleTrigger({
-  Icon,
-  title,
-  description,
-  accessory,
-}: {
-  Icon: LucideIcon;
-  title: string;
-  description: string;
-  accessory?: ReactNode;
-}) {
-  return (
-    <span className="flex min-w-0 flex-1 flex-col gap-1 text-left md:flex-row md:items-center md:justify-between md:gap-6">
-      <span className="flex min-w-0 items-center gap-2.5">
-        <Icon className="h-4 w-4 shrink-0 text-primary" />
-        <span className="text-sm font-semibold text-foreground">{title}</span>
-        {accessory}
-      </span>
-      <span className="text-xs font-normal leading-relaxed text-muted-foreground md:max-w-md md:text-right">
-        {description}
-      </span>
-    </span>
-  );
 }
 
 export function ProfileSettings({

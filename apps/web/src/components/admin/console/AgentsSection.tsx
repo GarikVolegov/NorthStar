@@ -1,25 +1,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
-  Activity,
-  BarChart3,
   Bot,
-  BriefcaseBusiness,
   CheckCircle2,
-  Clock,
-  FileText,
-  History,
-  Newspaper,
   Play,
   RefreshCw,
-  Settings2,
-  ShieldAlert,
-  Workflow,
 } from "lucide-react";
-import { useState } from "react";
-import { AgentLaunchResult } from "./AgentLaunchResult";
+import { AgentsLaunchTab } from "./AgentsLaunchTab";
+import { AgentsSummaryCards } from "./AgentsSummaryCards";
+import { AgentsTabButtons } from "./AgentsTabButtons";
 import { PersistenceWarningBanner } from "./shared";
 import type { AgentsOverview, AgentsTab } from "./types";
 import {
@@ -27,7 +17,6 @@ import {
   agentStatusLabel,
   fmtDuration,
   fmtShortDate,
-  fmtUsd,
 } from "./utils";
 
 type AgentLaunchPayload = Record<string, unknown>;
@@ -99,15 +88,6 @@ export function AgentsSection({
   onOpenStatus,
   onLaunch,
 }: AgentsSectionProps) {
-  const [showAdvancedTools, setShowAdvancedTools] = useState(false);
-  const tabs: Array<{ key: AgentsTab; label: string; icon: typeof Activity }> =
-    [
-      { key: "overview", label: "Dashboard", icon: Activity },
-      { key: "launch", label: "Pipeline", icon: Workflow },
-      { key: "history", label: "Cronologia", icon: History },
-      { key: "errors", label: "Errori", icon: ShieldAlert },
-    ];
-
   const healthStatus = data?.persistenceUnavailable
     ? "critical"
     : data && data.summary.criticalAgents > 0
@@ -129,18 +109,6 @@ export function AgentsSection({
   const hasNewsLaunch =
     pipelines.some((pipeline) => pipeline.key === "news-publishing") ||
     advancedAgents.some((agent) => agent.key === "news-research");
-  const pipelineIcon = (key: string) => {
-    if (key === "news-publishing") return Newspaper;
-    if (key === "growth-research-review") return FileText;
-    if (key === "market-refresh") return BriefcaseBusiness;
-    return Workflow;
-  };
-  const reviewPolicyLabel = (policy: string) => {
-    if (policy === "auto_publish") return "Pubblicazione automatica";
-    if (policy === "requires_review") return "Review prima";
-    return "Aggiornamento dati";
-  };
-
   return (
     <div className="p-4 sm:p-6 space-y-5">
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -200,86 +168,9 @@ export function AgentsSection({
             onOpenStatus={onOpenStatus}
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            <div
-              className={cn(
-                "border rounded-xl p-4",
-                agentStatusClass(healthStatus),
-              )}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium">Salute agenti</span>
-                <Activity className="w-4 h-4" />
-              </div>
-              <p className="text-2xl font-bold mt-2">
-                {agentStatusLabel(healthStatus)}
-              </p>
-              <p className="text-xs mt-1">
-                {data.summary.criticalAgents} critici,{" "}
-                {data.summary.degradedAgents} degradati
-              </p>
-            </div>
-            <div className="border rounded-xl p-4 bg-card">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-muted-foreground">
-                  Success rate
-                </span>
-                <CheckCircle2 className="w-4 h-4 text-success" />
-              </div>
-              <p className="text-2xl font-bold mt-2">
-                {data.summary.successRate30d}%
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {data.summary.totalRuns} run, {data.summary.failedRuns} fallite
-              </p>
-            </div>
-            <div className="border rounded-xl p-4 bg-card">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-muted-foreground">
-                  Durata media
-                </span>
-                <Clock className="w-4 h-4 text-info" />
-              </div>
-              <p className="text-2xl font-bold mt-2">
-                {fmtDuration(data.summary.avgDurationMs)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {data.summary.runningRuns} run in corso
-              </p>
-            </div>
-            <div className="border rounded-xl p-4 bg-card">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-muted-foreground">
-                  Costo AI {data.costs.days}g
-                </span>
-                <BarChart3 className="w-4 h-4 text-info" />
-              </div>
-              <p className="text-2xl font-bold mt-2">
-                {fmtUsd(data.summary.costUsd30d)}
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {data.summary.totalTokens30d.toLocaleString("it-IT")} token,{" "}
-                {data.summary.aiErrors30d} errori AI
-              </p>
-            </div>
-          </div>
+          <AgentsSummaryCards data={data} healthStatus={healthStatus} />
 
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {tabs.map((item) => {
-              const Icon = item.icon;
-              return (
-                <Button
-                  key={item.key}
-                  variant={tab === item.key ? "default" : "outline"}
-                  onClick={() => onTabChange(item.key)}
-                  className="min-h-11 shrink-0"
-                >
-                  <Icon className="w-4 h-4 mr-2" />
-                  {item.label}
-                </Button>
-              );
-            })}
-          </div>
+          <AgentsTabButtons tab={tab} onTabChange={onTabChange} />
 
           {tab === "overview" && (
             <div className="space-y-3">
@@ -683,207 +574,17 @@ export function AgentsSection({
           )}
 
           {tab === "launch" && (
-            <div className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">Pipeline operative</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Avvia flussi completi per pubblicare news, preparare bozze growth o aggiornare mercato.
-                  </p>
-                </div>
-                <Badge variant="outline" className="w-fit">
-                  {pipelines.length} pipeline pronte
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-              {pipelines.map((pipeline) => {
-                const running = agentsRunning.has(pipeline.key);
-                const result = agentsResult[pipeline.key];
-                const Icon = pipelineIcon(pipeline.key);
-                return (
-                  <div
-                    key={pipeline.key}
-                    className="border rounded-xl p-4 bg-card space-y-4"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background">
-                          <Icon className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0">
-                        <h4 className="font-semibold leading-tight">{pipeline.label}</h4>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {pipeline.description}
-                        </p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "capitalize",
-                          pipeline.risk === "low" &&
-                            "bg-success-surface text-success",
-                          pipeline.risk === "medium" &&
-                            "bg-warning-surface text-warning",
-                          pipeline.risk === "high" &&
-                            "bg-danger-surface text-danger",
-                        )}
-                      >
-                        {pipeline.risk}
-                      </Badge>
-                    </div>
-                    <div className="space-y-3">
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Step</p>
-                        <div className="mt-1 flex flex-wrap gap-1.5">
-                          {pipeline.steps.map((step) => (
-                            <Badge key={step} variant="secondary" className="text-xs">
-                              {step}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Output</p>
-                        <div className="mt-1 flex flex-wrap gap-1.5">
-                          {pipeline.outputs.map((output) => (
-                            <Badge key={output} variant="outline" className="text-xs">
-                              {output}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1.5">
-                        <Badge variant="outline" className="text-xs">
-                          {reviewPolicyLabel(pipeline.reviewPolicy)}
-                        </Badge>
-                        {pipeline.requiredConfigKeys.slice(0, 3).map((key) => (
-                          <Badge key={key} variant="outline" className="text-xs">
-                            {key}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <Button
-                      className="w-full min-h-11"
-                      disabled={running}
-                      onClick={() => {
-                        onLaunch(pipeline.key, pipeline.endpoint, {});
-                      }}
-                    >
-                      {running ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                          In esecuzione...
-                        </>
-                      ) : (
-                        <>
-                          <Play className="w-4 h-4 mr-2" />
-                          Avvia pipeline
-                        </>
-                      )}
-                    </Button>
-                    {result && (
-                      <AgentLaunchResult pipelineKey={pipeline.key} result={result} />
-                    )}
-                  </div>
-                );
-              })}
-              </div>
-              {pipelines.length === 0 && (
-                <div className="rounded-xl border bg-muted/20 p-10 text-center text-muted-foreground">
-                  Nessuna pipeline configurata.
-                </div>
-              )}
-
-              {advancedAgents.length > 0 && (
-                <div className="rounded-xl border bg-muted/10 p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-start gap-3">
-                      <Settings2 className="mt-0.5 h-5 w-5 text-muted-foreground" />
-                      <div>
-                        <h4 className="font-semibold">Strumenti avanzati</h4>
-                        <p className="text-sm text-muted-foreground">
-                          Trigger atomici per manutenzione e diagnosi.
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="min-h-11"
-                      onClick={() => setShowAdvancedTools((open) => !open)}
-                    >
-                      {showAdvancedTools ? "Nascondi" : "Mostra strumenti"}
-                    </Button>
-                  </div>
-
-                  {showAdvancedTools && (
-                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-                      {advancedAgents.map((agent) => {
-                        const running = agentsRunning.has(agent.key);
-                        const result = agentsResult[agent.key];
-                        return (
-                          <div key={agent.key} className="rounded-lg border bg-card p-3 space-y-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <h5 className="font-medium truncate">{agent.label}</h5>
-                                <p className="mt-1 text-xs text-muted-foreground">{agent.description}</p>
-                              </div>
-                              <Badge variant="outline" className="capitalize text-xs">
-                                {agent.risk}
-                              </Badge>
-                            </div>
-                            {agent.key === "news-research" && (
-                              <Input
-                                placeholder="Aree specifiche opzionali"
-                                value={newsSectorInput}
-                                onChange={(event) => onNewsSectorInputChange(event.target.value)}
-                                className="min-h-11"
-                              />
-                            )}
-                            <Button
-                              variant="outline"
-                              className="w-full min-h-11"
-                              disabled={running}
-                              onClick={() => {
-                                const body =
-                                  agent.key === "news-research"
-                                    ? {
-                                        sectorNames: newsSectorInput
-                                          .split(",")
-                                          .map((value) => value.trim())
-                                          .filter(Boolean),
-                                      }
-                                    : {};
-                                onLaunch(agent.key, agent.endpoint, body);
-                              }}
-                            >
-                              {running ? (
-                                <>
-                                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                  In esecuzione...
-                                </>
-                              ) : (
-                                <>
-                                  <Play className="w-4 h-4 mr-2" />
-                                  Avvia strumento
-                                </>
-                              )}
-                            </Button>
-                            {result && (
-                              <AgentLaunchResult agentKey={agent.key} result={result} />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <AgentsLaunchTab
+              pipelines={pipelines}
+              advancedAgents={advancedAgents}
+              agentsRunning={agentsRunning}
+              agentsResult={agentsResult}
+              newsSectorInput={newsSectorInput}
+              onNewsSectorInputChange={onNewsSectorInputChange}
+              onLaunch={onLaunch}
+            />
           )}
+
         </>
       )}
     </div>

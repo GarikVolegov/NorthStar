@@ -35,8 +35,8 @@ describe("refresh-wikillm-graphs corpus planning", () => {
 
   it("excludes generated, vendored, cache, and repetitive low-signal paths", () => {
     const excluded = [
-      ".tools/printed-clis/openai/internal/types/types.go",
-      "cli-printing-press/internal/pipeline/state.go",
+      ".brain/40_Agent_Context/tools/printed-clis/openai/internal/types/types.go",
+      "apps/server/api/index.js",
       "apps/server/api/index.js",
       "apps/web/src/locales/it/translation.json",
       "packages/db/drizzle/meta/0005_snapshot.json",
@@ -60,8 +60,8 @@ describe("refresh-wikillm-graphs corpus planning", () => {
       "scripts/src/seed-rag.ts",
       "docs/architecture/northstar-system-map.md",
       "README.md",
-      "ARCHITECTURE.md",
-      "lib/ml/embedder.py",
+      ".brain/20_Product/ARCHITECTURE.md",
+      "packages/ml-service/lib/ml/embedder.py",
     ];
 
     for (const path of included) {
@@ -113,7 +113,7 @@ describe("refresh-wikillm-graphs corpus planning", () => {
       reason: "excluded-prefix:apps/web/src/locales/",
     });
     expect(audit.topSources[0]).toEqual({ source: "apps/server", files: 2 });
-    expect(audit.warnings).toContain("Excluded noisy source: cli-printing-press/internal/pipeline/state.go");
+    expect(audit.warnings).toContain("Excluded noisy source: apps/web/src/locales/en/translation.json");
   });
 
   it("uses graphify extract for fresh temporary corpora", () => {

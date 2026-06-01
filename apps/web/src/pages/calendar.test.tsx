@@ -7,6 +7,7 @@ import Calendario from "./calendar";
 
 const getJsonMock = vi.hoisted(() => vi.fn());
 const deleteJsonMock = vi.hoisted(() => vi.fn());
+const apiFetchMock = vi.hoisted(() => vi.fn());
 const toastMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/apiClient", async () => {
@@ -17,6 +18,10 @@ vi.mock("@/lib/apiClient", async () => {
     deleteJson: deleteJsonMock,
   };
 });
+
+vi.mock("@/lib/api-fetch", () => ({
+  apiFetch: apiFetchMock,
+}));
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ user: { id: 42 }, isLoggedIn: true }),
@@ -105,6 +110,16 @@ describe("calendar persistence states", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    sessionStorage.clear();
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:calendar-export"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     class ResizeObserverMock {
       observe() {}
       unobserve() {}
@@ -146,5 +161,26 @@ describe("calendar persistence states", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Evento non eliminato dal calendario");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("Revisione CV")).toBeInTheDocument();
+  });
+
+  it("exports the calendar through the authenticated API client", async () => {
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("api/calendar/events?")) return Promise.resolve({ events: [event] });
+      if (url.includes("api/calendar/quota")) return Promise.resolve({ isPremium: false, eventCount: 1, eventLimit: 25 });
+      if (url.includes("api/sectors")) return Promise.resolve([]);
+      if (url.includes("api/objectives/me")) return Promise.resolve([]);
+      return Promise.resolve({});
+    });
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(new Blob(["BEGIN:VCALENDAR"], { type: "text/calendar" })),
+    });
+
+    renderCalendar();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Esporta \.ics/i }));
+
+    await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/api/calendar/export.ics"));
+    expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
   });
 });

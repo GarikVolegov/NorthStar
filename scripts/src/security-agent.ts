@@ -2,7 +2,7 @@
  * security-agent.ts
  *
  * Agente di sicurezza AI — analizza i file modificati nel repo alla ricerca
- * di vulnerabilità e aggiorna automaticamente SECURITY_RULES.md con le regole.
+ * di vulnerabilità e aggiorna automaticamente .brain/40_Agent_Context/rules/SECURITY_RULES.md con le regole.
  *
  * Utilizzo:
  *   pnpm --filter @workspace/scripts run security:scan
@@ -13,7 +13,7 @@
  *   oppure OPENROUTER_API_KEY
  */
 
-import 'dotenv/config';
+import "./load-env";
 import { execSync } from 'child_process';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
@@ -22,7 +22,7 @@ import OpenAI from 'openai';
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..');
-const SECURITY_MD = resolve(REPO_ROOT, 'SECURITY_RULES.md');
+const SECURITY_MD = resolve(REPO_ROOT, '.brain/40_Agent_Context/rules/SECURITY_RULES.md');
 const SCAN_ALL = process.argv.includes('--all');
 
 const MAX_FILE_CHARS  = 8_000;
@@ -149,7 +149,7 @@ async function analyzeFiles(client: OpenAI, files: { path: string; content: stri
   }
 }
 
-// ─── SECURITY_RULES.md updater ────────────────────────────────────────────────
+// ─── .brain/40_Agent_Context/rules/SECURITY_RULES.md updater ────────────────────────────────────────────────
 
 function updateSecurityMd(findings: Array<{ severity: string; category: string; file: string; line: number; title: string; description: string; exploit: string; fix: string }>, newRules: string[]): void {
   const date = new Date().toISOString().slice(0, 10);
@@ -188,7 +188,7 @@ function updateSecurityMd(findings: Array<{ severity: string; category: string; 
   }
 
   writeFileSync(SECURITY_MD, updatedContent, 'utf-8');
-  console.log(`✅  SECURITY_RULES.md aggiornato`);
+  console.log(`✅  .brain/40_Agent_Context/rules/SECURITY_RULES.md aggiornato`);
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────

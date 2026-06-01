@@ -93,7 +93,7 @@ router.post("/scan", requireAuth, requireAdmin, async (req: Request, res: Respon
 /**
  * GET /api/security/status
  *
- * Admin-only. Returns a quick summary of the last scan from SECURITY_RULES.md.
+ * Admin-only. Returns a quick summary of the last scan from .brain/40_Agent_Context/rules/SECURITY_RULES.md.
  */
 router.get("/status", requireAuth, requireAdmin, (_req: Request, res: Response) => {
   res.json({ ok: true, message: "Security agent disponibile. Usa POST /api/security/scan per avviare una scansione." });

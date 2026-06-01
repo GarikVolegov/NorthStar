@@ -146,7 +146,7 @@ router.patch("/onboarding", requireAuth, async (req, res) => {
 router.get("/:userId/public", async (req, res) => {
   try {
     const targetId = readInteger(req.params.userId);
-    const viewerId = readInteger(req.query.viewerId);
+    const viewerId = req.user?.id ?? null;
     if (targetId === null) {
       res.status(400).json({ error: "ID utente non valido" });
       return;
