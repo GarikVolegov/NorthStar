@@ -28,6 +28,7 @@ export const routes: RouteConfig[] = [
   { path: PATHS.PROFILE, component: () => import("@/pages/profilo"), guard: "protected", layout: "default", title: "Profilo" },
   { path: "/candidature", component: () => import("@/pages/applications"), guard: "protected", layout: "default", title: "Candidature" },
   { path: "/calendario", component: () => import("@/pages/calendar"), guard: "protected", layout: "default", title: "Calendario" },
+  { path: "/bussola", component: () => import("@/pages/bussola"), guard: "protected", layout: "default", title: "La Bussola" },
   { path: PATHS.FRIENDS, component: () => import("@/pages/amici"), guard: "protected", layout: "default", title: "Amici" },
   { path: "/social", component: () => import("@/pages/social"), guard: "protected", layout: "default", title: "Social" },
   { path: "/utente/:id", component: () => import("@/pages/utente"), guard: "public", layout: "default", title: "Utente" },
