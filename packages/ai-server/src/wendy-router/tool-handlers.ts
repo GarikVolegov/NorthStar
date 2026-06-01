@@ -18,7 +18,7 @@ import { handleCompareSectors, handleGenerateDayScene, handleGetGrowthArticles, 
 import { handleGetUserContext } from "./tool-handlers-user";
 import { handleGetJobPostingTrend, handleGetSkillCooccurrences, handleGetWeakSignals, handleSearchBrain, handleSearchMemoryGraph, handleSearchRag } from "./tool-handlers-market";
 import { handleCheckFoodSafety, handleGetBreedInfo, handleGetRabbitCareGuide, handleSearchRabbitKb } from "./tool-handlers-rabbit";
-import { handleGetCompass, handleProposeNextCompassStep } from "./tool-handlers-compass";
+import { handleGetCompass, handleProposeNextCompassStep, handleProposeSpike } from "./tool-handlers-compass";
 
 // ── Cache embedding query (LRU semplice con TTL 5 min) ───────────────────────
 const _embCache = new Map<string, { vec: number[]; ts: number }>();
@@ -290,6 +290,30 @@ function proposeRecordCompassSignal(args: { signalType?: string; refType?: strin
   });
 }
 
+function proposeLogSpikeOutcome(args: { spikeId?: number; decision?: string; energy?: number; learned?: string }): ToolResult {
+  const spikeId = typeof args.spikeId === "number" ? args.spikeId : Number(args.spikeId);
+  if (!Number.isInteger(spikeId)) return err("INVALID_INPUT", "spikeId non valido");
+  const decision = (args.decision ?? "").trim();
+  if (decision !== "continue" && decision !== "kill") return err("INVALID_INPUT", "decision deve essere 'continue' o 'kill'");
+  const energy = typeof args.energy === "number" ? Math.max(-1, Math.min(1, args.energy)) : undefined;
+  if (energy === undefined) return err("INVALID_INPUT", "Indica l'energia provata (-1..1)");
+  const learned = typeof args.learned === "string" ? args.learned.slice(0, 500) : undefined;
+  return wendyAction({
+    type: "log_spike_outcome",
+    status: "needs_confirmation",
+    risk: "low",
+    label: decision === "kill" ? "Chiudo lo spike come testato e scartato?" : "Segno che continui su questa strada?",
+    description: "Registro l'esito dello spike e aggiorno la tua Bussola solo dopo la tua conferma.",
+    requiresConfirmation: true,
+    targetRoute: "/bussola/spike",
+    payload: { spikeId, decision, energy, ...(learned ? { learned } : {}) },
+    preview: [
+      { label: "Esito", value: decision === "kill" ? "Stop (no informato — è progresso)" : "Continua" },
+      { label: "Energia", value: energy > 0 ? "positiva" : energy < 0 ? "scarica" : "neutra" },
+    ],
+  });
+}
+
 // ── 3. get_sector_detail ─────────────────────────────────────────────────────
 
 // ── 15. save_business_idea ───────────────────────────────────────────────────
@@ -330,6 +354,8 @@ export async function executeToolCall(
     case "get_compass":                result = await handleGetCompass({}, userId); break;
     case "propose_next_compass_step":  result = await handleProposeNextCompassStep({}, userId); break;
     case "record_compass_signal":      result = proposeRecordCompassSignal(typedArgs(args)); break;
+    case "propose_spike":              result = handleProposeSpike(typedArgs(args), userId); break;
+    case "log_spike_outcome":          result = proposeLogSpikeOutcome(typedArgs(args)); break;
 
     // Step 6: RAG + Job Market Intelligence
     case "search_rag":               result = await handleSearchRag(typedArgs(args)); break;

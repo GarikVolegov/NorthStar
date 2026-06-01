@@ -112,3 +112,4 @@ export * from "./pinnedSectors";
 export * from "./compassProfile";
 export * from "./compassSignal";
 export * from "./sceneCard";
+export * from "./careerSpike";

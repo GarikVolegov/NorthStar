@@ -86,6 +86,22 @@ export type {
   ScoringSignal,
   CandidateCluster,
 } from "./compass/scoring";
+export {
+  tournamentTarget,
+  selectTournamentPool,
+  rankByChoices,
+  nextTournamentPair,
+  tournamentChoiceDims,
+} from "./compass/tournament";
+export type { TournamentChoice, TournamentStanding } from "./compass/tournament";
+export {
+  COMMIT_ENERGY_THRESHOLD,
+  spikeReviewDate,
+  proposeSpike,
+  resolveSpikeOutcome,
+  spikeOutcomeDims,
+} from "./compass/spike";
+export type { SpikeSuggestion, SpikeDecision, SpikeResolution } from "./compass/spike";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
 export type { UserContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";

@@ -194,6 +194,24 @@ export const ALL_TOOLS: Record<string, ToolDefinition> = {
       { name: "valence",    type: "number", description: "Reazione da -1 (spento) a 1 (acceso)", required: true },
     ],
   },
+  propose_spike: {
+    name:        "propose_spike",
+    description: "Per un'ipotesi della Bussola propone uno SPIKE: micro-esperimento di ~2 settimane con azione piccola + kill-criterion deciso prima. Usare quando l'utente ha un'ipotesi ma teme di impegnarsi: è un test reversibile, non una scelta definitiva. Read-only.",
+    parameters: [
+      { name: "hypothesisLabel", type: "string", description: "L'ipotesi da mettere alla prova, es. 'UX Designer'", required: true },
+      { name: "firstSkill",      type: "string", description: "Eventuale competenza-ponte da testare" },
+    ],
+  },
+  log_spike_outcome: {
+    name:        "log_spike_outcome",
+    description: "Registra l'esito di uno spike raccontato in chat (continua/stop + energia provata). Un 'kill' è un no informato, non un fallimento. Prepara la scrittura: richiede conferma esplicita nel client.",
+    parameters: [
+      { name: "spikeId",  type: "number", description: "ID dello spike da risolvere", required: true },
+      { name: "decision", type: "string", description: "continue | kill", required: true },
+      { name: "energy",   type: "number", description: "Energia provata da -1 a 1", required: true },
+      { name: "learned",  type: "string", description: "Cosa ha imparato (opzionale)" },
+    ],
+  },
 
   // ── Step 6: RAG + Job Market Intelligence ──────────────────────────────────
   search_rag: {

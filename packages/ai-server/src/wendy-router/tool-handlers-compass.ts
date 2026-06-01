@@ -9,6 +9,7 @@
  */
 import { eq } from "drizzle-orm";
 import { db, compassProfilesTable, type CompassHypothesis } from "@workspace/db";
+import { proposeSpike } from "../compass/spike";
 import { err, type ToolResult } from "./tool-handlers";
 
 export async function handleGetCompass(_args: unknown, userId: number): Promise<ToolResult> {
@@ -89,4 +90,25 @@ export async function handleProposeNextCompassStep(_args: unknown, userId: numbe
 
 function step(s: NextStep) {
   return { clientSide: false, nextStep: s, reminder: "Non dare un verdetto: rispecchia e invita al passo." };
+}
+
+/**
+ * propose_spike — dato un'ipotesi, propone un micro-esperimento reversibile con
+ * kill-criterion. Read-only: suggerisce, non scrive (la creazione è in /bussola/spike).
+ */
+export function handleProposeSpike(
+  args: { hypothesisLabel?: string; firstSkill?: string },
+  _userId: number,
+): ToolResult {
+  const label = (args.hypothesisLabel ?? "").trim();
+  if (!label) return err("INVALID_INPUT", "Indica l'ipotesi da mettere alla prova");
+  const suggestions = proposeSpike(label, { firstSkill: args.firstSkill });
+  return {
+    ok: true,
+    data: {
+      hypothesisLabel: label,
+      suggestions,
+      reminder: "È un test di 2 settimane, reversibile. Ricorda il kill-criterion: serve a decidere prima, non a impegnarsi per sempre.",
+    },
+  };
 }

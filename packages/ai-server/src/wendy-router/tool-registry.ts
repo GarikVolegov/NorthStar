@@ -48,6 +48,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_compass",                // Indeciso: legge la Bussola direzionale
     "propose_next_compass_step",  // Indeciso: prossimo passo (no verdetti)
     "record_compass_signal",      // Indeciso: registra segnale emerso in chat (conferma)
+    "propose_spike",              // Indeciso: propone micro-esperimento reversibile (read)
+    "log_spike_outcome",          // Indeciso: registra esito spike (conferma)
     "search_memory_graph",
     "get_growth_articles",
     "add_calendar_event",
@@ -82,6 +84,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_compass",                // Indeciso: legge la Bussola direzionale
     "propose_next_compass_step",  // Indeciso: prossimo passo (no verdetti)
     "record_compass_signal",      // Indeciso: registra segnale emerso in chat (conferma)
+    "propose_spike",              // Indeciso: propone micro-esperimento reversibile (read)
+    "log_spike_outcome",          // Indeciso: registra esito spike (conferma)
     "search_memory_graph",
     "search_rag",                // Step 6: grounding per piano basato su dati reali
     "search_brain",              // Brain runtime: piani su NorthStar identity/product/process
@@ -105,6 +109,8 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_compass",                // Indeciso: legge la Bussola direzionale
     "propose_next_compass_step",  // Indeciso: prossimo passo (no verdetti)
     "record_compass_signal",      // Indeciso: registra segnale emerso in chat (conferma)
+    "propose_spike",              // Indeciso: propone micro-esperimento reversibile (read)
+    "log_spike_outcome",          // Indeciso: registra esito spike (conferma)
     "search_memory_graph",
     "get_user_objectives",
     "search_rag",                // Step 6: analisi profonda con fonti autorevoli
@@ -170,6 +176,7 @@ const WRITE_TOOLS = new Set([
   "save_memory_fact",
   "add_calendar_event",
   "record_compass_signal",
+  "log_spike_outcome",
 ]);
 
 (function bootstrapToolRegistry() {
