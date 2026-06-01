@@ -13,7 +13,6 @@ export function WendyVitalLabel({ sectorId, geography = "IT" }: WendyVitalLabelP
 
   React.useEffect(() => {
     if (sectorId > 0) summary.mutate({ sectorId, geography });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sectorId, geography]);
 
   if (summary.isPending) {

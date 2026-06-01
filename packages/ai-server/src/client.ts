@@ -84,21 +84,23 @@ function createStableOpenAIClient(config: OpenAIFallbackConfig): OpenAI {
   return new OpenAI({ apiKey: config.apiKey, baseURL: config.baseURL });
 }
 
+type ChatCompletionsCreate = (...args: unknown[]) => Promise<unknown>;
+
 function withOpenRouterFallback(primary: OpenAI, fallbackConfig: OpenAIFallbackConfig | null): OpenAI {
   if (!fallbackConfig) return primary;
   const fallback = createStableOpenAIClient(fallbackConfig);
 
   return new Proxy(primary, {
     get(target, prop, receiver) {
-      if (prop !== "chat") return Reflect.get(target, prop, receiver);
+      if (prop !== "chat") return Reflect.get(target, prop, receiver) as unknown;
       return {
         completions: {
           create: async (params: Record<string, unknown>, ...rest: unknown[]) => {
             try {
-              return await (target.chat.completions.create as unknown as Function)(params, ...rest);
+              return await (target.chat.completions.create as unknown as ChatCompletionsCreate)(params, ...rest);
             } catch (err) {
               if (!shouldFallbackToOpenAI(err)) throw err;
-              return await (fallback.chat.completions.create as unknown as Function)(
+              return await (fallback.chat.completions.create as unknown as ChatCompletionsCreate)(
                 { ...params, model: fallbackConfig.model },
                 ...rest,
               );

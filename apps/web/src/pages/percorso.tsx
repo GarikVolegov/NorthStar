@@ -97,7 +97,7 @@ const PERSONAS: Persona[] = [
 ];
 
 const JOURNEY_DESTINATION: Record<JourneyType, string> = {
-  indeciso: "/test",
+  indeciso: "/bussola",
   dipendente: "/dashboard",
   autonomo: "#wendy",
   azienda: "/settori",

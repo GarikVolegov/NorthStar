@@ -1,5 +1,5 @@
 import { getWendyCapability } from "./capability-matrix";
-import { buildWendyTrainingPromptSection } from "./training-cases";
+import { buildWendyTrainingPromptSection } from "./training-evaluator";
 import type { WendyDecision } from "./types";
 
 export function buildWendyIntelligenceDirectives(decision: WendyDecision): string {

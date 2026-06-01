@@ -44,7 +44,7 @@ function buildBaselineReadiness(reqUser: Express.Request["user"]) {
     commitment: clamp(isUndecided ? 2 : 7, COMPONENT_CAPS.commitment),
   };
 
-  const score = Object.values(components).reduce((sum, value) => sum + value, 0);
+  const score = (Object.values(components) as number[]).reduce((sum, value) => sum + value, 0);
   const weakest = Object.entries(components).sort((a, b) => a[1] - b[1])[0]?.[0] ?? "exploration";
 
   const nudges: Record<string, { component: string; toolHref: string; message: string }> = {

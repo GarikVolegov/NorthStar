@@ -20,7 +20,7 @@ export async function loadResponseContext(
   userMessage: string,
   history: ChatMessage[],
   requestId?: string,
-  conversationId?: string | number | undefined,
+  conversationId?: string | number,
 ): Promise<ResponseContext> {
   const conversationSummary = history
     .slice(-4)

@@ -39,4 +39,33 @@ describe("Wendy prompt brain separation", () => {
     expect(prompt.indexOf("## Attivazione neurale Wendy")).toBeLessThan(prompt.indexOf("## Wendy Brain"));
     expect(prompt.indexOf("## Wendy Brain")).toBeLessThan(prompt.indexOf("## Graphify codice"));
   });
+
+  it("injects the Bussola (no-verdetti) persona section only for journeyType=indeciso", () => {
+    const base = {
+      personaExamples: [],
+      documentChunks: [],
+      webResults: [],
+      platformChunks: [],
+      cot: null,
+      userMessage: "Non so cosa fare nella vita",
+      evalResult: {
+        score: 0.9,
+        level: "high" as const,
+        dimensions: { contextCoverage: 0.9, cotConfidence: 0.9, questionClarity: 0.9, memoryCoverage: 0.9 },
+        reasons: [],
+        needsClarification: false,
+      },
+    };
+
+    const indeciso = buildSystemPrompt({ ...base, userContext: { locale: "it", journeyType: "indeciso" } });
+    const jobSearch = buildSystemPrompt({ ...base, userContext: { locale: "it", journeyType: "job_search" } });
+
+    expect(indeciso).toContain("## Modalità Bussola (utente indeciso)");
+    expect(indeciso).toContain("bussola, non una mappa");
+    expect(indeciso).toContain("get_compass");
+    // No verdetti: must mention advancing the stage, not giving a definitive answer
+    expect(indeciso).toMatch(/avanzare di UNO stage/i);
+    // Other journeys must NOT receive the compass persona section
+    expect(jobSearch).not.toContain("## Modalità Bussola");
+  });
 });

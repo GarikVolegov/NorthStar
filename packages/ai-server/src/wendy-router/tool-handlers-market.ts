@@ -5,6 +5,10 @@ import { logger } from "../logger";
 import { readWeakSignalStatus } from "./tool-arg-utils";
 import { queryEmbedding, type ToolResult } from "./tool-handlers";
 import { multiHopSearchRag } from "../rag/sparse-retriever";
+import { wendyConfig } from "../config/wendy";
+
+/** Minimum cosine similarity for brain chunks — mirrors handleSearchRabbitKb (0.3). */
+const BRAIN_MIN_SIMILARITY = 0.3;
 
 function err(code: string, message: string): ToolResult {
   return { ok: false, code, message };
@@ -78,10 +82,22 @@ export async function handleSearchBrain(
       LIMIT ${limit}
     `);
 
+    // Use ragCitationMinScore as a configurable override only when it has been
+    // set below the conservative 0.3 floor (i.e. intentionally relaxed).
+    // For brain chunks 0.3 is already conservative and aligns with
+    // handleSearchRabbitKb; the external-RAG threshold (default 0.70) would
+    // over-filter internal knowledge-base documents.
+    const minSim = Math.min(
+      wendyConfig.prompt.ragCitationMinScore,
+      BRAIN_MIN_SIMILARITY,
+    );
+
+    const filtered = rows.rows.filter((row) => Number(row.similarity) >= minSim);
+
     return {
       ok: true,
       data: {
-        chunks: rows.rows.map((row) => ({
+        chunks: filtered.map((row) => ({
           content: row.content,
           obsidianPath: row.obsidian_path ?? "",
           sectors: row.sectors ?? [],
@@ -89,7 +105,7 @@ export async function handleSearchBrain(
           similarity: Math.round(Number(row.similarity) * 1000) / 1000,
           trustScore: row.trust_score,
         })),
-        totalFound: rows.rows.length,
+        totalFound: filtered.length,
       },
     };
   } catch (e) {

@@ -41,7 +41,7 @@ export interface OperatorEventInput {
   source: string;
   triggerType: string;
   decision: OperatorDecision;
-  targetType: OperatorTargetType | string;
+  targetType: OperatorTargetType | (string & {});
   targetId?: string | number | null;
   status: OperatorEventStatus;
   inputSummary?: string | null;

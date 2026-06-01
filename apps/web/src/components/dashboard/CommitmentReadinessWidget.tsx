@@ -44,7 +44,7 @@ const BAND_LABEL: Record<ReadinessData["band"], { headline: string; sub: string;
 export async function fetchReadiness(): Promise<ReadinessData> {
   const res = await apiFetch("/api/discovery/readiness");
   if (!res.ok) throw new Error("Errore caricamento readiness");
-  return res.json();
+  return (await res.json()) as ReadinessData;
 }
 
 export function isReadinessData(data: unknown): data is ReadinessData {

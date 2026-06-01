@@ -70,6 +70,38 @@ export type {
   TryADaySuggestions,
   TryADayTimeBlock,
 } from "./try-a-day";
+export {
+  RIASEC_DIMS,
+  recencyDecay,
+  weightedRiasec,
+  blendRiasec,
+  clusterFit,
+  deriveHypotheses,
+  nextStage,
+  directionConfidence,
+} from "./compass/scoring";
+export type {
+  RiasecDim,
+  RiasecVector,
+  ScoringSignal,
+  CandidateCluster,
+} from "./compass/scoring";
+export {
+  tournamentTarget,
+  selectTournamentPool,
+  rankByChoices,
+  nextTournamentPair,
+  tournamentChoiceDims,
+} from "./compass/tournament";
+export type { TournamentChoice, TournamentStanding } from "./compass/tournament";
+export {
+  COMMIT_ENERGY_THRESHOLD,
+  spikeReviewDate,
+  proposeSpike,
+  resolveSpikeOutcome,
+  spikeOutcomeDims,
+} from "./compass/spike";
+export type { SpikeSuggestion, SpikeDecision, SpikeResolution } from "./compass/spike";
 export { buildSystemPrompt } from "./growth-agent/prompt-builder";
 export type { UserContext } from "./growth-agent/prompt-builder";
 export type { RetrievedChunk } from "./growth-agent/retriever";
@@ -93,7 +125,7 @@ export type { QualityEvent } from "./growth-agent/quality-tracker";
 export { searchMemory, buildContextualMemorySection } from "./growth-agent/memory-search";
 export type { MemoryHit, MemoryHitType } from "./growth-agent/memory-search";
 export { runMemoryDecayJob, computeDecayScore } from "./jobs/memory-decay";
-export { runQualityOptimizer, runQualityOptimizerJob } from "./jobs/quality-optimizer";
+export { runQualityOptimizerJob } from "./jobs/quality-optimizer";
 // Phase 5: Plugin Tool Registry
 export { toolRegistry } from "./tools/registry";
 export type { Domain as ToolDomain, PluginToolDefinition, PluginParam, PluginToolContext, ToolDefinition as PluginToolDefinitionStrict } from "./tools/types";

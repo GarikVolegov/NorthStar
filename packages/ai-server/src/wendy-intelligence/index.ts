@@ -9,8 +9,8 @@ export {
   evaluateWendyTrainingCase,
   getWendyTrainingCoverage,
   runWendyTrainingEvaluation,
-  WENDY_TRAINING_CASES,
-} from "./training-cases";
+} from "./training-evaluator";
+export { WENDY_TRAINING_CASES } from "./training-cases";
 export { buildWendyRepairHint } from "./self-check";
 export type {
   WendyCapability,

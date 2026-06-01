@@ -24,7 +24,6 @@ let _muted = false;
 const _mutedListeners: Set<(muted: boolean) => void> = new Set();
 
 export function isMuted(): boolean { return _muted; }
-export const getMuted = isMuted; // Alias for backward compatibility
 
 export function setMuted(value: boolean): void {
    if (_muted === value) return;

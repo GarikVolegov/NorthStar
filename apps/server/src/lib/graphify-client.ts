@@ -47,7 +47,7 @@ export interface GraphifyResult {
   neighbors: GraphifyNeighbor[];
 }
 
-export type GraphifyProfile = "code" | "process" | "docs" | "all" | string;
+export type GraphifyProfile = "code" | "process" | "docs" | "all" | (string & {});
 
 export interface GraphifySearchOptions {
   limit?: number;
