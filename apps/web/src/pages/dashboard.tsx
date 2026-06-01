@@ -50,6 +50,7 @@ import {
   deriveDashboardPhase,
   getAdaptiveDashboardLayout,
   getAdaptiveSectionPresentation,
+  type AdaptiveDashboardPhase,
 } from "@/components/dashboard/dashboard-adaptive-flow";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
 import { DashboardIndecisoTools } from "@/components/dashboard/DashboardIndecisoTools";
@@ -92,7 +93,7 @@ const JOURNEY_META: Record<JourneyId, {
   investitore: { label: "Investitore",Icon: BarChart3,   color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Analizza le opportunità",         subline: "Aree in crescita, trend di mercato e analisi delle competenze richieste" },
 };
 
-const ADAPTIVE_PHASE_LABEL: Record<string, string> = {
+const ADAPTIVE_PHASE_LABEL: Record<AdaptiveDashboardPhase, string> = {
   start_test: "Scopri chi sei",
   explore_sectors: "Esplora il mondo",
   compare_options: "Confronta le opzioni",

@@ -14,7 +14,7 @@ export interface AdaptiveDashboardInput {
   hasSession: boolean;
   savedSectorsCount: number;
   hasDecided: boolean;
-  readinessBand?: ReadinessBand;
+  readinessBand?: ReadinessBand | undefined;
   layout: WidgetLayout[];
 }
 

@@ -28,7 +28,7 @@ export function DashboardClarityPath({
   hasSession: boolean;
   savedSectorsCount: number;
   hasDecided: boolean;
-  currentPhaseLabel?: string;
+  currentPhaseLabel?: string | undefined;
   nextAction?: ClarityPathNextAction;
   compact?: boolean;
 }) {
