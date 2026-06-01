@@ -6,9 +6,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
+import { cn } from "@/lib/utils";
 import { useGetRoleDetail } from "@workspace/api-client-react";
 import {
   ArrowLeft,
+  ArrowRight,
   Briefcase,
   ChevronRight,
   Clock,
@@ -81,6 +83,9 @@ export default function Ruolo() {
 
   const autonomyPercent = role.autonomyScore != null ? role.autonomyScore * 10 : null;
   const stabilityPercent = role.stabilityScore != null ? role.stabilityScore * 10 : null;
+  const jobsHref = role.sectorInfo
+    ? `/lavori?professionId=${role.id}&sectorId=${role.sectorInfo.id}`
+    : `/lavori?professionId=${role.id}`;
 
   return (
     <div className="container mx-auto px-4 py-8 md:py-16 max-w-4xl">
@@ -109,6 +114,30 @@ export default function Ruolo() {
           {role.description}
         </p>
       )}
+
+      <div className="mb-8 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+        <div className="mb-4 grid gap-2 text-sm sm:grid-cols-4">
+          {["Settore scelto", "Ruolo target", "Competenze", "Lavori"].map((step, index) => (
+            <div
+              key={step}
+              className={cn(
+                "rounded-xl border px-3 py-2",
+                index <= 1
+                  ? "border-primary/30 bg-background text-primary"
+                  : "border-border bg-card text-muted-foreground",
+              )}
+            >
+              <span className="font-semibold">{step}</span>
+            </div>
+          ))}
+        </div>
+        <Button asChild className="min-h-11 rounded-full">
+          <Link href={jobsHref}>
+            Trova aziende e lavori per questo ruolo
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
 
       <div className="flex flex-wrap gap-2 mb-10">
         {role.riasecFit.map((code) => {
@@ -185,6 +214,19 @@ export default function Ruolo() {
         journeyType={user?.journeyType}
         onSceneChange={setCurrentTryADayScene}
       />
+
+      <div className="mb-12 rounded-2xl border border-primary/20 bg-primary/5 p-5 text-center">
+        <h2 className="mb-2 text-xl font-serif font-bold">Trasforma questo ruolo in ricerca reale</h2>
+        <p className="mx-auto mb-5 max-w-xl text-sm text-muted-foreground">
+          Hai visto il ruolo, le competenze e una giornata tipo. Ora guarda aziende locali e domanda reale collegate a questa professione.
+        </p>
+        <Button asChild className="min-h-11 rounded-full">
+          <Link href={jobsHref}>
+            Trova aziende e lavori per questo ruolo
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
 
       <Separator className="mb-12" />
 

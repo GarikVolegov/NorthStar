@@ -38,6 +38,7 @@ interface Job {
 
 interface JobsResponse {
   jobs: Job[];
+  basedOnProfession: string | null;
   basedOnSector: string | null;
   totalCount: number;
   status?: "ok" | "empty" | "not_configured";
@@ -46,6 +47,31 @@ interface JobsResponse {
   personalized?: boolean;
   source?: "job_posting_snapshots" | string;
   period?: string | null;
+  filter?: {
+    professionId: number | null;
+    sectorId: number | null;
+    fallback: "sector" | null;
+  };
+}
+
+interface CompanyProspect {
+  name: string;
+  location: string;
+  reason: string;
+  evidence: string;
+  sourceUrl: string;
+  sourceLabel: string;
+  confidence: "high" | "medium" | "low";
+  suggestedSearchUrl: string;
+}
+
+interface CompanyProspectsResponse {
+  companies: CompanyProspect[];
+  basedOnProfession: string | null;
+  basedOnSector: string | null;
+  basedOnCity: string | null;
+  status: "ok" | "empty" | "city_required" | "not_configured";
+  coverageNote: string;
 }
 
 function SignalBar({ score }: { score: number }) {
@@ -129,11 +155,31 @@ function JobCard({ job }: { job: Job }) {
 export default function Lavori() {
   const { isLoggedIn, user } = useAuth();
   const [filterType, setFilterType] = useState<string>("all");
+  const params = new URLSearchParams(window.location.search);
+  const professionId = params.get("professionId");
+  const sectorId = params.get("sectorId");
+  const city = params.get("city");
+  const jobsQuery = new URLSearchParams();
+  if (professionId) jobsQuery.set("professionId", professionId);
+  if (sectorId) jobsQuery.set("sectorId", sectorId);
+  const companyQuery = new URLSearchParams(jobsQuery);
+  if (city) companyQuery.set("city", city);
+  const jobsQueryString = jobsQuery.toString();
+  const companyQueryString = companyQuery.toString();
+  const jobsPath = `${BASE}api/jobs${jobsQueryString ? `?${jobsQueryString}` : ""}`;
+  const companiesPath = `${BASE}api/jobs/company-prospects?${companyQueryString}`;
 
   const { data, isError, isLoading, refetch } = useQuery<JobsResponse>({
-    queryKey: ["jobs", user?.id],
-    queryFn: () => getJson<JobsResponse>(`${BASE}api/jobs`),
+    queryKey: ["jobs", user?.id, professionId, sectorId],
+    queryFn: () => getJson<JobsResponse>(jobsPath),
     enabled: isLoggedIn,
+    staleTime: 60_000 * 10,
+  });
+
+  const { data: companyProspects } = useQuery<CompanyProspectsResponse>({
+    queryKey: ["company-prospects", user?.id, professionId, sectorId, city],
+    queryFn: () => getJson<CompanyProspectsResponse>(companiesPath),
+    enabled: isLoggedIn && Boolean(professionId),
     staleTime: 60_000 * 10,
   });
 
@@ -145,6 +191,27 @@ export default function Lavori() {
     return true;
   });
   const canShowFilters = !!data && !jobsNotConfigured && rawJobs.length > 0;
+  const fallbackToSector = data?.filter?.fallback === "sector";
+  const roleTitle = companyProspects?.basedOnProfession ?? data?.basedOnProfession;
+  const companyCity = companyProspects?.basedOnCity;
+  const heading = roleTitle && companyCity
+    ? `Aziende e lavori per ${roleTitle} a ${companyCity}`
+    : roleTitle
+      ? `Aziende e lavori per ${roleTitle}`
+      : data?.basedOnSector
+        ? `Domanda lavoro in ${data.basedOnSector}`
+        : "Domanda per ruolo";
+  const subtitle = fallbackToSector
+    ? `Non ho ancora snapshot specifici per questo ruolo: ti mostro la domanda nel settore ${data?.basedOnSector}.`
+    : roleTitle
+      ? "Prima trovi aziende locali scoperte dalle fonti disponibili, poi i segnali aggregati per il ruolo target."
+      : data?.basedOnSector
+        ? `Snapshot aggregati ordinati per il tuo settore: ${data.basedOnSector}.`
+        : jobsNotConfigured
+          ? "Pipeline dati mercato non collegata"
+          : data?.period
+            ? `Snapshot job posting aggiornati al periodo ${data.period}`
+            : "Completa il test per vedere segnali personalizzati";
 
   if (!isLoggedIn) {
     return (
@@ -171,22 +238,17 @@ export default function Lavori() {
                 <Briefcase className="h-5 w-5 text-primary" />
                 <span className="text-xs font-semibold text-primary uppercase tracking-wide">Segnali mercato</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-black text-foreground mb-2">Domanda per ruolo</h1>
+              <h1 className="text-2xl sm:text-3xl font-black text-foreground mb-2">{heading}</h1>
               <p className="text-muted-foreground text-sm">
-                {data?.basedOnSector
-                  ? <>Snapshot aggregati ordinati per il tuo settore: <span className="text-foreground font-medium">{data.basedOnSector}</span></>
-                  : jobsNotConfigured
-                    ? "Pipeline dati mercato non collegata"
-                    : data?.period
-                      ? `Snapshot job posting aggiornati al periodo ${data.period}`
-                      : "Completa il test per vedere segnali personalizzati"
-                }
+                {subtitle}
               </p>
             </div>
-            {data?.basedOnSector && (
+            {(data?.basedOnProfession || data?.basedOnSector) && (
               <div className="shrink-0 flex items-center gap-1.5 bg-primary/10 border border-primary/20 rounded-full px-3 py-1.5">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="text-xs font-semibold text-primary">Profilo applicato</span>
+                <span className="text-xs font-semibold text-primary">
+                  {data?.basedOnProfession ? "Ruolo applicato" : "Profilo applicato"}
+                </span>
               </div>
             )}
           </div>
@@ -219,6 +281,52 @@ export default function Lavori() {
             </div>
             <span className="text-xs text-muted-foreground shrink-0">{jobs.length} segnali</span>
           </div>
+        )}
+
+        {companyProspects && (
+          <section className="mb-8 rounded-2xl border border-primary/20 bg-primary/5 p-5">
+            <div className="mb-4">
+              <h2 className="text-lg font-bold text-foreground">Aziende nella tua zona</h2>
+              <p className="mt-1 text-sm text-muted-foreground">{companyProspects.coverageNote}</p>
+            </div>
+            {companyProspects.status === "city_required" ? (
+              <p className="rounded-xl border border-dashed bg-background p-4 text-sm text-muted-foreground">
+                Aggiungi una citta al profilo o cerca con un parametro citta per trovare aziende locali.
+              </p>
+            ) : companyProspects.status === "not_configured" ? (
+              <p className="rounded-xl border border-dashed bg-background p-4 text-sm text-muted-foreground">
+                La ricerca aziende richiede un provider web configurato; intanto mostro i segnali di mercato aggregati.
+              </p>
+            ) : companyProspects.companies.length > 0 ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {companyProspects.companies.map((company) => (
+                  <article key={`${company.name}-${company.sourceUrl}`} className="rounded-xl border bg-background p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold text-foreground">{company.name}</h3>
+                        <p className="text-xs text-muted-foreground">{company.location}</p>
+                      </div>
+                      <span className="rounded-full bg-muted px-2 py-1 text-xs text-muted-foreground">{company.confidence}</span>
+                    </div>
+                    <p className="mt-3 text-sm text-muted-foreground">{company.reason}</p>
+                    <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{company.evidence}</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <a className="text-sm font-semibold text-primary" href={company.sourceUrl} target="_blank" rel="noreferrer">
+                        Fonte: {company.sourceLabel}
+                      </a>
+                      <a className="text-sm font-semibold text-primary" href={company.suggestedSearchUrl} target="_blank" rel="noreferrer">
+                        Cerca posizioni aperte
+                      </a>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-dashed bg-background p-4 text-sm text-muted-foreground">
+                Non ho trovato aziende locali dalle fonti disponibili; continuo a mostrarti la domanda aggregata per il ruolo.
+              </p>
+            )}
+          </section>
         )}
 
         {isLoading ? (

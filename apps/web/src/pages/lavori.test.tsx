@@ -5,13 +5,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Lavori from "./lavori";
 
 const getJsonMock = vi.hoisted(() => vi.fn());
+const authState = vi.hoisted(() => ({
+  isLoggedIn: true,
+  user: { id: 42 } as { id: number } | null,
+}));
 
 vi.mock("@/lib/apiClient", () => ({
   getJson: getJsonMock,
 }));
 
 vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({ user: { id: 42 }, isLoggedIn: true }),
+  useAuth: () => ({ user: authState.user, isLoggedIn: authState.isLoggedIn }),
 }));
 
 vi.mock("wouter", () => ({
@@ -20,7 +24,8 @@ vi.mock("wouter", () => ({
   ),
 }));
 
-function renderLavori() {
+function renderLavori(path = "/lavori") {
+  window.history.replaceState({}, "", path);
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -53,8 +58,145 @@ function marketSignal(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function jobsResponse(overrides: Record<string, unknown> = {}) {
+  return {
+    jobs: [marketSignal({ title: "Product Designer" })],
+    basedOnProfession: "Product Designer",
+    basedOnSector: "Design & UX",
+    totalCount: 1,
+    status: "ok",
+    personalized: true,
+    source: "job_posting_snapshots",
+    period: "2026-06",
+    filter: { professionId: 55, sectorId: 2, fallback: null },
+    ...overrides,
+  };
+}
+
+function companiesResponse(overrides: Record<string, unknown> = {}) {
+  return {
+    companies: [{
+      name: "Studio Forma",
+      location: "Milano",
+      reason: "Lavora su prodotti digitali e design.",
+      evidence: "Pagina careers pubblica collegata a Product Designer.",
+      sourceUrl: "https://example.com/studio-forma",
+      sourceLabel: "example.com",
+      confidence: "medium",
+      suggestedSearchUrl: "https://www.google.com/search?q=Studio%20Forma%20Product%20Designer",
+    }],
+    basedOnProfession: "Product Designer",
+    basedOnSector: "Design & UX",
+    basedOnCity: "Milano",
+    status: "ok",
+    coverageNote: "Mostro aziende scoperte dalle fonti configurate e disponibili.",
+    ...overrides,
+  };
+}
+
+function mockRoleAwareApi(
+  jobs = jobsResponse(),
+  companies = companiesResponse(),
+) {
+  getJsonMock.mockImplementation((path: string) => {
+    if (path.startsWith("/api/jobs/company-prospects")) return Promise.resolve(companies);
+    if (path.startsWith("/api/jobs")) return Promise.resolve(jobs);
+    return Promise.reject(new Error(`Unexpected path ${path}`));
+  });
+}
+
+describe("lavori page role context", () => {
+  beforeEach(() => {
+    authState.isLoggedIn = true;
+    authState.user = { id: 42 };
+    getJsonMock.mockReset();
+    mockRoleAwareApi();
+  });
+
+  it("requests jobs and company prospects with profession and sector context", async () => {
+    renderLavori("/lavori?professionId=55&sectorId=2");
+
+    expect(await screen.findByText("Aziende e lavori per Product Designer a Milano")).toBeInTheDocument();
+
+    expect(getJsonMock).toHaveBeenCalledWith("/api/jobs?professionId=55&sectorId=2");
+    expect(getJsonMock).toHaveBeenCalledWith("/api/jobs/company-prospects?professionId=55&sectorId=2");
+    expect(screen.getByText("Studio Forma")).toBeInTheDocument();
+    expect(screen.getByText(/aziende scoperte dalle fonti/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /fonte: example.com/i })).toHaveAttribute("href", "https://example.com/studio-forma");
+    expect(screen.getByRole("link", { name: /cerca posizioni aperte/i })).toHaveAttribute("href", "https://www.google.com/search?q=Studio%20Forma%20Product%20Designer");
+  });
+
+  it("passes query city to company prospect search", async () => {
+    renderLavori("/lavori?professionId=55&sectorId=2&city=Torino");
+
+    expect(await screen.findByText("Aziende e lavori per Product Designer a Milano")).toBeInTheDocument();
+
+    expect(getJsonMock).toHaveBeenCalledWith("/api/jobs/company-prospects?professionId=55&sectorId=2&city=Torino");
+  });
+
+  it("renders sector fallback copy when role snapshots are missing", async () => {
+    mockRoleAwareApi(jobsResponse({
+      basedOnProfession: null,
+      filter: { professionId: 55, sectorId: 2, fallback: "sector" },
+    }));
+
+    renderLavori("/lavori?professionId=55&sectorId=2");
+
+    expect(await screen.findByText("Aziende e lavori per Product Designer a Milano")).toBeInTheDocument();
+    expect(screen.getByText(/non ho ancora snapshot specifici per questo ruolo/i)).toBeInTheDocument();
+  });
+
+  it("asks for a city when local company search has no city", async () => {
+    mockRoleAwareApi(jobsResponse(), companiesResponse({
+      companies: [],
+      basedOnCity: null,
+      status: "city_required",
+    }));
+
+    renderLavori("/lavori?professionId=55&sectorId=2");
+
+    expect(await screen.findByText(/aggiungi una citta/i)).toBeInTheDocument();
+  });
+
+  it("shows provider setup copy when company prospect search is not configured", async () => {
+    mockRoleAwareApi(jobsResponse(), companiesResponse({
+      companies: [],
+      status: "not_configured",
+    }));
+
+    renderLavori("/lavori?professionId=55&sectorId=2");
+
+    expect(await screen.findByText(/richiede un provider web configurato/i)).toBeInTheDocument();
+  });
+
+  it("shows an empty company state while keeping market signals", async () => {
+    mockRoleAwareApi(jobsResponse(), companiesResponse({
+      companies: [],
+      status: "empty",
+    }));
+
+    renderLavori("/lavori?professionId=55&sectorId=2");
+
+    expect(await screen.findByText(/non ho trovato aziende locali/i)).toBeInTheDocument();
+    expect(screen.getByText("Product Designer")).toBeInTheDocument();
+  });
+
+  it("keeps the existing auth gate for logged out users", () => {
+    authState.isLoggedIn = false;
+    authState.user = null;
+
+    renderLavori("/lavori?professionId=55");
+
+    expect(screen.getByText("Segnali mercato NorthStar")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /accedi/i })).toHaveAttribute("href", "/sign-in?redirect_url=/lavori");
+    expect(getJsonMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("lavori page reliability states", () => {
   beforeEach(() => {
+    authState.isLoggedIn = true;
+    authState.user = { id: 42 };
     getJsonMock.mockReset();
   });
 
