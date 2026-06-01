@@ -159,6 +159,8 @@ export default function Lavori() {
   const professionId = params.get("professionId");
   const sectorId = params.get("sectorId");
   const city = params.get("city");
+  const currentPathWithSearch = `${window.location.pathname}${window.location.search}`;
+  const signInHref = `/sign-in?redirect_url=${encodeURIComponent(currentPathWithSearch)}`;
   const jobsQuery = new URLSearchParams();
   if (professionId) jobsQuery.set("professionId", professionId);
   if (sectorId) jobsQuery.set("sectorId", sectorId);
@@ -221,7 +223,7 @@ export default function Lavori() {
         <p className="text-muted-foreground max-w-md">
           Accedi per vedere i ruoli piu richiesti dal mercato, ordinati per compatibilita con il tuo profilo.
         </p>
-        <Link href="/sign-in?redirect_url=/lavori">
+        <Link href={signInHref}>
           <Button className="rounded-full px-8">Accedi</Button>
         </Link>
       </div>

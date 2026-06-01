@@ -181,14 +181,17 @@ describe("lavori page role context", () => {
     expect(screen.getByText("Product Designer")).toBeInTheDocument();
   });
 
-  it("keeps the existing auth gate for logged out users", () => {
+  it("keeps role context in the sign-in redirect for logged out users", () => {
     authState.isLoggedIn = false;
     authState.user = null;
 
-    renderLavori("/lavori?professionId=55");
+    renderLavori("/lavori?professionId=55&sectorId=2&city=Torino");
 
     expect(screen.getByText("Segnali mercato NorthStar")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /accedi/i })).toHaveAttribute("href", "/sign-in?redirect_url=/lavori");
+    expect(screen.getByRole("link", { name: /accedi/i })).toHaveAttribute(
+      "href",
+      "/sign-in?redirect_url=%2Flavori%3FprofessionId%3D55%26sectorId%3D2%26city%3DTorino",
+    );
     expect(getJsonMock).not.toHaveBeenCalled();
   });
 });
