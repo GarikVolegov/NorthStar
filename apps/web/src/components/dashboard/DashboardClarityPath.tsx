@@ -12,14 +12,25 @@ interface ClarityStep {
   active: boolean;
 }
 
+interface ClarityPathNextAction {
+  label: string;
+  href: string;
+}
+
 export function DashboardClarityPath({
   hasSession,
   savedSectorsCount,
   hasDecided,
+  currentPhaseLabel,
+  nextAction,
+  compact = false,
 }: {
   hasSession: boolean;
   savedSectorsCount: number;
   hasDecided: boolean;
+  currentPhaseLabel?: string;
+  nextAction?: ClarityPathNextAction;
+  compact?: boolean;
 }) {
   const steps: ClarityStep[] = [
     {
@@ -56,7 +67,7 @@ export function DashboardClarityPath({
     {
       icon: Sparkles,
       label: "Decidi",
-      desc: hasDecided ? "Percorso scelto — ora costruisci!" : "Scegli il tuo percorso e parti",
+      desc: hasDecided ? "Percorso scelto: ora costruisci!" : "Scegli il tuo percorso e parti",
       cta: "Scegli percorso",
       href: "/percorso",
       done: hasDecided,
@@ -65,21 +76,39 @@ export function DashboardClarityPath({
   ];
 
   const currentStep = steps.findIndex((s) => s.active && !s.done);
+  const completedCount = steps.filter((step) => step.done).length;
+  const activeStep = currentStep >= 0 ? steps[currentStep] : steps[steps.length - 1];
+  const activeAction = nextAction ?? (activeStep ? { label: activeStep.cta, href: activeStep.href } : undefined);
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
-          <Compass className="h-3.5 w-3.5" />
+    <div className={cn("rounded-2xl border border-border bg-card shadow-sm", compact ? "p-4" : "p-5")}>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex items-start gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
+            <Compass className="h-3.5 w-3.5" />
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Mappa della chiarezza
+            </p>
+            <p className="mt-1 text-sm font-semibold text-foreground">
+              {currentPhaseLabel ?? activeStep?.label ?? "Prossimo passo"}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {completedCount} / {steps.length} step completati
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Mappa della chiarezza
-          </p>
-        </div>
+        {activeAction && (
+          <Link
+            href={activeAction.href}
+            className="inline-flex min-h-9 items-center justify-center rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          >
+            {activeAction.label}
+          </Link>
+        )}
       </div>
 
-      {/* Mobile: vertical list */}
       <div className="flex flex-col gap-3 sm:hidden">
         {steps.map((step, i) => {
           const Icon = step.icon;
@@ -110,22 +139,12 @@ export function DashboardClarityPath({
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">{step.desc}</p>
               </div>
-              {isCurrent && !step.done && (
-                <Link
-                  href={step.href}
-                  className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  {step.cta}
-                </Link>
-              )}
             </div>
           );
         })}
       </div>
 
-      {/* Desktop: horizontal path */}
       <div className="relative hidden sm:block">
-        {/* Connecting line */}
         <div className="absolute left-[calc(12.5%)] right-[calc(12.5%)] top-[22px] h-px bg-border" aria-hidden="true" />
 
         <div className="relative grid grid-cols-4 gap-3">
@@ -134,7 +153,6 @@ export function DashboardClarityPath({
             const isCurrent = i === currentStep;
             return (
               <div key={step.label} className="flex flex-col items-center gap-2 text-center">
-                {/* Node */}
                 <div
                   className={cn(
                     "relative z-10 flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-sm transition-all duration-300",
@@ -146,7 +164,6 @@ export function DashboardClarityPath({
                   {step.done ? <Check className="h-5 w-5" /> : <Icon className="h-4.5 w-4.5" />}
                 </div>
 
-                {/* Label & desc */}
                 <div className="min-w-0">
                   <p
                     className={cn(
@@ -161,17 +178,6 @@ export function DashboardClarityPath({
                   </p>
                 </div>
 
-                {/* CTA only for current step */}
-                {isCurrent && !step.done && (
-                  <Link
-                    href={step.href}
-                    className="mt-0.5 rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-                  >
-                    {step.cta} →
-                  </Link>
-                )}
-
-                {/* Numero step */}
                 <span
                   className={cn(
                     "text-[10px] font-bold tabular-nums",

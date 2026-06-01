@@ -47,7 +47,9 @@ import { fetchReadiness, isReadinessData } from "@/components/dashboard/Commitme
 import { NextRoutineWidget } from "@/components/dashboard/widgets/NextRoutineWidget";
 import type { JourneyId } from "@/components/dashboard/dashboard-sections";
 import {
+  deriveDashboardPhase,
   getAdaptiveDashboardLayout,
+  getAdaptiveSectionPresentation,
 } from "@/components/dashboard/dashboard-adaptive-flow";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
 import { DashboardIndecisoTools } from "@/components/dashboard/DashboardIndecisoTools";
@@ -88,6 +90,14 @@ const JOURNEY_META: Record<JourneyId, {
   autonomo:    { label: "Autonomo",   Icon: Rocket,      color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Scala il tuo business",          subline: "Valida idee, trova mercati, costruisci il tuo piano strategico con l'AI" },
   azienda:     { label: "Azienda",    Icon: Building2,   color: "text-growth",    bgColor: "bg-growth/10",    borderColor: "border-growth/30",    headline: "Trova i profili giusti",          subline: "Esplora i profili RIASEC, pubblica le tue opportunità, analizza il mercato" },
   investitore: { label: "Investitore",Icon: BarChart3,   color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Analizza le opportunità",         subline: "Aree in crescita, trend di mercato e analisi delle competenze richieste" },
+};
+
+const ADAPTIVE_PHASE_LABEL: Record<string, string> = {
+  start_test: "Scopri chi sei",
+  explore_sectors: "Esplora il mondo",
+  compare_options: "Confronta le opzioni",
+  choose_path: "Scegli il percorso",
+  active_journey: "Percorso attivo",
 };
 
 function useLatestSession() {
@@ -300,6 +310,8 @@ export default function Dashboard() {
     readinessBand,
     layout: dashboardLayout,
   };
+  const adaptiveState = deriveDashboardPhase(adaptiveInput);
+  const adaptiveSectionPresentation = getAdaptiveSectionPresentation(adaptiveInput);
   const visibleDashboardLayout = getAdaptiveDashboardLayout(adaptiveInput);
 
   function renderDiscoveryFeed() {
@@ -412,7 +424,19 @@ export default function Dashboard() {
   function renderDashboardSection(section: WidgetLayout) {
     switch (section.id) {
       case "clarity_path":
-        return <DashboardClarityPath hasSession={!!sessionId} savedSectorsCount={savedSectorsCount} hasDecided={false} />;
+        return (
+          <DashboardClarityPath
+            hasSession={!!sessionId}
+            savedSectorsCount={savedSectorsCount}
+            hasDecided={false}
+            currentPhaseLabel={ADAPTIVE_PHASE_LABEL[adaptiveState.phase]}
+            nextAction={{
+              label: adaptiveState.nextAction.label,
+              href: adaptiveState.nextAction.href,
+            }}
+            compact={adaptiveSectionPresentation.clarity_path?.priority === "compact"}
+          />
+        );
       case "next_routine":
         return <NextRoutineWidget size={section.size} />;
       case "discovery_feed":
