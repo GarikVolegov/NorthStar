@@ -18,6 +18,7 @@ import { handleCompareSectors, handleGenerateDayScene, handleGetGrowthArticles, 
 import { handleGetUserContext } from "./tool-handlers-user";
 import { handleGetJobPostingTrend, handleGetSkillCooccurrences, handleGetWeakSignals, handleSearchBrain, handleSearchMemoryGraph, handleSearchRag } from "./tool-handlers-market";
 import { handleCheckFoodSafety, handleGetBreedInfo, handleGetRabbitCareGuide, handleSearchRabbitKb } from "./tool-handlers-rabbit";
+import { handleGetCompass, handleProposeNextCompassStep } from "./tool-handlers-compass";
 
 // ── Cache embedding query (LRU semplice con TTL 5 min) ───────────────────────
 const _embCache = new Map<string, { vec: number[]; ts: number }>();
@@ -267,6 +268,28 @@ function proposeMemoryFact(args: { key?: string; value?: string }): ToolResult {
   });
 }
 
+function proposeRecordCompassSignal(args: { signalType?: string; refType?: string; refId?: string; valence?: number }): ToolResult {
+  const ALLOWED = ["chat_reaction", "tournament_choice", "block_answer", "spike_outcome"];
+  const signalType = (args.signalType ?? "chat_reaction").trim();
+  if (!ALLOWED.includes(signalType)) return err("INVALID_INPUT", "signalType non valido per la chat");
+  const valence = typeof args.valence === "number" ? Math.max(-1, Math.min(1, args.valence)) : undefined;
+  if (valence === undefined) return err("INVALID_INPUT", "Indica una reazione (valence -1..1)");
+  return wendyAction({
+    type: "record_compass_signal",
+    status: "needs_confirmation",
+    risk: "low",
+    label: "Lo aggiungo alla tua Bussola?",
+    description: "Registro questo segnale solo dopo la tua conferma.",
+    requiresConfirmation: true,
+    targetRoute: "/bussola",
+    payload: { signalType, refType: args.refType, refId: args.refId, valence },
+    preview: [
+      { label: "Reazione", value: valence > 0 ? "ti accende" : valence < 0 ? "ti spegne" : "neutra" },
+      ...(args.refId ? [{ label: "Su", value: `${args.refType ?? "elemento"} ${args.refId}` }] : []),
+    ],
+  });
+}
+
 // ── 3. get_sector_detail ─────────────────────────────────────────────────────
 
 // ── 15. save_business_idea ───────────────────────────────────────────────────
@@ -302,6 +325,11 @@ export async function executeToolCall(
     case "add_calendar_event":         result = proposeCalendarEvent(typedArgs(args)); break;
     case "save_memory_fact":           result = proposeMemoryFact(typedArgs(args)); break;
     case "get_user_context":           result = await handleGetUserContext({}, userId); break;
+
+    // Percorso Indeciso: "La Bussola"
+    case "get_compass":                result = await handleGetCompass({}, userId); break;
+    case "propose_next_compass_step":  result = await handleProposeNextCompassStep({}, userId); break;
+    case "record_compass_signal":      result = proposeRecordCompassSignal(typedArgs(args)); break;
 
     // Step 6: RAG + Job Market Intelligence
     case "search_rag":               result = await handleSearchRag(typedArgs(args)); break;

@@ -45,6 +45,9 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_news_summary",
     "get_market_trend",
     "get_user_context",
+    "get_compass",                // Indeciso: legge la Bussola direzionale
+    "propose_next_compass_step",  // Indeciso: prossimo passo (no verdetti)
+    "record_compass_signal",      // Indeciso: registra segnale emerso in chat (conferma)
     "search_memory_graph",
     "get_growth_articles",
     "add_calendar_event",
@@ -76,6 +79,9 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "add_calendar_event",
     "save_memory_fact",
     "get_user_context",
+    "get_compass",                // Indeciso: legge la Bussola direzionale
+    "propose_next_compass_step",  // Indeciso: prossimo passo (no verdetti)
+    "record_compass_signal",      // Indeciso: registra segnale emerso in chat (conferma)
     "search_memory_graph",
     "search_rag",                // Step 6: grounding per piano basato su dati reali
     "search_brain",              // Brain runtime: piani su NorthStar identity/product/process
@@ -96,6 +102,9 @@ const INTENT_TOOLS: Record<WendyIntent, string[]> = {
     "get_market_trend",
     "get_growth_articles",
     "get_user_context",
+    "get_compass",                // Indeciso: legge la Bussola direzionale
+    "propose_next_compass_step",  // Indeciso: prossimo passo (no verdetti)
+    "record_compass_signal",      // Indeciso: registra segnale emerso in chat (conferma)
     "search_memory_graph",
     "get_user_objectives",
     "search_rag",                // Step 6: analisi profonda con fonti autorevoli
@@ -160,6 +169,7 @@ const WRITE_TOOLS = new Set([
   "save_business_idea",
   "save_memory_fact",
   "add_calendar_event",
+  "record_compass_signal",
 ]);
 
 (function bootstrapToolRegistry() {

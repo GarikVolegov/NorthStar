@@ -27,7 +27,7 @@ describe("recencyDecay", () => {
 describe("weightedRiasec", () => {
   it("fa emergere la dimensione dominante dai segnali", () => {
     const rv = weightedRiasec([sig({ I: 5 }), sig({ I: 5 }), sig({ R: 1 })], NOW);
-    expect(rv.I).toBeGreaterThan(rv.R);
+    expect(rv.I).toBeGreaterThan(rv.R!);
     expect(rv.I).toBeCloseTo(5, 5);
   });
   it("ignora segnali senza dims e ritorna 0 per dimensioni mai viste", () => {
@@ -35,8 +35,8 @@ describe("weightedRiasec", () => {
     expect(rv.A).toBe(0);
   });
   it("pesa meno i segnali vecchi", () => {
-    const recent = weightedRiasec([sig({ E: 5 }, 0)], NOW).E;
-    const old = weightedRiasec([sig({ E: 5 }, 365)], NOW).E;
+    const recent = weightedRiasec([sig({ E: 5 }, 0)], NOW).E!;
+    const old = weightedRiasec([sig({ E: 5 }, 365)], NOW).E!;
     // la media per-dimensione resta 5 in entrambi (un solo segnale), ma il peso
     // conta quando si combinano dims diverse:
     const mix = weightedRiasec([sig({ E: 5 }, 365), sig({ S: 5 }, 0)], NOW);

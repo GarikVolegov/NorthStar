@@ -173,6 +173,28 @@ export const ALL_TOOLS: Record<string, ToolDefinition> = {
     parameters: [],
   },
 
+  // ── Percorso Indeciso: "La Bussola" ────────────────────────────────────────
+  get_compass: {
+    name:        "get_compass",
+    description: "Legge la Bussola dell'utente indeciso: stage del percorso (zero_ideas→committed), tipo di blocco, ipotesi di carriera con confidence, cosa lo accende. Usare per orientare la conversazione di chi non sa ancora cosa fare. Read-only.",
+    parameters: [],
+  },
+  propose_next_compass_step: {
+    name:        "propose_next_compass_step",
+    description: "Suggerisce il PROSSIMO passo concreto in base allo stage della Bussola (es. fai lo Specchio, prova una giornata, capisci il blocco). Non dà verdetti. Read-only.",
+    parameters: [],
+  },
+  record_compass_signal: {
+    name:        "record_compass_signal",
+    description: "Registra un segnale emerso in chat (es. l'utente si è acceso parlando di un tema) nella Bussola. Prepara la scrittura: richiede conferma esplicita nel client.",
+    parameters: [
+      { name: "signalType", type: "string", description: "chat_reaction | tournament_choice | block_answer | spike_outcome", required: true },
+      { name: "refType",    type: "string", description: "profession | sector | skill" },
+      { name: "refId",      type: "string", description: "ID dell'entità a cui si riferisce la reazione" },
+      { name: "valence",    type: "number", description: "Reazione da -1 (spento) a 1 (acceso)", required: true },
+    ],
+  },
+
   // ── Step 6: RAG + Job Market Intelligence ──────────────────────────────────
   search_rag: {
     name:        "search_rag",
