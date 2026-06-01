@@ -124,7 +124,7 @@ export function BussolaHome({ showHeader = true }: { showHeader?: boolean }) {
               <p className="text-sm text-muted-foreground">Non una mappa, una direzione che si calibra mentre esplori.</p>
             </div>
           </div>
-          <Link href={`${BASE}chi-sono`} className="hidden items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition hover:border-primary/50 sm:flex">
+          <Link href={`${BASE}chi-siamo`} className="hidden items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm transition hover:border-primary/50 sm:flex">
             <UserCircle className="h-4 w-4 text-primary" /> Chi sono
           </Link>
         </header>
@@ -220,7 +220,7 @@ export function BussolaHome({ showHeader = true }: { showHeader?: boolean }) {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold">Il tuo viaggio, in 4 momenti</h2>
-          <Link href={`${BASE}chi-sono`} className="flex items-center gap-1.5 text-sm text-primary hover:underline">
+          <Link href={`${BASE}chi-siamo`} className="flex items-center gap-1.5 text-sm text-primary hover:underline">
             <UserCircle className="h-4 w-4" /> Chi sono
           </Link>
         </div>

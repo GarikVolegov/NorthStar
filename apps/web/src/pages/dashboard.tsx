@@ -51,7 +51,7 @@ import {
   type AdaptiveDashboardPhase,
 } from "@/components/dashboard/dashboard-adaptive-flow";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
-import { BussolaLaunchpad } from "@/features/compass/BussolaLaunchpad";
+import { BussolaHome } from "@/features/compass/BussolaHome";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
 import { WorkModePanel } from "@/components/dashboard/WorkModePanel";
 
@@ -371,7 +371,7 @@ export default function Dashboard() {
           {journeyMeta && <span className="text-xs text-muted-foreground">- {journeyMeta.label}</span>}
         </div>
         {isIndeciso ? (
-          <BussolaLaunchpad />
+          <BussolaHome showHeader={false} />
         ) : (
           <JourneyToolsSection {...toolsProps} presentation={adaptiveSectionPresentation.tools} />
         )}

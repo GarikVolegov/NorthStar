@@ -36,6 +36,7 @@ export const routes: RouteConfig[] = [
   { path: "/bussola/blocco", component: () => import("@/pages/bussola-blocco"), guard: "protected", layout: "default", title: "Cosa ti blocca" },
   { path: "/bussola/torneo", component: () => import("@/pages/bussola-torneo"), guard: "protected", layout: "default", title: "Il Torneo" },
   { path: "/bussola/spike", component: () => import("@/pages/bussola-spike"), guard: "protected", layout: "default", title: "I tuoi Spike" },
+  { path: "/chi-sono", component: () => import("@/pages/chi-sono"), guard: "protected", layout: "default", title: "Chi sono" },
   { path: PATHS.FRIENDS, component: () => import("@/pages/amici"), guard: "protected", layout: "default", title: "Amici" },
   { path: "/social", component: () => import("@/pages/social"), guard: "protected", layout: "default", title: "Social" },
   { path: "/utente/:id", component: () => import("@/pages/utente"), guard: "public", layout: "default", title: "Utente" },
