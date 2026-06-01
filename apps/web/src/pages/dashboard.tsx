@@ -43,8 +43,12 @@ import { DashboardCareerComparison } from "@/components/dashboard/DashboardCaree
 import { DashboardClarityPath } from "@/components/dashboard/DashboardClarityPath";
 import { DashboardDiscoveryFeed, useSavedSectorsCount } from "@/components/dashboard/DashboardDiscoveryFeed";
 import { DashboardWendyPrompts } from "@/components/dashboard/DashboardWendyPrompts";
+import { fetchReadiness, isReadinessData } from "@/components/dashboard/CommitmentReadinessWidget";
 import { NextRoutineWidget } from "@/components/dashboard/widgets/NextRoutineWidget";
 import type { JourneyId } from "@/components/dashboard/dashboard-sections";
+import {
+  getAdaptiveDashboardLayout,
+} from "@/components/dashboard/dashboard-adaptive-flow";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
 import { DashboardIndecisoTools } from "@/components/dashboard/DashboardIndecisoTools";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
@@ -195,6 +199,12 @@ export default function Dashboard() {
   const { insights, error: insightsError, refetch: refetchInsights, markRead, dismiss } = useProactiveInsights();
   const { data: monthlyRitual } = useMonthlyRitualCurrent();
   const { layout: dashboardLayout } = useDashboardLayout();
+  const { data: readinessData } = useQuery({
+    queryKey: ["discovery-readiness"],
+    queryFn: fetchReadiness,
+    enabled: journeyType === "indeciso",
+    staleTime: 60 * 1000,
+  });
   const ritualRequested = location.includes("ritual=notte-fondazione");
   const objectives = dashData?.objectives ?? [];
   const strategicObjectives = objectives.filter((objective) => objective.category !== "idea_validation");
@@ -280,6 +290,17 @@ export default function Dashboard() {
   const compSectorB = topTwoRecs[1]
     ? { sectorId: topTwoRecs[1].sectorId, sectorName: topTwoRecs[1].sectorName, matchScore: topTwoRecs[1].matchScore ?? 0 }
     : null;
+
+  const readinessBand = isReadinessData(readinessData) ? readinessData.band : undefined;
+  const adaptiveInput = {
+    journeyType,
+    hasSession: !!sessionId,
+    savedSectorsCount,
+    hasDecided: false,
+    readinessBand,
+    layout: dashboardLayout,
+  };
+  const visibleDashboardLayout = getAdaptiveDashboardLayout(adaptiveInput);
 
   function renderDiscoveryFeed() {
     if (!user) return null;
@@ -482,13 +503,10 @@ export default function Dashboard() {
 
       {dashError && <DashboardProgressUnavailable onRetry={() => refetchDashboard()} />}
 
-      {dashboardLayout
-        .filter((section) => section.visible)
-        .sort((a, b) => a.position - b.position)
-        .map((section) => {
-          const content = renderDashboardSection(section);
-          return content ? <div key={section.id}>{content}</div> : null;
-        })}
+      {visibleDashboardLayout.map((section) => {
+        const content = renderDashboardSection(section);
+        return content ? <div key={section.id}>{content}</div> : null;
+      })}
 
     </div>
   );

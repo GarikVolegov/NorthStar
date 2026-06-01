@@ -7,17 +7,27 @@ import Dashboard from "./dashboard";
 const useDashboardDataMock = vi.hoisted(() => vi.fn());
 const refetchDashboardMock = vi.hoisted(() => vi.fn());
 const getJsonMock = vi.hoisted(() => vi.fn());
+const apiFetchMock = vi.hoisted(() => vi.fn());
+const authState = vi.hoisted(() => ({
+  user: {
+    id: 7,
+    name: "Ada",
+    journeyType: "dipendente",
+    onboardingCompleted: true,
+    avatarUrl: null,
+  } as {
+    id: number;
+    name: string;
+    journeyType: string;
+    onboardingCompleted: boolean;
+    avatarUrl: string | null;
+  },
+}));
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
     authReady: true,
-    user: {
-      id: 7,
-      name: "Ada",
-      journeyType: "dipendente",
-      onboardingCompleted: true,
-      avatarUrl: null,
-    },
+    user: authState.user,
   }),
 }));
 
@@ -28,9 +38,13 @@ vi.mock("@/hooks/useDashboardData", () => ({
 vi.mock("@/hooks/useDashboardLayout", () => ({
   useDashboardLayout: () => ({
     layout: [
-      { id: "kpi_strip", position: 0, visible: true, size: "lg" },
-      { id: "week_timeline", position: 1, visible: true, size: "lg" },
-      { id: "diary_objectives", position: 2, visible: true, size: "lg" },
+      { id: "tools", position: 0, visible: true, size: "lg" },
+      { id: "clarity_path", position: 1, visible: true, size: "lg" },
+      { id: "discovery_feed", position: 2, visible: true, size: "lg" },
+      { id: "career_comparison", position: 3, visible: true, size: "lg" },
+      { id: "kpi_strip", position: 4, visible: true, size: "lg" },
+      { id: "week_timeline", position: 5, visible: true, size: "lg" },
+      { id: "diary_objectives", position: 6, visible: true, size: "lg" },
     ],
   }),
 }));
@@ -42,7 +56,7 @@ vi.mock("@/lib/apiClient", () => {
 });
 
 vi.mock("@/lib/api-fetch", () => ({
-  apiFetch: vi.fn(),
+  apiFetch: apiFetchMock,
 }));
 
 vi.mock("@/lib/seo", () => ({
@@ -116,6 +130,14 @@ function renderDashboard() {
 describe("Dashboard progress UX", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    apiFetchMock.mockResolvedValue({ ok: true });
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      journeyType: "dipendente",
+      onboardingCompleted: true,
+      avatarUrl: null,
+    };
   });
 
   it("does not render empty progress widgets when dashboard data fails to load", async () => {
@@ -215,5 +237,71 @@ describe("Dashboard progress UX", () => {
     expect(await screen.findByText(/timeline settimanale/i)).toBeInTheDocument();
     expect(screen.getAllByText("Aggiornare portfolio").length).toBeGreaterThan(0);
     expect(screen.queryByText(/traccia predefinita/i)).not.toBeInTheDocument();
+  });
+
+  it("promotes discovery feed above tools when the indeciso user has completed the test", async () => {
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      journeyType: "indeciso",
+      onboardingCompleted: true,
+      avatarUrl: null,
+    };
+    useDashboardDataMock.mockReturnValue({
+      data: {
+        user: {
+          journeyType: "indeciso",
+          name: "Ada",
+          email: "ada@example.com",
+          isPremium: false,
+          onboardingCompleted: true,
+        },
+        session: null,
+        objectives: [],
+        objectivesProgress: { done: 0, total: 0, percent: 0 },
+        upcomingEvents: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: refetchDashboardMock,
+    });
+    getJsonMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("api/test-sessions/latest")) {
+        return {
+          sessionId: 42,
+          recommendations: [
+            { sectorId: 1, sectorName: "Product Design", matchScore: 91 },
+            { sectorId: 2, sectorName: "UX Research", matchScore: 88 },
+          ],
+          riasecScores: {},
+          primaryTypes: ["A"],
+          spiritScores: {},
+          createdAt: "2026-05-30T00:00:00.000Z",
+        };
+      }
+      if (url.endsWith("api/test-sessions/42")) {
+        return {
+          id: 42,
+          recommendations: [
+            { sectorId: 1, sectorName: "Product Design", matchScore: 91 },
+            { sectorId: 2, sectorName: "UX Research", matchScore: 88 },
+          ],
+          riasecScores: {},
+          primaryTypes: ["A"],
+          spiritScores: {},
+          createdAt: "2026-05-30T00:00:00.000Z",
+        };
+      }
+      return { layout: [] };
+    });
+
+    renderDashboard();
+
+    const clarity = await screen.findByText(/mappa della chiarezza/i);
+    const sectors = await screen.findByText(/settori consigliati per te/i);
+    const tools = await screen.findByRole("heading", { name: /strumenti del percorso/i });
+
+    expect(clarity.compareDocumentPosition(sectors) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sectors.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
