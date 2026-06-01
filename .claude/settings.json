@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo NorthStar: leggi memoria.md (documento-radice vivente) PRIMA di lavorare; a fine lavoro significativo aggiornalo (header + sezione 7 Stato e Direzione + sezione 10 Changelog). Vedi CLAUDE.md / AGENTS.md."
+          }
+        ]
+      }
+    ]
+  }
+}
