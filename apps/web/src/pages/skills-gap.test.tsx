@@ -79,6 +79,8 @@ describe("SkillsGap stream states", () => {
     fireEvent.click(screen.getByRole("button", { name: /riprova analisi/i }));
 
     expect(await screen.findByText("72/100")).toBeInTheDocument();
+    expect(screen.getAllByText(/livello di prontezza/i).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/indice di readiness/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

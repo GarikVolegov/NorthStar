@@ -46,6 +46,7 @@ vi.mock("react-i18next", () => ({
         "calendar.category": "Categoria",
         "calendar.priority": "Priorita",
         "calendar.status": "Stato",
+        "calendar.eventOptions": "Opzioni evento",
         "calendar.linkedSector": "Settore collegato",
         "calendar.noSector": "Nessun settore",
         "calendar.linkedGoal": "Obiettivo collegato",
@@ -110,5 +111,21 @@ describe("CalendarioEventoModal persistence states", () => {
     );
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("stacks category priority and status controls on mobile", () => {
+    renderWithClient(
+      <CalendarioEventoModal
+        open
+        onOpenChange={vi.fn()}
+        userId={42}
+        defaultDate={new Date("2026-06-05T09:00:00.000Z")}
+        editingEvent={null}
+        onSaved={vi.fn()}
+        onDeleted={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText("Opzioni evento")).toHaveClass("grid-cols-1", "sm:grid-cols-3");
   });
 });

@@ -64,4 +64,28 @@ describe("CvEditorDrawer persistence states", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.queryByText("Salvato!")).not.toBeInTheDocument();
   });
+
+  it("asks before discarding unsaved edits", () => {
+    const onClose = vi.fn();
+
+    renderWithClient(
+      <CvEditorDrawer
+        open
+        onClose={onClose}
+        userId={42}
+        initialCv={initialCv}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Profilo \/ Sommario/i }));
+    fireEvent.change(screen.getByPlaceholderText("Breve descrizione professionale..."), {
+      target: { value: "Inventrice e mentor tecnico" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Annulla" }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+    expect(screen.getByText("Scartare le modifiche al CV?")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Inventrice e mentor tecnico")).toBeInTheDocument();
+  });
 });

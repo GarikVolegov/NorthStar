@@ -437,11 +437,25 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 
 Esito: export calendario ora passa da `apiFetch` e quindi include il bearer token, con loading e alert di errore. Le pagine admin/status/messaggi/agenti/crescita/affiliazione e la fonte news YouTube non espongono piu testo mojibake nelle superfici verificate.
 
+## Verifica Tranche 24
+
+- `pnpm --filter @northstar/server test src/routes/users.test.ts`
+- `pnpm --filter @northstar/server test src/routes/account.test.ts`
+- `pnpm --filter @northstar/web test ApplicationCard.test.tsx`
+- `pnpm --filter @northstar/web test src/components/dashboard/DashboardWendyPrompts.test.tsx`
+- `pnpm --filter @northstar/server test src/routes/users.test.ts src/routes/account.test.ts`
+- `pnpm --filter @northstar/web test ApplicationCard.test.tsx src/components/dashboard/DashboardWendyPrompts.test.tsx`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `git diff --check -- apps/server/src/routes/users.ts apps/server/src/routes/users.test.ts apps/server/src/routes/account.ts apps/server/src/routes/account.test.ts apps/web/src/pages/utente.tsx apps/web/src/components/profile/settings/PrivacyCard.tsx apps/web/src/features/social/SocialPanels.tsx apps/web/src/features/applications/ApplicationCard.tsx apps/web/src/features/applications/ApplicationCard.test.tsx apps/web/src/components/dashboard/DashboardWendyPrompts.test.tsx`
+
+Esito: il profilo pubblico non accetta piu `viewerId` dalla query come autorizzazione; la vista deriva il viewer dal token e i caller frontend non inviano piu il parametro manipolabile. L'export account usa una allowlist esplicita per `profile.user` e `profile.settings`, evitando campi auth, pagamento e blob interni. Le note diario nelle candidature mostrano ora un alert su errore save/delete e conservano il testo inserito dopo un salvataggio fallito. Corretto anche il test dashboard che bloccava il typecheck web per un possibile bottone undefined.
+
 ## Backlog Prossima Tranche
 
 1. Estendere E2E referral/affiliate a WebKit ora che il browser Safari-like locale e disponibile.
 2. Aggiungere audit operativo per rate-limit provider news e trend errori fonti nel tempo.
 3. Aggiungere smoke tablet per `/news` con diagnostica provider e tab categoria overflow-safe.
-4. Correggere `viewerId` spoofabile nei profili pubblici e allowlist export account.
-5. Correggere retry Wendy che puo perdere il turno utente e TTS voice endpoint non autenticato.
-6. Correggere eventi calendario multi-giorno/overlap e download CV verso route mancanti.
+4. Correggere retry Wendy che puo perdere il turno utente e TTS voice endpoint non autenticato.
+5. Correggere eventi calendario multi-giorno/overlap e download CV verso route mancanti.
+6. Rendere onboarding realmente retryable quando la persistenza fallisce e transazionale lato server.

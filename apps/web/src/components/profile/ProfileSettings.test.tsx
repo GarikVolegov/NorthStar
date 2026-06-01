@@ -106,6 +106,44 @@ describe("ProfileSettings", () => {
     vi.spyOn(document.body, "removeChild");
   });
 
+  it("shows profile fields when async profile data arrives after mount", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const user = {
+      id: 7,
+      name: "Ada",
+      email: "ada@example.com",
+      testSessionId: null,
+      emailVerified: true,
+    };
+
+    const { rerender } = render(
+      <QueryClientProvider client={queryClient}>
+        <ProfileSettings user={user} />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByText("Costruisco strumenti affidabili per crescere.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Milano")).not.toBeInTheDocument();
+    expect(screen.queryByText("ada-lovelace")).not.toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={queryClient}>
+        <ProfileSettings
+          user={user}
+          bio="Costruisco strumenti affidabili per crescere."
+          city="Milano"
+          username="ada-lovelace"
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByText("Costruisco strumenti affidabili per crescere.")).toBeInTheDocument();
+    expect(screen.getByText("Milano")).toBeInTheDocument();
+    expect(screen.getByText("ada-lovelace")).toBeInTheDocument();
+  });
+
   it("reports Wendy tone save failures and keeps the previous tone selected", async () => {
     patchJsonMock.mockRejectedValue(new Error("Persistenza non disponibile"));
     const user = userEvent.setup();

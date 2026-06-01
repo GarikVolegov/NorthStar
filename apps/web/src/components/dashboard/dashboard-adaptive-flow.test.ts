@@ -114,7 +114,27 @@ describe("dashboard adaptive flow", () => {
     ]);
   });
 
-  it("preserves standard journey layout order while returning active_journey", () => {
+  it("forces the mission-critical clarity path and active next section visible above hidden saved layout choices", () => {
+    const layout = getAdaptiveDashboardLayout({
+      ...baseInput,
+      hasSession: true,
+      savedSectorsCount: 1,
+      layout: [
+        { id: "tools", position: 0, visible: true, size: "lg" },
+        { id: "personality", position: 1, visible: true, size: "md" },
+        { id: "discovery_feed", position: 2, visible: false, size: "lg" },
+        { id: "clarity_path", position: 3, visible: false, size: "lg" },
+      ],
+    });
+
+    expect(layout.map((section) => [section.id, section.visible]).slice(0, 3)).toEqual([
+      ["clarity_path", true],
+      ["discovery_feed", true],
+      ["tools", true],
+    ]);
+  });
+
+  it("promotes the active journey next routine above saved standard layout preferences", () => {
     const layout = getAdaptiveDashboardLayout({
       ...baseInput,
       journeyType: "dipendente",
@@ -122,10 +142,17 @@ describe("dashboard adaptive flow", () => {
       layout: [
         { id: "week_timeline", position: 0, visible: true, size: "lg" },
         { id: "kpi_strip", position: 1, visible: true, size: "lg" },
+        { id: "next_routine", position: 2, visible: false, size: "lg" },
+        { id: "tools", position: 3, visible: true, size: "lg" },
       ],
     });
 
-    expect(layout.map((section) => section.id)).toEqual(["week_timeline", "kpi_strip"]);
+    expect(layout.map((section) => [section.id, section.visible])).toEqual([
+      ["next_routine", true],
+      ["week_timeline", true],
+      ["kpi_strip", true],
+      ["tools", true],
+    ]);
   });
 
   it("marks the active section as primary and future gated sections as gated", () => {

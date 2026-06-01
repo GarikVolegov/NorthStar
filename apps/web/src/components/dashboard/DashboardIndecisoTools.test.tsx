@@ -57,7 +57,7 @@ describe("DashboardIndecisoTools", () => {
 
     renderWithClient(client);
 
-    expect(screen.getByText(/discovery engine non disponibile/i)).toBeInTheDocument();
+    expect(screen.getByText(/prontezza non disponibile/i)).toBeInTheDocument();
     expect(screen.getByText(/test di personalit/i)).toBeInTheDocument();
   });
 

@@ -15,7 +15,6 @@ export const FALLBACK_IMAGE_THEMES: Record<string, { from: string; to: string; i
 };
 
 type MeaningCopy = {
-  label: string;
   audience: (sector: string) => string;
   happened: (summary: string) => string;
   why: (sector: string) => string;
@@ -32,22 +31,20 @@ type MeaningCopy = {
 
 const MEANING_COPY: Record<NewsLocale, MeaningCopy> = {
   it: {
-    label: "Per chi è",
     audience: (sector) => `Per chi sta valutando o seguendo ${sector}, competenze collegate e prossime scelte professionali.`,
     happened: (summary) => summary,
     why: (sector) => `Questa notizia ti aiuta a leggere cosa cambia in ${sector} e quali decisioni professionali potrebbero diventare più importanti per te.`,
-    practical: "Confronta il segnale con il tuo percorso, segna una competenza da approfondire e verifica se cambia priorità nelle prossime scelte.",
+    practical: "Confronta il segnale con il tuo percorso: scegli una competenza da verificare questa settimana e decidi se aggiornare una priorità concreta.",
     signal: "Segnale per il tuo percorso",
     headings: {
       audience: "Per chi è",
       happened: "Cosa è successo",
-      why: "Perché conta per te",
+      why: "Perché conta per l'utente",
       practical: "Cosa fare adesso",
     },
     detailWhy: (sectors) => `Questa notizia conta se stai osservando ${sectors}: ti aiuta a capire quali competenze, ruoli o decisioni potrebbero pesare nelle tue prossime scelte.`,
   },
   en: {
-    label: "Who it's for",
     audience: (sector) => `For people tracking ${sector}, related skills, and upcoming career choices.`,
     happened: (summary) => summary,
     why: (sector) => `This story helps you understand what is changing in ${sector} and which career decisions may become more important.`,
@@ -62,7 +59,6 @@ const MEANING_COPY: Record<NewsLocale, MeaningCopy> = {
     detailWhy: (sectors) => `This story matters if you are tracking ${sectors}: it helps you understand which skills, roles, or decisions may affect your next choices.`,
   },
   es: {
-    label: "Para quién es",
     audience: (sector) => `Para quien sigue ${sector}, competencias relacionadas y próximas decisiones profesionales.`,
     happened: (summary) => summary,
     why: (sector) => `Esta noticia te ayuda a entender qué cambia en ${sector} y qué decisiones profesionales pueden volverse más importantes.`,
@@ -77,7 +73,6 @@ const MEANING_COPY: Record<NewsLocale, MeaningCopy> = {
     detailWhy: (sectors) => `Esta noticia importa si estás siguiendo ${sectors}: te ayuda a entender qué competencias, roles o decisiones pueden influir en tus próximas elecciones.`,
   },
   fr: {
-    label: "Pour qui",
     audience: (sector) => `Pour les personnes qui suivent ${sector}, les compétences liées et les prochains choix professionnels.`,
     happened: (summary) => summary,
     why: (sector) => `Cette actualité vous aide à comprendre ce qui change dans ${sector} et quelles décisions professionnelles peuvent devenir plus importantes.`,
@@ -92,7 +87,6 @@ const MEANING_COPY: Record<NewsLocale, MeaningCopy> = {
     detailWhy: (sectors) => `Cette actualité compte si vous suivez ${sectors}: elle vous aide à comprendre quelles compétences, quels rôles ou quelles décisions peuvent peser dans vos prochains choix.`,
   },
   de: {
-    label: "Für wen",
     audience: (sector) => `Für alle, die ${sector}, verwandte Skills und nächste berufliche Entscheidungen verfolgen.`,
     happened: (summary) => summary,
     why: (sector) => `Diese Nachricht hilft dir zu verstehen, was sich in ${sector} verändert und welche beruflichen Entscheidungen wichtiger werden können.`,
@@ -136,19 +130,28 @@ function newsMeaning(row: NewsArticleRow, locale: NewsLocale) {
   const sector = row.sectorNames?.[0] ?? (locale === "it" ? "mercato del lavoro" : "the job market");
   const summary = row.summary?.trim() || row.title;
   const copy = MEANING_COPY[locale];
+  const audience = copy.audience(sector);
+  const happened = copy.happened(summary);
+  const whyItMatters = copy.why(sector);
+  const practicalNextStep = copy.practical;
+  const sections = [
+    { key: "audience" as const, body: audience },
+    { key: "happened" as const, body: happened },
+    { key: "why" as const, body: whyItMatters },
+    { key: "practical" as const, body: practicalNextStep },
+  ];
   return {
-    label: copy.label,
-    audience: copy.audience(sector),
-    happened: copy.happened(summary),
-    whyItMatters: copy.why(sector),
-    practicalNextStep: copy.practical,
-    action: copy.practical,
+    audience,
+    happened,
+    whyItMatters,
+    practicalNextStep,
+    action: practicalNextStep,
     signal: copy.signal,
+    sections,
   };
 }
 
 function structuredContent(a: NewsArticleRow, locale: NewsLocale): string {
-  const summary = a.summary?.trim() || a.title;
   const sectors = a.sectorNames?.length ? a.sectorNames.join(", ") : (locale === "it" ? "mercato del lavoro" : "the job market");
   const meaning = newsMeaning(a, locale);
   const copy = MEANING_COPY[locale];
@@ -157,7 +160,7 @@ function structuredContent(a: NewsArticleRow, locale: NewsLocale): string {
     meaning.audience,
     "",
     `### ${copy.headings.happened}`,
-    summary,
+    meaning.happened,
     "",
     `### ${copy.headings.why}`,
     copy.detailWhy(sectors),

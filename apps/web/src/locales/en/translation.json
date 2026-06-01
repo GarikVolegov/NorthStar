@@ -1213,6 +1213,19 @@
     "yourSector": "Your sector",
     "removeFromSaved": "Remove from saved",
     "saveArticle": "Save article",
+    "meaning": {
+      "audience": "Who it's for",
+      "happened": "What happened",
+      "why": "Why it matters to you",
+      "practical": "What to do now"
+    },
+    "detail": {
+      "unavailableTitle": "News article unavailable",
+      "unavailableDesc": "We could not load this news article.",
+      "backToNews": "Back to news",
+      "sourceNote": "NorthStar reframes this news for orientation, work and business. To read the full original text, open the source.",
+      "readSource": "Read from the source"
+    },
     "sourceLabel": {
       "live": "Real-time updated news",
       "static": "Selected editorial content"
@@ -2615,6 +2628,7 @@
     "category": "Category",
     "priority": "Priority",
     "status": "Status",
+    "eventOptions": "Event options",
     "linkedSector": "Related sector",
     "noSector": "No sector",
     "suggestedContent": "Suggested content for {{name}}",

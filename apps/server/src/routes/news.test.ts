@@ -8,6 +8,7 @@ const dbMock = vi.hoisted(() => ({
 
 const aiServerMock = vi.hoisted(() => ({
   runNewsPublisher: vi.fn(),
+  translateNewsForLocale: vi.fn(),
 }));
 
 const redisMock = vi.hoisted(() => ({
@@ -23,6 +24,7 @@ vi.mock("../lib/redis", () => ({
 vi.mock("@workspace/ai-server", () => ({
   PUBLIC_NEWS_SOURCES: ["gnews", "tavily", "newsapi", "il sole 24 ore", "ninja marketing", "ansa", "wired italia", "la repubblica"],
   runNewsPublisher: aiServerMock.runNewsPublisher,
+  translateNewsForLocale: aiServerMock.translateNewsForLocale,
 }));
 
 vi.mock("@workspace/db", async (importOriginal) => {
@@ -116,6 +118,21 @@ describe("news routes", () => {
     redisMock.cacheGet.mockResolvedValue(null);
     redisMock.cacheSet.mockResolvedValue(undefined);
     aiServerMock.runNewsPublisher.mockResolvedValue({ transferred: 0, seeded: 0, missingCoverage: [], durationMs: 10 });
+    aiServerMock.translateNewsForLocale.mockImplementation(async (item, locale) => ({
+      ...item,
+      language: locale,
+      title: `${locale}:${item.title}`,
+      preview: `${locale}:${item.preview}`,
+      description: `${locale}:${item.description}`,
+      content: item.content ? `${locale}:${item.content}` : item.content,
+      meaning: item.meaning ? {
+        ...item.meaning,
+        sections: item.meaning.sections?.map((section: { key: string; body: string }) => ({
+          key: section.key,
+          body: `${locale}:${section.body}`,
+        })),
+      } : item.meaning,
+    }));
   });
 
   it("returns published GNews and Tavily articles whose source keeps the editorial name", async () => {
@@ -135,9 +152,14 @@ describe("news routes", () => {
         image: expect.stringContaining("/api/news/fallback-image/technology.svg"),
         language: "it",
         meaning: expect.objectContaining({
-          label: "Per chi è",
           audience: expect.stringContaining("Tecnologia & Software"),
           whyItMatters: expect.stringContaining("Questa notizia ti aiuta"),
+          sections: [
+            expect.objectContaining({ key: "audience", body: expect.stringContaining("Tecnologia & Software") }),
+            expect.objectContaining({ key: "happened", body: expect.stringContaining("competenze digitali") }),
+            expect.objectContaining({ key: "why", body: expect.stringContaining("Questa notizia ti aiuta") }),
+            expect.objectContaining({ key: "practical", body: expect.stringContaining("Confronta") }),
+          ],
         }),
         category: "technology",
         sector: "Tecnologia & Software",
@@ -164,13 +186,17 @@ describe("news routes", () => {
     expect(response.body.news[0]).toMatchObject({
       language: "en",
       image: expect.stringContaining("/api/news/fallback-image/technology.svg"),
+      title: expect.stringContaining("en:"),
       meaning: expect.objectContaining({
-        label: "Who it's for",
-        audience: expect.stringContaining("people tracking Tecnologia & Software"),
-        whyItMatters: expect.stringContaining("This story helps you"),
-        practicalNextStep: expect.stringContaining("Compare"),
+        sections: [
+          expect.objectContaining({ key: "audience", body: expect.stringContaining("en:") }),
+          expect.objectContaining({ key: "happened", body: expect.stringContaining("en:") }),
+          expect.objectContaining({ key: "why", body: expect.stringContaining("en:") }),
+          expect.objectContaining({ key: "practical", body: expect.stringContaining("en:") }),
+        ],
       }),
     });
+    expect(aiServerMock.translateNewsForLocale).toHaveBeenCalledWith(expect.objectContaining({ id: "10" }), "en");
     expect(response.body.news[0].meaning.whyItMatters).not.toMatch(/NorthStar/i);
   });
 
@@ -183,8 +209,9 @@ describe("news routes", () => {
 
     expect(response.body.article.content).toContain("### Per chi è");
     expect(response.body.article.content).toContain("### Cosa è successo");
-    expect(response.body.article.content).toContain("### Perché conta per te");
+    expect(response.body.article.content).toContain("### Perché conta per l'utente");
     expect(response.body.article.content).toContain("### Cosa fare adesso");
+    expect(response.body.article.content).not.toContain("### Perché conta per te");
     expect(response.body.article.content).not.toContain("### Impatto pratico");
     expect(response.body.article.content).not.toContain("### Cosa osservare");
     expect(response.body.article.content).not.toMatch(/NorthStar/i);
@@ -197,10 +224,15 @@ describe("news routes", () => {
       .get("/api/news/article/10?locale=es")
       .expect(200);
 
-    expect(response.body.article.content).toContain("### Para quién es");
-    expect(response.body.article.content).toContain("### Qué pasó");
-    expect(response.body.article.content).toContain("### Por qué te importa");
-    expect(response.body.article.content).toContain("### Qué hacer ahora");
+    expect(aiServerMock.translateNewsForLocale).toHaveBeenCalledWith(expect.objectContaining({ id: "10" }), "es");
+    expect(response.body.article.language).toBe("es");
+    expect(response.body.article.content).toContain("es:");
+    expect(response.body.article.meaning.sections).toEqual([
+      expect.objectContaining({ key: "audience", body: expect.stringContaining("es:") }),
+      expect.objectContaining({ key: "happened", body: expect.stringContaining("es:") }),
+      expect.objectContaining({ key: "why", body: expect.stringContaining("es:") }),
+      expect.objectContaining({ key: "practical", body: expect.stringContaining("es:") }),
+    ]);
     expect(response.body.article.content).not.toMatch(/NorthStar/i);
   });
 

@@ -98,6 +98,10 @@ function extractReadinessScore(text: string): number | null {
   return match?.[1] ? parseInt(match[1], 10) : null;
 }
 
+function getReadableAnalysisText(text: string): string {
+  return text.replace(/Indice di Readiness/gi, "Livello di prontezza");
+}
+
 const PROGRESS_TEXTS = [
   "Analizzando le tue competenze…",
   "Confrontando con i requisiti del settore…",
@@ -514,7 +518,7 @@ export default function SkillsGap() {
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold">
-                    Indice di Readiness
+                    Livello di prontezza
                   </span>
                   <span className="font-bold text-lg">{readiness}/100</span>
                 </div>
@@ -544,7 +548,7 @@ export default function SkillsGap() {
           {!streamError && (
             <Card>
               <CardContent className="pt-6">
-                <MarkdownContent content={result} />
+                <MarkdownContent content={getReadableAnalysisText(result)} />
               </CardContent>
             </Card>
           )}

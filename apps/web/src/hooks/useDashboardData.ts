@@ -39,6 +39,8 @@ export interface DashboardData {
     email: string;
     isPremium: boolean;
     onboardingCompleted: boolean;
+    journeyDecidedAt: string | null;
+    journeyDecisionSource: string | null;
   };
   session: DashboardSession | null;
   objectives: DashboardObjective[];

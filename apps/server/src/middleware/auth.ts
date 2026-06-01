@@ -19,6 +19,8 @@ declare global {
         role: "user" | "admin";
         stripeSubscriptionId: string | null;
         journeyType: string | null;
+        journeyDecidedAt?: string | null;
+        journeyDecisionSource?: string | null;
         testSessionId: number | null;
         onboardingCompleted: boolean;
       };
@@ -43,6 +45,8 @@ interface JwtPayload {
   role: "user" | "admin";
   onboardingCompleted: boolean;
   journeyType: string | null;
+  journeyDecidedAt?: string | null;
+  journeyDecisionSource?: string | null;
   stripeSubscriptionId: string | null;
   testSessionId: number | null;
 }
@@ -136,6 +140,8 @@ export async function requireAuth(
       role: payload.role,
       stripeSubscriptionId: payload.stripeSubscriptionId,
       journeyType: payload.journeyType,
+      journeyDecidedAt: payload.journeyDecidedAt ?? null,
+      journeyDecisionSource: payload.journeyDecisionSource ?? null,
       testSessionId: payload.testSessionId,
       onboardingCompleted: payload.onboardingCompleted,
     };
@@ -159,6 +165,8 @@ export async function requireAuth(
             role: usersTable.role,
             stripeSubscriptionId: usersTable.stripeSubscriptionId,
             journeyType: usersTable.journeyType,
+            journeyDecidedAt: usersTable.journeyDecidedAt,
+            journeyDecisionSource: usersTable.journeyDecisionSource,
             testSessionId: usersTable.testSessionId,
             onboardingCompleted: usersTable.onboardingCompleted,
           })
@@ -174,6 +182,8 @@ export async function requireAuth(
             role: (dbUser.role as "user" | "admin") ?? "user",
             stripeSubscriptionId: dbUser.stripeSubscriptionId,
             journeyType: dbUser.journeyType,
+            journeyDecidedAt: dbUser.journeyDecidedAt?.toISOString() ?? null,
+            journeyDecisionSource: dbUser.journeyDecisionSource ?? null,
             testSessionId: dbUser.testSessionId,
             onboardingCompleted: dbUser.onboardingCompleted ?? false,
           };
@@ -239,6 +249,8 @@ export async function requireAuth(
               role: "user",
               stripeSubscriptionId: null,
               journeyType: null,
+              journeyDecidedAt: null,
+              journeyDecisionSource: null,
               testSessionId: null,
               onboardingCompleted: false,
             };
@@ -379,6 +391,8 @@ export async function optionalAuth(
       role: payload.role,
       stripeSubscriptionId: payload.stripeSubscriptionId,
       journeyType: payload.journeyType,
+      journeyDecidedAt: payload.journeyDecidedAt ?? null,
+      journeyDecisionSource: payload.journeyDecisionSource ?? null,
       testSessionId: payload.testSessionId,
       onboardingCompleted: payload.onboardingCompleted,
     };
@@ -396,6 +410,8 @@ export async function optionalAuth(
         role: "user",
         stripeSubscriptionId: null,
         journeyType: null,
+        journeyDecidedAt: null,
+        journeyDecisionSource: null,
         testSessionId: null,
         onboardingCompleted: false,
       };

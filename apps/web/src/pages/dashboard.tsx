@@ -16,10 +16,8 @@ import {
   BarChart3,
   Bot,
   Building2,
-  ChevronRight,
   HelpCircle,
   LayoutGrid,
-  MapPin,
   RefreshCw,
   Rocket,
   Sparkles,
@@ -93,6 +91,16 @@ const JOURNEY_META: Record<JourneyId, {
   investitore: { label: "Investitore",Icon: BarChart3,   color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30",      headline: "Analizza le opportunità",         subline: "Aree in crescita, trend di mercato e analisi delle competenze richieste" },
 };
 
+function isJourneyId(value: unknown): value is JourneyId {
+  return (
+    value === "indeciso" ||
+    value === "dipendente" ||
+    value === "autonomo" ||
+    value === "azienda" ||
+    value === "investitore"
+  );
+}
+
 const ADAPTIVE_PHASE_LABEL: Record<AdaptiveDashboardPhase, string> = {
   start_test: "Scopri chi sei",
   explore_sectors: "Esplora il mondo",
@@ -162,10 +170,15 @@ export default function Dashboard() {
     if (authReady && !user) navigate("/");
   }, [user, authReady, navigate]);
 
-  const journeyType = (user?.journeyType ?? "indeciso") as JourneyId;
-  const journeyMeta = JOURNEY_META[journeyType];
-
   const { data: dashData, isLoading: dashLoading, isError: dashError, refetch: refetchDashboard } = useDashboardData();
+  const authJourneyType = isJourneyId(user?.journeyType) ? user.journeyType : null;
+  const dashboardJourneyType = isJourneyId(dashData?.user.journeyType)
+    ? dashData.user.journeyType
+    : null;
+  const journeyType = dashData
+    ? dashboardJourneyType ?? authJourneyType ?? "indeciso"
+    : authJourneyType ?? "indeciso";
+  const journeyMeta = JOURNEY_META[journeyType];
   const { data: latestSession, isLoading: sessionLoading } = useLatestSession();
   const dashboardSession = dashData?.session ?? null;
   const sessionId = latestSession?.sessionId ?? dashboardSession?.id ?? null;
@@ -219,6 +232,10 @@ export default function Dashboard() {
   const objectivesProgress = dashData?.objectivesProgress ?? { done: 0, total: 0, percent: 0 };
   const upcomingEvents = dashData?.upcomingEvents ?? [];
   const readinessBand = isReadinessData(readinessData) ? readinessData.band : undefined;
+  const journeyDecidedAt = dashData
+    ? dashData.user.journeyDecidedAt ?? null
+    : user?.journeyDecidedAt ?? null;
+  const hasDecided = Boolean(journeyDecidedAt) || journeyType !== "indeciso";
   const clarityScore = journeyType === "indeciso"
     ? Math.min(100, Math.round(
         (sessionId               ? 30 : 0) +
@@ -232,7 +249,7 @@ export default function Dashboard() {
     journeyType,
     hasSession: !!sessionId,
     savedSectorsCount,
-    hasDecided: false,
+    hasDecided,
     readinessBand,
     layout: dashboardLayout,
   };
@@ -278,32 +295,6 @@ export default function Dashboard() {
 
   if (!user) return null;
 
-  if (!sessionId && !sessionLoading && authReady) {
-    return (
-      <div className="max-w-2xl mx-auto px-4 py-20 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mx-auto mb-5 border border-primary/20">
-          <Bot className="w-8 h-8" />
-        </div>
-        <h1 className="text-3xl font-bold mb-3 text-foreground">Pannello di controllo</h1>
-        <p className="text-muted-foreground mb-8 max-w-sm mx-auto">
-          Completa il test di orientamento per sbloccare l'analisi personalizzata e tutti gli strumenti.
-        </p>
-        <Button asChild size="lg" className="rounded-full">
-          <Link href="/test"><Sparkles className="w-4 h-4 mr-2" />Inizia il test gratuito</Link>
-        </Button>
-        {!journeyType && (
-          <div className="mt-6">
-            <Link href="/percorso">
-              <div className="inline-flex items-center gap-2 text-sm font-semibold text-primary hover:gap-2.5 transition-all">
-                <MapPin className="w-4 h-4" /> Oppure scegli il tuo percorso <ChevronRight className="w-4 h-4" />
-              </div>
-            </Link>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   // Calcolo percentuale completamento profilo
   const profilePercent = Math.min(100, Math.round(
     (sessionId                                        ? 25 : 0) +
@@ -344,6 +335,7 @@ export default function Dashboard() {
           }))}
           userId={user.id}
           onSavedCountChange={setSavedSectorsCount}
+          presentation={adaptiveSectionPresentation.discovery_feed}
         />
       </section>
     );
@@ -379,9 +371,13 @@ export default function Dashboard() {
           {journeyMeta && <span className="text-xs text-muted-foreground">- {journeyMeta.label}</span>}
         </div>
         {isIndeciso ? (
-          <DashboardIndecisoTools toolsProps={toolsProps} adaptivePhase={adaptiveState.phase} />
+          <DashboardIndecisoTools
+            toolsProps={toolsProps}
+            adaptivePhase={adaptiveState.phase}
+            presentation={adaptiveSectionPresentation.tools}
+          />
         ) : (
-          <JourneyToolsSection {...toolsProps} />
+          <JourneyToolsSection {...toolsProps} presentation={adaptiveSectionPresentation.tools} />
         )}
       </section>
     );
@@ -437,12 +433,14 @@ export default function Dashboard() {
           <DashboardClarityPath
             hasSession={!!sessionId}
             savedSectorsCount={savedSectorsCount}
-            hasDecided={false}
+            hasDecided={hasDecided}
             currentPhaseLabel={ADAPTIVE_PHASE_LABEL[adaptiveState.phase]}
             nextAction={{
               label: adaptiveState.nextAction.label,
               href: adaptiveState.nextAction.href,
             }}
+            adaptivePhase={adaptiveState.phase}
+            priority={adaptiveSectionPresentation.clarity_path?.priority}
             compact={adaptiveSectionPresentation.clarity_path?.priority === "compact"}
           />
         );
@@ -453,9 +451,20 @@ export default function Dashboard() {
       case "personality":
         return renderPersonality();
       case "career_comparison":
-        return <DashboardCareerComparison sectorA={compSectorA} sectorB={compSectorB} />;
+        return (
+          <DashboardCareerComparison
+            sectorA={compSectorA}
+            sectorB={compSectorB}
+            presentation={adaptiveSectionPresentation.career_comparison}
+          />
+        );
       case "wendy_prompts":
-        return <DashboardWendyPrompts adaptivePhase={adaptiveState.phase} />;
+        return (
+          <DashboardWendyPrompts
+            adaptivePhase={adaptiveState.phase}
+            presentation={adaptiveSectionPresentation.wendy_prompts}
+          />
+        );
       case "kpi_strip":
         if (dashError) return null;
         return (

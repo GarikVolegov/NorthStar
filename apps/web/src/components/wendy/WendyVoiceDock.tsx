@@ -14,6 +14,23 @@ interface WendyVoiceDockProps {
   compact?: boolean;
 }
 
+function sttErrorMessage(error: string | null): string | null {
+  if (!error) return null;
+  if (error === "not-allowed" || error === "service-not-allowed") {
+    return "Permesso microfono negato. Abilita il microfono nel browser e riprova.";
+  }
+  if (error === "audio-capture") {
+    return "Microfono non disponibile. Controlla il dispositivo di input e riprova.";
+  }
+  if (error === "network") {
+    return "Connessione instabile durante la dettatura. Riprova tra un attimo.";
+  }
+  if (error === "no-speech") {
+    return "Non ho rilevato voce. Avvicinati al microfono e riprova.";
+  }
+  return "Dettatura non disponibile. Riprova o passa alla scrittura.";
+}
+
 export function WendyVoiceDock({
   value,
   setValue,
@@ -27,6 +44,7 @@ export function WendyVoiceDock({
   const hasQuery = value.trim().length >= 2;
   const isListening = chat.stt.isListening;
   const isSpeaking = chat.openaiTts.isSpeaking || chat.tts.speaking;
+  const sttError = sttErrorMessage(chat.stt.error);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -91,6 +109,11 @@ export function WendyVoiceDock({
           {!chat.stt.supported && (
             <p className="text-center text-xs text-muted-foreground">
               Il browser non supporta ancora la dettatura vocale.
+            </p>
+          )}
+          {sttError && (
+            <p role="alert" className="max-w-xs text-center text-xs font-medium text-destructive">
+              {sttError}
             </p>
           )}
         </div>
@@ -174,6 +197,11 @@ export function WendyVoiceDock({
           </button>
         )}
       </div>
+      {sttError && (
+        <p role="alert" className="mt-2 px-1 text-xs font-medium text-destructive">
+          {sttError}
+        </p>
+      )}
     </form>
   );
 }

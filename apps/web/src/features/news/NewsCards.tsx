@@ -128,6 +128,12 @@ export function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?
   const detailHref = item.detailUrl ?? `/news/${item.id}`;
   const preview = item.preview ?? item.description;
   const sourceHref = item.sourceUrl ?? item.url;
+  const meaningSections = item.meaning?.sections ?? (item.meaning ? [
+    { key: "audience" as const, body: item.meaning.audience ?? "" },
+    { key: "happened" as const, body: item.meaning.happened ?? preview ?? "" },
+    { key: "why" as const, body: item.meaning.whyItMatters },
+    { key: "practical" as const, body: item.meaning.practicalNextStep ?? item.meaning.action ?? "" },
+  ].filter((section) => section.body.trim().length > 0) : []);
 
   function toggleSave(e: React.MouseEvent) {
     e.preventDefault();
@@ -207,12 +213,18 @@ export function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?
         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2 mb-4 flex-1">
           {preview}
         </p>
-        {item.meaning && (
+        {meaningSections.length > 0 && (
           <div className="mb-4 rounded-lg border border-primary/10 bg-primary/5 px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase text-primary">{item.meaning.label}</p>
-            <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-foreground/80">
-              {item.meaning.audience ?? item.meaning.whyItMatters}
-            </p>
+            <dl className="space-y-2">
+              {meaningSections.map((section) => (
+                <div key={section.key} className="min-w-0">
+                  <dt className="text-[11px] font-semibold uppercase text-primary">{t(`news.meaning.${section.key}`)}</dt>
+                  <dd className="mt-0.5 line-clamp-2 text-xs leading-relaxed text-foreground/80">
+                    {section.body}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
         )}
         <div className="flex items-center justify-between mt-auto">

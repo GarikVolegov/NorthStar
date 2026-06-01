@@ -11,6 +11,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { AdaptiveDashboardPhase } from "./dashboard-adaptive-flow";
+import type { AdaptiveSectionPresentation } from "./dashboard-adaptive-flow";
+import { cn } from "@/lib/utils";
 
 interface WendyPrompt {
   Icon: LucideIcon;
@@ -86,11 +88,14 @@ function getPrompts(adaptivePhase?: AdaptiveDashboardPhase): WendyPrompt[] {
 
 export function DashboardWendyPrompts({
   adaptivePhase,
+  presentation,
 }: {
   adaptivePhase?: AdaptiveDashboardPhase | undefined;
+  presentation?: AdaptiveSectionPresentation | undefined;
 }) {
   const wendy = useOptionalWendy();
   const prompts = getPrompts(adaptivePhase);
+  const visiblePrompts = presentation?.priority === "compact" ? prompts.slice(0, 3) : prompts;
 
   function handlePrompt(prompt: WendyPrompt) {
     if (!wendy) return;
@@ -99,7 +104,13 @@ export function DashboardWendyPrompts({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+    <div
+      className={cn(
+        "rounded-2xl border bg-card shadow-sm",
+        presentation?.priority === "primary" ? "border-primary/35 p-5 shadow-primary/10" : "border-border p-5",
+        presentation?.priority === "compact" && "p-4",
+      )}
+    >
       <div className="mb-4 flex items-center gap-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
           <BrainCircuit className="h-3.5 w-3.5" />
@@ -113,7 +124,7 @@ export function DashboardWendyPrompts({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {prompts.map(({ Icon, ...prompt }) => (
+        {visiblePrompts.map(({ Icon, ...prompt }) => (
           <button
             key={prompt.label}
             type="button"

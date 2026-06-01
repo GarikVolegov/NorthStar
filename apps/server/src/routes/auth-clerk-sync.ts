@@ -24,6 +24,8 @@ type ClerkSyncUser = {
   timezone: string | null;
   userMode: string | null;
   journeyType: string | null;
+  journeyDecidedAt: Date | null;
+  journeyDecisionSource: string | null;
   avatarUrl: string | null;
   isPublic: boolean | null;
   isAffiliate: boolean | null;
@@ -68,6 +70,8 @@ function userProjection() {
     timezone: userProfileSettingsTable.timezone,
     userMode: userProfileSettingsTable.userMode,
     journeyType: usersTable.journeyType,
+    journeyDecidedAt: usersTable.journeyDecidedAt,
+    journeyDecisionSource: usersTable.journeyDecisionSource,
     avatarUrl: usersTable.avatarUrl,
     isPublic: userProfileSettingsTable.isPublic,
     isAffiliate: userProfileSettingsTable.isAffiliate,

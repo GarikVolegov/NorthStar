@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Check, Compass, Scale, Sparkles, Target } from "lucide-react";
 import { Link } from "wouter";
+import type { AdaptiveDashboardPhase } from "./dashboard-adaptive-flow";
 
 interface ClarityStep {
   icon: React.ElementType;
@@ -23,6 +24,8 @@ export function DashboardClarityPath({
   hasDecided,
   currentPhaseLabel,
   nextAction,
+  adaptivePhase,
+  priority = "supporting",
   compact = false,
 }: {
   hasSession: boolean;
@@ -30,9 +33,11 @@ export function DashboardClarityPath({
   hasDecided: boolean;
   currentPhaseLabel?: string | undefined;
   nextAction?: ClarityPathNextAction;
+  adaptivePhase?: AdaptiveDashboardPhase | undefined;
+  priority?: "primary" | "supporting" | "compact" | undefined;
   compact?: boolean;
 }) {
-  const steps: ClarityStep[] = [
+  const rawSteps: ClarityStep[] = [
     {
       icon: Compass,
       label: "Scopri chi sei",
@@ -61,7 +66,7 @@ export function DashboardClarityPath({
         : "Salva 3+ settori per sbloccare il confronto",
       cta: "Confronta",
       href: "/settori",
-      done: hasDecided,
+      done: hasDecided || adaptivePhase === "choose_path" || adaptivePhase === "active_journey",
       active: savedSectorsCount >= 3 && !hasDecided,
     },
     {
@@ -74,6 +79,17 @@ export function DashboardClarityPath({
       active: savedSectorsCount >= 3,
     },
   ];
+  const phaseStepIndex: Partial<Record<AdaptiveDashboardPhase, number>> = {
+    start_test: 0,
+    explore_sectors: 1,
+    compare_options: 2,
+    choose_path: 3,
+  };
+  const currentPhaseStep = adaptivePhase ? phaseStepIndex[adaptivePhase] : undefined;
+  const steps = rawSteps.map((step, index) => ({
+    ...step,
+    active: currentPhaseStep !== undefined ? index === currentPhaseStep : step.active,
+  }));
 
   const currentStep = steps.findIndex((s) => s.active && !s.done);
   const completedCount = steps.filter((step) => step.done).length;
@@ -81,7 +97,13 @@ export function DashboardClarityPath({
   const activeAction = nextAction ?? (activeStep ? { label: activeStep.cta, href: activeStep.href } : undefined);
 
   return (
-    <div className={cn("rounded-2xl border border-border bg-card shadow-sm", compact ? "p-4" : "p-5")}>
+    <div
+      className={cn(
+        "rounded-2xl border bg-card shadow-sm",
+        priority === "primary" ? "border-primary/35 shadow-primary/10" : "border-border",
+        compact ? "p-4" : "p-5",
+      )}
+    >
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary border border-primary/20">
@@ -116,6 +138,8 @@ export function DashboardClarityPath({
           return (
             <div
               key={step.label}
+              aria-current={isCurrent ? "step" : undefined}
+              aria-label={`${step.label}${isCurrent ? " step attivo" : ""}`}
               className={cn(
                 "flex items-center gap-3 rounded-xl border p-3 transition-colors",
                 step.done && "border-primary/20 bg-primary/5",
@@ -152,7 +176,12 @@ export function DashboardClarityPath({
             const Icon = step.icon;
             const isCurrent = i === currentStep;
             return (
-              <div key={step.label} className="flex flex-col items-center gap-2 text-center">
+              <div
+                key={step.label}
+                aria-current={isCurrent ? "step" : undefined}
+                aria-label={`${step.label}${isCurrent ? " step attivo" : ""}`}
+                className="flex flex-col items-center gap-2 text-center"
+              >
                 <div
                   className={cn(
                     "relative z-10 flex h-11 w-11 items-center justify-center rounded-full border-2 shadow-sm transition-all duration-300",

@@ -97,6 +97,8 @@ router.post("/google-token", async (req, res) => {
           timezone: userProfileSettingsTable.timezone,
           userMode: userProfileSettingsTable.userMode,
           journeyType: usersTable.journeyType,
+          journeyDecidedAt: usersTable.journeyDecidedAt,
+          journeyDecisionSource: usersTable.journeyDecisionSource,
           avatarUrl: usersTable.avatarUrl,
           isPublic: userProfileSettingsTable.isPublic,
           isAffiliate: userProfileSettingsTable.isAffiliate,

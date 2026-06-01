@@ -4,8 +4,17 @@ import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Percorso from "./percorso";
 
+type AuthTestUser = {
+  id: number;
+  name: string;
+  email: string;
+  journeyType: string | null;
+  journeyDecidedAt?: string | null;
+  journeyDecisionSource?: string | null;
+};
+
 const authState = vi.hoisted(() => ({
-  user: { id: 7, name: "Ada", email: "ada@example.com", journeyType: null },
+  user: { id: 7, name: "Ada", email: "ada@example.com", journeyType: null } as AuthTestUser,
   token: "token-7",
   login: vi.fn(),
 }));
@@ -97,7 +106,16 @@ describe("Percorso save reliability", () => {
   });
 
   it("navigates only after the authenticated journey save succeeds", async () => {
-    apiFetchMock.mockResolvedValue({ ok: true, status: 200, json: vi.fn() });
+    apiFetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue({
+        success: true,
+        journeyType: "dipendente",
+        journeyDecidedAt: "2026-06-01T10:00:00.000Z",
+        journeyDecisionSource: "percorso_page",
+      }),
+    });
 
     render(<Percorso />);
 
@@ -105,11 +123,73 @@ describe("Percorso save reliability", () => {
     await userEvent.click(screen.getByRole("button", { name: /inizia il tuo percorso/i }));
 
     expect(authState.login).toHaveBeenCalledWith(
-      expect.objectContaining({ journeyType: "dipendente" }),
+      expect.objectContaining({
+        journeyType: "dipendente",
+        journeyDecidedAt: "2026-06-01T10:00:00.000Z",
+        journeyDecisionSource: "percorso_page",
+      }),
       "token-7",
     );
     expect(routerState.navigate).toHaveBeenCalledWith("/dashboard");
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows the confirmed journey state and lets the user continue to the dashboard", () => {
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      email: "ada@example.com",
+      journeyType: "dipendente",
+      journeyDecidedAt: "2026-06-01T10:00:00.000Z",
+      journeyDecisionSource: "percorso_page",
+    };
+
+    render(<Percorso />);
+
+    expect(screen.getByText(/percorso confermato/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/dipendente che vuole crescere/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/prossimo passo: pannello attivita/i)).toBeInTheDocument();
+    expect(screen.queryByText(/mission board/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /continua in dashboard/i })).toBeInTheDocument();
+  });
+
+  it("continues from an already confirmed journey without saving it again", async () => {
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      email: "ada@example.com",
+      journeyType: "dipendente",
+      journeyDecidedAt: "2026-06-01T10:00:00.000Z",
+      journeyDecisionSource: "percorso_page",
+    };
+
+    render(<Percorso />);
+
+    await userEvent.click(screen.getByRole("button", { name: /continua in dashboard/i }));
+
+    expect(apiFetchMock).not.toHaveBeenCalled();
+    expect(authState.login).not.toHaveBeenCalled();
+    expect(routerState.navigate).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("keeps undecided users in exploration mode and promotes the clarity map", async () => {
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      email: "ada@example.com",
+      journeyType: "indeciso",
+      journeyDecidedAt: null,
+      journeyDecisionSource: null,
+    };
+
+    render(<Percorso />);
+
+    expect(screen.getByText(/ancora in esplorazione/i)).toBeInTheDocument();
+    expect(screen.getByText(/prossimo passo: test di chiarezza/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^indeciso/i }));
+
+    expect(screen.getByRole("button", { name: /continua la mappa/i })).toBeInTheDocument();
   });
 
   it("clears a previous save error when the user picks another journey", async () => {

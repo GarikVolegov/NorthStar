@@ -48,7 +48,7 @@ import {
   User,
   Volume2,
 } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -96,6 +96,13 @@ export function ProfileSettings({
   const [bio, setBio] = useState<string | null | undefined>(initialBio);
   const [city, setCity] = useState<string | null | undefined>(initialCity);
   const [username, setUsername] = useState<string | null | undefined>(initialUsername);
+
+  useEffect(() => {
+    if (editingAccount) return;
+    setBio(initialBio);
+    setCity(initialCity);
+    setUsername(initialUsername);
+  }, [initialBio, initialCity, initialUsername]);
 
   // Tono Wendy con auto-save
   const [tone, setTone] = useState<string>(initialTone ?? "auto");

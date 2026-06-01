@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { requireAuth } from "../middleware/auth";
-import { eq, and, gte, asc, sql } from "drizzle-orm";
+import { eq, and, gte, lte, asc, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { db, calendarEventsTable } from "@workspace/db";
 import {
@@ -219,9 +219,8 @@ router.get("/events", requireAuth, async (req, res) => {
     }
 
     const conditions: SQL[] = [eq(calendarEventsTable.userId, userId)];
-    if (startDate) conditions.push(gte(calendarEventsTable.startAt, startDate));
-    if (endDate)
-      conditions.push(sql`${calendarEventsTable.endAt} <= ${endDate}`);
+    if (endDate) conditions.push(lte(calendarEventsTable.startAt, endDate));
+    if (startDate) conditions.push(gte(calendarEventsTable.endAt, startDate));
 
     const events = await db
       .select({

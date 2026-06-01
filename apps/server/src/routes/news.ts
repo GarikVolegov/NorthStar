@@ -2,7 +2,7 @@ import { Router } from "express";
 import type { Response } from "express";
 import { eq, desc, or, and, lt, ilike, sql, type SQL } from "drizzle-orm";
 import { db, newsArticlesTable } from "@workspace/db";
-import { PUBLIC_NEWS_SOURCES, runNewsPublisher } from "@workspace/ai-server";
+import { PUBLIC_NEWS_SOURCES, runNewsPublisher, translateNewsForLocale } from "@workspace/ai-server";
 import { cacheGet, cacheSet } from "../lib/redis";
 import { clampContentLimit, readContentSearchQuery } from "../lib/content-search";
 import { resolveNewsCategoryFilter } from "../lib/news-category";
@@ -276,6 +276,21 @@ async function selectNewsRows(
   }
 }
 
+type MappedNewsItem = ReturnType<typeof mapNewsItem>;
+type MappedNewsDetail = ReturnType<typeof mapNewsDetail>;
+
+async function localizeNewsItems(rows: NewsArticleRow[], locale: NewsLocale): Promise<MappedNewsItem[]> {
+  const baseItems = rows.map((article) => mapNewsItem(article, "it"));
+  if (locale === "it") return baseItems;
+  return await Promise.all(baseItems.map((item) => translateNewsForLocale(item, locale)));
+}
+
+async function localizeNewsDetail(row: NewsArticleRow, locale: NewsLocale): Promise<MappedNewsDetail> {
+  const baseDetail = mapNewsDetail(row, "it");
+  if (locale === "it") return baseDetail;
+  return await translateNewsForLocale(baseDetail, locale);
+}
+
 router.get("/", async (req, res) => {
   try {
     const { multi, categories, perCategory, category, limit } = req.query;
@@ -325,11 +340,11 @@ router.get("/", async (req, res) => {
 
       let refresh: NewsRefreshResult | undefined;
       let results = await loadCategoryResults();
-      let news = results.flatMap((r) => r.articles).map((article) => mapNewsItem(article, locale));
+      let news = await localizeNewsItems(results.flatMap((r) => r.articles), locale);
       if (!cursor && news.length === 0) {
         refresh = await runAutoNewsRefresh("empty", req.log);
         results = await loadCategoryResults();
-        news = results.flatMap((r) => r.articles).map((article) => mapNewsItem(article, locale));
+        news = await localizeNewsItems(results.flatMap((r) => r.articles), locale);
       }
 
       const anyMore = results.some((r) => r.hasMore);
@@ -355,7 +370,7 @@ router.get("/", async (req, res) => {
     // Try cache first for non-filtered requests
     if (!category && !cursor && !search) {
       const cacheKey = `news:recent:real:v3:${locale}`;
-      const cached = await cacheGet<ReturnType<typeof mapNewsItem>[]>(cacheKey);
+      const cached = await cacheGet<MappedNewsItem[]>(cacheKey);
       if (cached && cached.length > 0 && !isStaleMappedNewsItem(cached[0])) {
         const status = newsStatus(cached.length);
         const diagnostics = status === "empty" ? await buildNewsProviderDiagnostics() : undefined;
@@ -400,7 +415,7 @@ router.get("/", async (req, res) => {
     const hasMore = articles.length > limitNum;
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
 
-    const mapped = capped.map((article) => mapNewsItem(article, locale));
+    const mapped = await localizeNewsItems(capped, locale);
 
     // Cache non-filtered first page
     if (!category && !cursor && !search) {
@@ -474,7 +489,7 @@ router.get("/article/:id", async (req, res) => {
       return;
     }
 
-    res.json({ article: mapNewsDetail(article, locale) });
+    res.json({ article: await localizeNewsDetail(article, locale) });
   } catch (err) {
     req.log?.error?.({ err }, "news detail error");
     res.status(500).json({ error: "Unable to load news article" });
@@ -499,7 +514,7 @@ router.get("/sector/:sectorName", async (req, res) => {
 
     const hasMore = articles.length > limitNum;
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
-    const mapped = capped.map((article) => mapNewsItem(article, locale));
+    const mapped = await localizeNewsItems(capped, locale);
 
     const last = mapped[mapped.length - 1];
     const nextCursor = hasMore && last

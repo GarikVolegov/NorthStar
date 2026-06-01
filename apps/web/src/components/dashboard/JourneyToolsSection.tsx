@@ -1,6 +1,7 @@
 import { ArrowRight, BarChart3, BookOpen, BrainCircuit, Briefcase, Building2, Compass, HeartHandshake, MapPin, Mic2, Network, Newspaper, Rocket, Sparkles, Target, TrendingUp, Zap, type LucideIcon } from "lucide-react";
 import { Link } from "wouter";
-import type { AdaptiveDashboardPhase } from "./dashboard-adaptive-flow";
+import type { AdaptiveDashboardPhase, AdaptiveSectionPresentation } from "./dashboard-adaptive-flow";
+import { cn } from "@/lib/utils";
 
 type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
 
@@ -29,11 +30,13 @@ export function JourneyToolsSection({
   sectorId,
   readinessBand,
   adaptivePhase,
+  presentation,
 }: {
   journeyType: string | null | undefined;
   sectorId?: number;
   readinessBand?: "low" | "mid" | "high";
   adaptivePhase?: AdaptiveDashboardPhase;
+  presentation?: AdaptiveSectionPresentation | undefined;
 }) {
   const base = import.meta.env.BASE_URL || "/";
   const diaryTool: ToolItem = {
@@ -120,12 +123,19 @@ export function JourneyToolsSection({
       : journeyType === "indeciso" && adaptivePhase === "explore_sectors"
         ? promoteTool(baseTools, exploreSectorsTool)
         : baseTools;
+  const visibleTools = presentation?.priority === "compact" ? tools.slice(0, 3) : tools;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {tools.map(({ href, icon: Icon, title, desc, badge }) => (
+    <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4", presentation?.priority === "primary" && "rounded-2xl border border-primary/25 bg-primary/5 p-2")}>
+      {visibleTools.map(({ href, icon: Icon, title, desc, badge }, index) => (
         <Link key={title} href={href}>
-          <div className="group rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-primary/30 hover:shadow-md hover:shadow-black/10 transition-all duration-200 cursor-pointer h-full">
+          <div
+            className={cn(
+              "group rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-primary/30 hover:shadow-md hover:shadow-black/10 transition-all duration-200 cursor-pointer h-full",
+              presentation?.priority === "primary" && index === 0 && "sm:col-span-2 border-primary/35 bg-primary/5",
+              presentation?.priority === "compact" && "p-4",
+            )}
+          >
             <div className="flex items-start justify-between">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary border border-primary/20 group-hover:bg-primary/15 transition-colors">
                 <Icon className="w-5 h-5" />
@@ -136,7 +146,9 @@ export function JourneyToolsSection({
             </div>
             <div>
               <p className="font-semibold text-foreground text-sm leading-snug">{title}</p>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{desc}</p>
+              {presentation?.priority !== "compact" && (
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{desc}</p>
+              )}
             </div>
             <ArrowRight className="w-4 h-4 mt-auto self-end text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
           </div>

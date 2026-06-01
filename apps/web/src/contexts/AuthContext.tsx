@@ -28,6 +28,8 @@ export interface AuthUser {
   timezone?: string | null;
   userMode?: string | null;
   journeyType?: string | null;
+  journeyDecidedAt?: string | null;
+  journeyDecisionSource?: string | null;
   avatarUrl?: string | null;
   bio?: string | null;
   city?: string | null;

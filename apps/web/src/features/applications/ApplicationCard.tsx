@@ -2,7 +2,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { deleteJson, postJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Calendar, ChevronDown, ChevronUp, Clock, DollarSign, ExternalLink, Loader2, MapPin, Send, Sparkles, StickyNote, Trash2, X } from "lucide-react";
+import { Calendar, Check, ChevronDown, ChevronUp, Clock, DollarSign, ExternalLink, Loader2, MapPin, Send, Sparkles, StickyNote, Trash2, X } from "lucide-react";
 import { useEffect, useRef, useState, type DragEvent as ReactDragEvent } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -44,11 +44,16 @@ export function AppCard({
   const [notesOpen, setNotesOpen] = useState(false);
   const [noteInput, setNoteInput] = useState("");
   const [noteError, setNoteError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (notesOpen) inputRef.current?.focus();
   }, [notesOpen]);
+
+  useEffect(() => {
+    setConfirmingDelete(false);
+  }, [app.id]);
 
   const addNoteMutation = useMutation({
     mutationFn: async (text: string) => {
@@ -110,14 +115,38 @@ export function AppCard({
             <p className="text-sm font-bold text-foreground leading-tight truncate">{app.company}</p>
             <p className="text-xs text-muted-foreground truncate">{app.role}</p>
           </div>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8 sm:opacity-0 sm:group-hover:opacity-100"
-            disabled={deleting}
-            aria-label={`Elimina candidatura ${app.company}`}
-          >
-            {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-          </button>
+          {confirmingDelete ? (
+            <div className="flex shrink-0 items-center gap-1" onClick={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => {
+                  onDelete();
+                  setConfirmingDelete(false);
+                }}
+                className="flex h-11 w-11 items-center justify-center rounded-lg bg-destructive/10 text-destructive transition-colors hover:bg-destructive/20 sm:h-8 sm:w-8"
+                disabled={deleting}
+                aria-label={`Conferma eliminazione candidatura ${app.company}`}
+              >
+                {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+              </button>
+              <button
+                onClick={() => setConfirmingDelete(false)}
+                className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-8 sm:w-8"
+                disabled={deleting}
+                aria-label={`Annulla eliminazione candidatura ${app.company}`}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmingDelete(true); }}
+              className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8 sm:opacity-0 sm:group-hover:opacity-100"
+              disabled={deleting}
+              aria-label={`Elimina candidatura ${app.company}`}
+            >
+              {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+            </button>
+          )}
         </div>
 
         {/* Location / Salary */}

@@ -84,6 +84,8 @@ router.get("/", requireAuth, async (req, res) => {
     res.json({
       user: {
         journeyType: user.journeyType,
+        journeyDecidedAt: user.journeyDecidedAt ?? null,
+        journeyDecisionSource: user.journeyDecisionSource ?? null,
         name: user.name,
         email: user.email,
         isPremium: planMeets(currentPlan, "pro"),

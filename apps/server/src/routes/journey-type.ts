@@ -15,6 +15,16 @@ const VALID_JOURNEY_TYPES = [
   "investitore",
 ] as const;
 
+function buildJourneyDecisionUpdate(journeyType: string) {
+  const decidedAt = journeyType === "indeciso" ? null : new Date();
+  return {
+    journeyType,
+    journeyDecidedAt: decidedAt,
+    journeyDecisionSource: decidedAt ? "percorso_page" : null,
+    updatedAt: new Date(),
+  };
+}
+
 /* ─── PATCH /api/journey-type/me/journey-type  —  aggiorna tipo percorso (utente corrente) ─── */
 router.patch("/me/journey-type", requireAuth, async (req, res) => {
   try {
@@ -31,12 +41,19 @@ router.patch("/me/journey-type", requireAuth, async (req, res) => {
       return;
     }
 
+    const update = buildJourneyDecisionUpdate(journeyType);
+
     await db
       .update(usersTable)
-      .set({ journeyType, updatedAt: new Date() })
+      .set(update)
       .where(eq(usersTable.id, userId));
     invalidateUserFeedCache(userId);
-    res.json({ success: true, journeyType });
+    res.json({
+      success: true,
+      journeyType,
+      journeyDecidedAt: update.journeyDecidedAt?.toISOString() ?? null,
+      journeyDecisionSource: update.journeyDecisionSource,
+    });
   } catch (err) {
     req.log?.error?.({ err }, "journey-type /me update error");
     res
@@ -61,15 +78,22 @@ router.patch("/:userId/journey-type", requireAuth, async (req, res) => {
       return;
     }
 
+    const update = buildJourneyDecisionUpdate(journeyType);
+
     await db
       .update(usersTable)
-      .set({ journeyType, updatedAt: new Date() })
+      .set(update)
       .where(eq(usersTable.id, userId));
 
     // Invalida la cache del feed personalizzato dopo cambio di percorso
     invalidateUserFeedCache(userId);
 
-    res.json({ success: true, journeyType });
+    res.json({
+      success: true,
+      journeyType,
+      journeyDecidedAt: update.journeyDecidedAt?.toISOString() ?? null,
+      journeyDecisionSource: update.journeyDecisionSource,
+    });
   } catch (err) {
     req.log?.error?.({ err }, "journey-type update error");
     res

@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Bookmark, BookmarkCheck, TrendingUp, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "wouter";
+import type { AdaptiveSectionPresentation } from "./dashboard-adaptive-flow";
 
 export interface DiscoverySector {
   sectorId: number;
@@ -60,7 +61,7 @@ function MatchBadge({ score }: { score: number }) {
                 "text-muted-foreground bg-muted/40 border-border";
   return (
     <span className={cn("rounded-full border px-2 py-0.5 text-[11px] font-bold tabular-nums", color)}>
-      {pct}% match
+      {pct}% affinita
     </span>
   );
 }
@@ -69,10 +70,12 @@ export function DashboardDiscoveryFeed({
   sectors,
   userId,
   onSavedCountChange,
+  presentation,
 }: {
   sectors: DiscoverySector[];
   userId: number | string;
   onSavedCountChange?: (count: number) => void;
+  presentation?: AdaptiveSectionPresentation | undefined;
 }) {
   const [reactions, setReactions] = useState<ReactionsMap>(() => loadReactions(userId));
 
@@ -110,9 +113,11 @@ export function DashboardDiscoveryFeed({
     return b.matchScore - a.matchScore;
   });
 
-  // Only show up to 6 sectors
-  const visible = sorted.slice(0, 6);
+  const maxVisible = presentation?.priority === "compact" ? 3 : 6;
+  const visible = sorted.slice(0, maxVisible);
   const savedCount = Object.values(reactions).filter((r) => r === "saved").length;
+  const isCompact = presentation?.priority === "compact";
+  const isPrimary = presentation?.priority === "primary";
 
   if (sectors.length === 0) {
     return (
@@ -140,20 +145,23 @@ export function DashboardDiscoveryFeed({
         </div>
       )}
 
-      <div className="space-y-2">
-        {visible.map((sector) => {
+      <div className={cn("space-y-2", isPrimary && "rounded-2xl border border-primary/25 bg-primary/5 p-2")}>
+        {visible.map((sector, index) => {
           const reaction = reactions[sector.sectorId];
           const isSaved = reaction === "saved";
           const isDismissed = reaction === "dismissed";
+          const isPromoted = isPrimary && index === 0;
 
           return (
             <div
               key={sector.sectorId}
+              aria-label={`${sector.sectorName}${isPromoted ? " settore promosso" : ""}`}
               className={cn(
                 "flex items-center gap-3 rounded-xl border p-3 transition-all duration-200",
+                isPromoted && "border-primary/35 bg-primary/8 shadow-sm",
                 isSaved && "border-primary/25 bg-primary/5",
                 isDismissed && "opacity-40",
-                !isSaved && !isDismissed && "border-border bg-card hover:border-primary/20",
+                !isPromoted && !isSaved && !isDismissed && "border-border bg-card hover:border-primary/20",
               )}
             >
               {/* Match indicator */}
@@ -171,7 +179,7 @@ export function DashboardDiscoveryFeed({
                 <p className={cn("text-sm font-semibold leading-tight", isSaved ? "text-primary" : "text-foreground")}>
                   {sector.sectorName}
                 </p>
-                {sector.matchReason && (
+                {sector.matchReason && !isCompact && (
                   <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{sector.matchReason}</p>
                 )}
                 <div className="mt-1">

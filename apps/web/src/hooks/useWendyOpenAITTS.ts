@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { TOKEN_STORAGE_KEY } from '@/lib/storage-keys';
 
 export type OpenAITTSState = 'idle' | 'loading' | 'playing' | 'error';
 
@@ -85,9 +86,13 @@ export function useWendyOpenAITTS(options: UseWendyOpenAITTSOptions = {}): UseWe
     playingRef.current = true;
 
     try {
+      const token = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+
       const resp = await fetch(apiUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         credentials: 'include',
         body: JSON.stringify({ text: text.slice(0, 5000) }),
       });

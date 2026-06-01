@@ -27,4 +27,20 @@ describe("DashboardClarityPath", () => {
     expect(screen.getByText("1 / 4 step completati")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Esplora settori" })).toHaveAttribute("href", "/settori");
   });
+
+  it("uses the adaptive phase to mark the decision step as current", () => {
+    render(
+      <DashboardClarityPath
+        hasSession
+        savedSectorsCount={3}
+        hasDecided={false}
+        adaptivePhase="choose_path"
+        currentPhaseLabel="Scegli il percorso"
+        nextAction={{ label: "Scegli percorso", href: "/percorso" }}
+      />,
+    );
+
+    expect(screen.getAllByLabelText(/decidi.*step attivo/i).length).toBeGreaterThan(0);
+    expect(screen.queryAllByLabelText(/confronta.*step attivo/i)).toHaveLength(0);
+  });
 });

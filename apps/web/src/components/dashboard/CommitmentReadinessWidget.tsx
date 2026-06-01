@@ -84,9 +84,9 @@ export function CommitmentReadinessWidget() {
         <div className="flex items-start gap-3">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold text-foreground">Discovery Engine non disponibile</h3>
+            <h3 className="text-sm font-semibold text-foreground">Prontezza non disponibile</h3>
             <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-              Non riesco a caricare il tuo indice di readiness. Puoi riprovare o continuare dagli strumenti del percorso.
+              Non riesco a caricare il tuo livello di prontezza. Puoi riprovare o continuare dagli strumenti del percorso.
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => refetch()}>
@@ -113,7 +113,7 @@ export function CommitmentReadinessWidget() {
         <div>
           <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-semibold border border-primary/20 mb-2">
             <Compass className="w-3 h-3" />
-            Discovery Engine
+            Prontezza alla scelta
           </div>
           <h3 className="text-sm font-semibold leading-tight">{band.headline}</h3>
           <p className="text-xs text-muted-foreground mt-0.5">{band.sub}</p>

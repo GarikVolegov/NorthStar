@@ -10,6 +10,24 @@ const dbMock = vi.hoisted(() => ({
   delete: undefined as undefined | ReturnType<typeof vi.fn>,
 }));
 
+type TestCondition =
+  | { op: "and"; conditions: TestCondition[] }
+  | { op: "eq" | "gte" | "lte" | "asc"; column: unknown; value?: unknown }
+  | { op: "sql"; strings: string[]; values: unknown[] };
+
+vi.mock("drizzle-orm", () => ({
+  and: (...conditions: TestCondition[]) => ({ op: "and", conditions }),
+  asc: (column: unknown) => ({ op: "asc", column }),
+  eq: (column: unknown, value: unknown) => ({ op: "eq", column, value }),
+  gte: (column: unknown, value: unknown) => ({ op: "gte", column, value }),
+  lte: (column: unknown, value: unknown) => ({ op: "lte", column, value }),
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+    op: "sql",
+    strings: Array.from(strings),
+    values,
+  }),
+}));
+
 vi.mock("../lib/jwt-secret", () => ({
   JWT_SECRET: "test-secret",
 }));
@@ -63,6 +81,13 @@ function app() {
   return instance;
 }
 
+function hasCondition(condition: TestCondition, op: string, column: unknown): boolean {
+  if (condition.op === op && "column" in condition && condition.column === column) {
+    return true;
+  }
+  return condition.op === "and" && condition.conditions.some((child: TestCondition) => hasCondition(child, op, column));
+}
+
 describe("calendar quota route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,6 +126,54 @@ describe("calendar quota route", () => {
       eventCount: 0,
       eventLimit: null,
     });
+  });
+});
+
+describe("calendar events route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    dbMock.select = undefined;
+    dbMock.insert = undefined;
+    dbMock.update = undefined;
+    dbMock.delete = undefined;
+  });
+
+  it("queries events that overlap the requested visible range", async () => {
+    const where = vi.fn((_condition: TestCondition) => ({
+      orderBy: vi.fn().mockResolvedValue([
+        {
+          id: 12,
+          title: "Sprint portfolio",
+          description: null,
+          startAt: new Date("2026-05-31T09:00:00.000Z"),
+          endAt: new Date("2026-06-02T17:00:00.000Z"),
+          allDay: false,
+          category: "task",
+          priority: "medium",
+          status: "todo",
+          color: null,
+          tags: [],
+          linkedSectorId: null,
+          linkedGoal: null,
+          linkedContentIds: [],
+          isRecurring: false,
+          recurrenceRule: null,
+        },
+      ]),
+    }));
+    dbMock.select = vi.fn(() => ({
+      from: vi.fn(() => ({ where })),
+    }));
+
+    const response = await request(app())
+      .get("/api/calendar/events?from=2026-06-01T00:00:00.000Z&to=2026-06-07T23:59:59.999Z")
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(200);
+
+    expect(response.body.events).toHaveLength(1);
+    const condition = where.mock.calls[0]?.[0] as TestCondition;
+    expect(hasCondition(condition, "lte", "calendar_events.start_at")).toBe(true);
+    expect(hasCondition(condition, "gte", "calendar_events.end_at")).toBe(true);
   });
 });
 

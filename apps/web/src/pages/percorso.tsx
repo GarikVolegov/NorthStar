@@ -8,6 +8,7 @@ import {
   BarChart3,
   Building2,
   CheckCircle2,
+  Compass,
   HelpCircle,
   Rocket,
   Star,
@@ -103,6 +104,36 @@ const JOURNEY_DESTINATION: Record<JourneyType, string> = {
   investitore: "/settori",
 };
 
+interface JourneySaveResponse {
+  success: boolean;
+  journeyType: JourneyType;
+  journeyDecidedAt: string | null;
+  journeyDecisionSource: string | null;
+}
+
+function isJourneyType(value: unknown): value is JourneyType {
+  return (
+    value === "indeciso" ||
+    value === "dipendente" ||
+    value === "autonomo" ||
+    value === "azienda" ||
+    value === "investitore"
+  );
+}
+
+function getConfirmCopy(
+  selected: JourneyType,
+  saving: boolean,
+  isCurrentConfirmedSelection: boolean,
+) {
+  if (saving) return "Salvataggio...";
+  if (selected === "indeciso") return "Continua la mappa";
+  if (isCurrentConfirmedSelection && selected === "dipendente") return "Continua in dashboard";
+  if (isCurrentConfirmedSelection && selected === "autonomo") return "Apri Wendy";
+  if (isCurrentConfirmedSelection) return "Vai ai settori";
+  return "Inizia il tuo percorso";
+}
+
 async function readJourneySaveError(response: Response): Promise<string> {
   try {
     const body = (await response.json()) as { error?: unknown; message?: unknown };
@@ -130,14 +161,25 @@ export default function Percorso() {
   const { user, login, token } = useAuth();
   const [, setLocation] = useLocation();
   const wendy = useWendy();
+  const userJourneyType = isJourneyType(user?.journeyType) ? user.journeyType : null;
   const [selected, setSelected] = useState<JourneyType | null>(
-    (user?.journeyType as JourneyType) ?? null
+    userJourneyType
   );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   async function handleConfirm() {
     if (!selected) return;
+
+    if (isCurrentConfirmedSelection) {
+      const dest = JOURNEY_DESTINATION[selected];
+      if (dest === "#wendy") {
+        wendy.open();
+      } else {
+        setLocation(dest);
+      }
+      return;
+    }
 
     if (user && token) {
       setSaving(true);
@@ -151,7 +193,13 @@ export default function Percorso() {
         if (!response.ok) {
           throw new Error(await readJourneySaveError(response));
         }
-        login({ ...user, journeyType: selected }, token);
+        const saved = (await response.json()) as JourneySaveResponse;
+        login({
+          ...user,
+          journeyType: saved.journeyType,
+          journeyDecidedAt: saved.journeyDecidedAt,
+          journeyDecisionSource: saved.journeyDecisionSource,
+        }, token);
         toast({ title: "Piano salvato!", description: `Hai scelto: ${PERSONAS.find((p) => p.id === selected)?.label}` });
       } catch (error) {
         const message =
@@ -175,6 +223,27 @@ export default function Percorso() {
   }
 
   const selectedPersona = PERSONAS.find((p) => p.id === selected);
+  const currentPersona = PERSONAS.find((p) => p.id === userJourneyType);
+  const hasConfirmedJourney =
+    Boolean(user?.journeyDecidedAt) && userJourneyType !== null && userJourneyType !== "indeciso";
+  const hasSelectedJourney = userJourneyType !== null && userJourneyType !== "indeciso";
+  const statusTitle = hasConfirmedJourney
+    ? "Percorso confermato"
+    : hasSelectedJourney
+      ? "Percorso selezionato"
+      : "Ancora in esplorazione";
+  const statusCopy = hasConfirmedJourney
+    ? `${currentPersona?.label ?? "Il tuo percorso"} e' attivo nel tuo pannello attivita. Il prossimo passo resta sempre in alto.`
+    : hasSelectedJourney
+      ? `${currentPersona?.label ?? "Il tuo percorso"} e' pronto: confermalo per salvare lo stato decisionale.`
+      : "Puoi restare indeciso e usare la mappa di chiarezza: NorthStar ti terra' nel flusso reale, senza schermate morte.";
+  const statusNextAction = hasSelectedJourney
+    ? "Prossimo passo: pannello attivita"
+    : "Prossimo passo: test di chiarezza";
+  const isCurrentConfirmedSelection = hasConfirmedJourney && selected === userJourneyType;
+  const confirmCopy = selected
+    ? getConfirmCopy(selected, saving, isCurrentConfirmedSelection)
+    : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -203,6 +272,32 @@ export default function Percorso() {
 
       {/* Persona grid */}
       <div className="max-w-5xl mx-auto px-4 py-12">
+        <section
+          aria-label="Stato del percorso"
+          className="mb-8 grid gap-4 rounded-xl border border-border bg-card p-4 shadow-sm md:grid-cols-[1fr_auto] md:items-center md:p-5"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              {hasConfirmedJourney ? (
+                <CheckCircle2 className="h-5 w-5" />
+              ) : (
+                <Compass className="h-5 w-5" />
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+                {statusTitle}
+              </p>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                {statusCopy}
+              </p>
+            </div>
+          </div>
+          <div className="rounded-lg border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground">
+            {statusNextAction}
+          </div>
+        </section>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {PERSONAS.map((persona, i) => {
             const Icon = persona.icon;
@@ -314,7 +409,7 @@ export default function Percorso() {
               disabled={saving}
               className="flex items-center gap-2 bg-primary text-primary-foreground font-bold px-8 py-3 rounded-full text-sm hover:bg-primary/90 transition-all hover:shadow-lg hover:shadow-primary/25 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {saving ? "Salvataggio…" : "Inizia il tuo percorso"}
+              {confirmCopy}
               <ArrowRight className="w-4 h-4" />
             </button>
           </motion.div>

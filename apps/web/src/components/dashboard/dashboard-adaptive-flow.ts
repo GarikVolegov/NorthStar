@@ -92,21 +92,27 @@ export function deriveDashboardPhase(input: AdaptiveDashboardInput): AdaptiveDas
 }
 
 export function getAdaptiveDashboardLayout(input: AdaptiveDashboardInput): WidgetLayout[] {
-  const sortedVisible = [...input.layout]
-    .filter((section) => section.visible)
-    .sort((a, b) => a.position - b.position);
+  const sortedLayout = [...input.layout].sort((a, b) => a.position - b.position);
+  const sortedVisible = sortedLayout.filter((section) => section.visible);
 
-  const { phase } = deriveDashboardPhase(input);
+  const state = deriveDashboardPhase(input);
+  const { phase } = state;
 
-  if (phase === "active_journey" && input.journeyType !== "indeciso") {
-    return sortedVisible.map((section, position) => ({ ...section, position }));
-  }
-
-  const preferredOrder = INDECISO_PHASE_ORDER[phase];
-  const byId = new Map(sortedVisible.map((section) => [section.id, section]));
+  const preferredOrder =
+    phase === "active_journey" && input.journeyType !== "indeciso"
+      ? [state.nextAction.sectionId]
+      : INDECISO_PHASE_ORDER[phase];
+  const protectedIds = new Set(
+    phase === "active_journey" && input.journeyType !== "indeciso"
+      ? [state.nextAction.sectionId]
+      : ["clarity_path", state.nextAction.sectionId],
+  );
+  const byId = new Map(sortedLayout.map((section) => [section.id, section]));
   const promoted = preferredOrder
     .map((id) => byId.get(id))
-    .filter((section): section is WidgetLayout => Boolean(section));
+    .filter((section): section is WidgetLayout => Boolean(section))
+    .filter((section) => section.visible || protectedIds.has(section.id))
+    .map((section) => protectedIds.has(section.id) ? { ...section, visible: true } : section);
   const promotedIds = new Set(promoted.map((section) => section.id));
   const remaining = sortedVisible.filter((section) => !promotedIds.has(section.id));
 

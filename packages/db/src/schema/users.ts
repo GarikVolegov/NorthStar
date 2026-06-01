@@ -35,6 +35,8 @@ export const usersTable = pgTable("users", {
 
   onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
   journeyType: text("journey_type").notNull().default("indeciso"),
+  journeyDecidedAt: timestamp("journey_decided_at", { withTimezone: true }),
+  journeyDecisionSource: text("journey_decision_source"),
 
   voiceStreak: integer("voice_streak").default(0),
   totalXp: integer("total_xp").default(0),

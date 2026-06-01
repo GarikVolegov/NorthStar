@@ -11,13 +11,17 @@ export interface NewsItem {
   image: string | null;
   language?: "it" | "en" | "es" | "fr" | "de";
   meaning?: {
-    label: string;
+    label?: string;
     audience?: string;
     happened?: string;
     whyItMatters: string;
     practicalNextStep?: string;
     action?: string;
     signal: string;
+    sections?: Array<{
+      key: "audience" | "happened" | "why" | "practical";
+      body: string;
+    }>;
   };
   category: string;
   sector: string | null;

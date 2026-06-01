@@ -7,9 +7,10 @@ import Candidature from "./applications";
 const getJsonMock = vi.hoisted(() => vi.fn());
 const postJsonMock = vi.hoisted(() => vi.fn());
 const patchJsonMock = vi.hoisted(() => vi.fn());
+const deleteJsonMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/apiClient", () => ({
-  deleteJson: vi.fn(),
+  deleteJson: deleteJsonMock,
   getJson: getJsonMock,
   patchJson: patchJsonMock,
   postJson: postJsonMock,
@@ -49,6 +50,7 @@ describe("applications page reliability states", () => {
     getJsonMock.mockReset();
     postJsonMock.mockReset();
     patchJsonMock.mockReset();
+    deleteJsonMock.mockReset();
   });
 
   it("shows an API error state instead of the empty-applications state when loading fails", async () => {
@@ -129,5 +131,38 @@ describe("applications page reliability states", () => {
     await waitFor(() => expect(patchJsonMock).toHaveBeenCalled());
     expect(await screen.findByRole("alert")).toHaveTextContent("Aggiornamento non salvato");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("requires confirmation before calling the delete API", async () => {
+    getJsonMock.mockResolvedValue({
+      applications: [{
+        id: 7,
+        userId: 42,
+        company: "NorthStar",
+        role: "UX Reliability",
+        url: null,
+        status: "saved",
+        notes: null,
+        salary: null,
+        location: null,
+        appliedAt: "2026-05-20T00:00:00.000Z",
+        updatedAt: "2026-05-20T00:00:00.000Z",
+        notesLog: null,
+      }],
+      status: "ok",
+      totalCount: 1,
+    });
+    deleteJsonMock.mockResolvedValue(null);
+
+    renderApplications();
+
+    fireEvent.click(await screen.findByRole("button", { name: /elimina candidatura northstar/i }));
+
+    expect(deleteJsonMock).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /conferma eliminazione candidatura northstar/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /conferma eliminazione candidatura northstar/i }));
+
+    await waitFor(() => expect(deleteJsonMock).toHaveBeenCalledWith("/api/applications/7"));
   });
 });

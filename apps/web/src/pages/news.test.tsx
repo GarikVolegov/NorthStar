@@ -38,7 +38,12 @@ vi.mock("@/lib/seo", () => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key,
+    t: (key: string, options?: { defaultValue?: string }) => ({
+      "news.meaning.audience": "Per chi è",
+      "news.meaning.happened": "Cosa è successo",
+      "news.meaning.why": "Perché conta per l'utente",
+      "news.meaning.practical": "Cosa fare adesso",
+    }[key] ?? options?.defaultValue ?? key),
     i18n: {
       language: i18nLanguageMock.value,
       resolvedLanguage: i18nLanguageMock.value,
@@ -83,6 +88,26 @@ function newsItem(id: string, title: string) {
     tags: [],
     relevance: 80,
     plan: "free" as const,
+  };
+}
+
+function meaningfulNewsItem(id: string, title: string) {
+  return {
+    ...newsItem(id, title),
+    meaning: {
+      audience: "Per chi segue Tecnologia & Software.",
+      happened: "Le imprese cercano nuove competenze digitali.",
+      whyItMatters: "Questa notizia aiuta l'utente a capire quali scelte professionali anticipare.",
+      practicalNextStep: "Confronta il segnale con il tuo percorso e scegli una competenza da verificare questa settimana.",
+      action: "Confronta il segnale con il tuo percorso e scegli una competenza da verificare questa settimana.",
+      signal: "Segnale per il tuo percorso",
+      sections: [
+        { key: "audience", body: "Per chi segue Tecnologia & Software." },
+        { key: "happened", body: "Le imprese cercano nuove competenze digitali." },
+        { key: "why", body: "Questa notizia aiuta l'utente a capire quali scelte professionali anticipare." },
+        { key: "practical", body: "Confronta il segnale con il tuo percorso e scegli una competenza da verificare questa settimana." },
+      ],
+    },
   };
 }
 
@@ -208,6 +233,24 @@ describe("News page reliability states", () => {
 
     expect(await screen.findByText("English feed request")).toBeInTheDocument();
     expect(getJsonMock.mock.calls.some(([url]) => String(url).includes("locale=en"))).toBe(true);
+  });
+
+  it("shows the four user-facing meaning sections for each news card", async () => {
+    getJsonMock.mockResolvedValue({
+      news: [meaningfulNewsItem("1", "News con significato chiaro")],
+      nextCursor: null,
+      source: "live",
+      status: "ok",
+    });
+
+    renderNews();
+
+    expect(await screen.findByText("News con significato chiaro")).toBeInTheDocument();
+    expect(screen.getByText("Per chi è")).toBeInTheDocument();
+    expect(screen.getByText("Cosa è successo")).toBeInTheDocument();
+    expect(screen.getByText("Perché conta per l'utente")).toBeInTheDocument();
+    expect(screen.getByText("Cosa fare adesso")).toBeInTheDocument();
+    expect(screen.getByText(/competenza da verificare questa settimana/i)).toBeInTheDocument();
   });
 
   it("keeps loaded articles visible when loading another page fails", async () => {

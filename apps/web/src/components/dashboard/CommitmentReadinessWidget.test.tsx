@@ -44,7 +44,10 @@ describe("CommitmentReadinessWidget", () => {
 
     renderWithQueryClient();
 
-    expect(await screen.findByText(/discovery engine non disponibile/i)).toBeInTheDocument();
+    expect(await screen.findByText(/prontezza non disponibile/i)).toBeInTheDocument();
+    expect(screen.getByText(/livello di prontezza/i)).toBeInTheDocument();
+    expect(screen.queryByText(/readiness/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/discovery engine/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /riprova/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /apri strumenti/i })).toHaveAttribute("href", "/dashboard");
   });
@@ -55,7 +58,32 @@ describe("CommitmentReadinessWidget", () => {
 
     renderWithQueryClient(client);
 
-    expect(await screen.findByText(/discovery engine non disponibile/i)).toBeInTheDocument();
+    expect(await screen.findByText(/prontezza non disponibile/i)).toBeInTheDocument();
     expect(screen.queryByText(/NaN/)).not.toBeInTheDocument();
+  });
+
+  it("uses simple Italian wording when readiness data loads", async () => {
+    apiFetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        score: 72,
+        band: "high",
+        components: {
+          selfKnowledge: 20,
+          exploration: 22,
+          reflection: 18,
+          emotion: 8,
+          commitment: 4,
+        },
+        nextNudge: null,
+      }),
+    });
+
+    renderWithQueryClient();
+
+    expect(await screen.findByText(/prontezza alla scelta/i)).toBeInTheDocument();
+    expect(screen.getByText(/72/)).toBeInTheDocument();
+    expect(screen.queryByText(/readiness/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/discovery engine/i)).not.toBeInTheDocument();
   });
 });

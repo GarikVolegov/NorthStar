@@ -17,7 +17,6 @@ import {
   endOfWeek,
   format,
   isBefore,
-  isSameDay,
   isSameMonth,
   isToday, parseISO,
   startOfDay,
@@ -391,6 +390,12 @@ function getDateRange(view: ViewMode, date: Date): { from: Date; to: Date } {
   }
 }
 
+function eventOverlapsDay(event: CalendarEvent, day: Date): boolean {
+  const eventStart = parseISO(event.startAt);
+  const eventEnd = parseISO(event.endAt);
+  return eventStart <= endOfDay(day) && eventEnd >= startOfDay(day);
+}
+
 function MonthView({ currentDate, events, onDayClick, onEventClick }: {
   currentDate: Date;
   events: CalendarEvent[];
@@ -418,7 +423,7 @@ function MonthView({ currentDate, events, onDayClick, onEventClick }: {
       </div>
       <div className="grid grid-cols-7">
         {days.map((day, i) => {
-          const dayEvents = events.filter((e) => isSameDay(parseISO(e.startAt), day));
+          const dayEvents = events.filter((e) => eventOverlapsDay(e, day));
           const notCurrentMonth = !isSameMonth(day, currentDate);
           return (
             <div
@@ -485,7 +490,7 @@ function WeekView({ currentDate, events, onDayClick, onEventClick }: {
       </div>
       <div className="grid grid-cols-7 min-h-[400px]">
         {days.map((day) => {
-          const dayEvents = events.filter((e) => isSameDay(parseISO(e.startAt), day));
+          const dayEvents = events.filter((e) => eventOverlapsDay(e, day));
           return (
             <div
               key={day.toISOString()}
@@ -515,7 +520,7 @@ function DayView({ currentDate, events, onEventClick, onNewEvent }: {
   onNewEvent: () => void;
 }) {
   const dayEvents = events
-    .filter((e) => isSameDay(parseISO(e.startAt), currentDate))
+    .filter((e) => eventOverlapsDay(e, currentDate))
     .sort((a, b) => parseISO(a.startAt).getTime() - parseISO(b.startAt).getTime());
 
   return (

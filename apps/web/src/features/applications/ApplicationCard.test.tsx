@@ -39,14 +39,15 @@ function renderCard(app: Application = baseApplication) {
   const client = new QueryClient({
     defaultOptions: { mutations: { retry: false }, queries: { retry: false } },
   });
+  const onDelete = vi.fn();
 
-  return render(
+  const rendered = render(
     <QueryClientProvider client={client}>
       <AppCard
         app={app}
         userId={42}
         onEdit={vi.fn()}
-        onDelete={vi.fn()}
+        onDelete={onDelete}
         onStatusChange={vi.fn()}
         deleting={false}
         isDragging={false}
@@ -56,6 +57,8 @@ function renderCard(app: Application = baseApplication) {
       />
     </QueryClientProvider>,
   );
+
+  return { ...rendered, onDelete };
 }
 
 describe("AppCard diary notes", () => {
@@ -93,5 +96,25 @@ describe("AppCard diary notes", () => {
 
     await waitFor(() => expect(deleteJsonMock).toHaveBeenCalled());
     expect(await screen.findByRole("alert")).toHaveTextContent("Nota non eliminata");
+  });
+});
+
+describe("AppCard application deletion", () => {
+  beforeEach(() => {
+    deleteJsonMock.mockReset();
+    postJsonMock.mockReset();
+  });
+
+  it("asks for confirmation before calling the delete action", () => {
+    const { onDelete } = renderCard();
+
+    fireEvent.click(screen.getByRole("button", { name: /elimina candidatura northstar/i }));
+
+    expect(onDelete).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /conferma eliminazione candidatura northstar/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /conferma eliminazione candidatura northstar/i }));
+
+    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });

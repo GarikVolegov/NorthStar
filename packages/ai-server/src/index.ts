@@ -120,6 +120,8 @@ export type { CollectorResult, RunCollectorOptions } from "./discovery-agent/col
 export { runEnricher } from "./discovery-agent/enricher-agent";
 export type { EnricherResult } from "./discovery-agent/enricher-agent";
 export { runNewsPublisher } from "./discovery-agent/news-publisher";
+export { translateNewsForLocale } from "./discovery-agent/news-translator";
+export type { TranslatableNewsItem } from "./discovery-agent/news-translator";
 export { PUBLIC_NEWS_SOURCES, isPublicNewsArticleSource, isPublishableDiscoveryNews } from "./discovery-agent/news-policy";
 export { getOpenAIFallbackConfig, shouldFallbackToOpenAI } from "./client";
 export type { NewsPublisherResult } from "./discovery-agent/news-publisher";

@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Tag,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Link, useRoute } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -30,11 +31,17 @@ interface NewsDetailItem {
   sector: string | null;
   tags: string[];
   relevance: number;
+  meaning?: {
+    sections?: Array<{
+      key: "audience" | "happened" | "why" | "practical";
+      body: string;
+    }>;
+  };
 }
 
-function formatDate(value: string): string {
+function formatDate(value: string, locale: string): string {
   try {
-    return new Intl.DateTimeFormat("it-IT", {
+    return new Intl.DateTimeFormat(locale, {
       day: "2-digit",
       month: "long",
       year: "numeric",
@@ -72,14 +79,33 @@ function renderContent(content: string) {
     });
 }
 
+function renderMeaningSections(
+  sections: NonNullable<NewsDetailItem["meaning"]>["sections"],
+  t: (key: string) => string,
+) {
+  return sections?.map((section) => (
+    <section key={section.key}>
+      <h2 className="mt-8 text-xl font-semibold text-foreground">
+        {t(`news.meaning.${section.key}`)}
+      </h2>
+      <p className="text-base leading-8 text-muted-foreground">
+        {section.body}
+      </p>
+    </section>
+  ));
+}
+
 export default function NewsDetail() {
+  const { t, i18n } = useTranslation();
   const [, params] = useRoute("/news/:id");
   const id = params?.id;
+  const newsLocale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["news-detail", id],
+    queryKey: ["news-detail", id, newsLocale],
     queryFn: async () => {
-      const res = await apiFetch(`${BASE}api/news/article/${id}`);
+      const localeParam = `?locale=${encodeURIComponent(newsLocale)}`;
+      const res = await apiFetch(`${BASE}api/news/article/${id}${localeParam}`);
       if (!res.ok) throw new Error("news detail error");
       return res.json() as Promise<{ article: NewsDetailItem }>;
     },
@@ -90,9 +116,9 @@ export default function NewsDetail() {
   const article = data?.article;
 
   usePageMeta({
-    title: article?.title ?? "News",
+    title: article?.title ?? t("news.title"),
     description:
-      article?.preview ?? article?.description ?? "Notizia NorthStar",
+      article?.preview ?? article?.description ?? t("seo.news.description"),
     path: id ? `/news/${id}` : "/news",
     type: "article",
     ...(article?.image ? { image: article.image } : {}),
@@ -119,10 +145,10 @@ export default function NewsDetail() {
         <div className="container mx-auto max-w-3xl px-4 py-16 text-center">
           <Newspaper className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
           <h1 className="mb-2 text-2xl font-semibold text-foreground">
-            Notizia non disponibile
+            {t("news.detail.unavailableTitle")}
           </h1>
           <p className="mb-6 text-muted-foreground">
-            Non siamo riusciti a caricare il dettaglio della notizia.
+            {t("news.detail.unavailableDesc")}
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button
@@ -131,10 +157,10 @@ export default function NewsDetail() {
               className="min-h-11 gap-2 rounded-full"
             >
               <RefreshCw className="h-4 w-4" />
-              Riprova
+              {t("news.retry")}
             </Button>
             <Button asChild className="min-h-11 rounded-full">
-              <Link href="/news">Torna alle news</Link>
+              <Link href="/news">{t("news.detail.backToNews")}</Link>
             </Button>
           </div>
         </div>
@@ -155,7 +181,7 @@ export default function NewsDetail() {
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
-            Torna alle news
+            {t("news.detail.backToNews")}
           </Link>
         </Button>
 
@@ -164,7 +190,7 @@ export default function NewsDetail() {
           {article.sector && <Badge variant="outline">{article.sector}</Badge>}
           <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
             <CalendarDays className="h-4 w-4" />
-            {formatDate(article.publishedAt)}
+            {formatDate(article.publishedAt, i18n.resolvedLanguage ?? i18n.language ?? "it")}
           </span>
         </div>
 
@@ -201,12 +227,15 @@ export default function NewsDetail() {
           ))}
         </div>
 
-        <div className="space-y-4">{renderContent(article.content)}</div>
+        <div className="space-y-4">
+          {article.meaning?.sections?.length
+            ? renderMeaningSections(article.meaning.sections, t)
+            : renderContent(article.content)}
+        </div>
 
         <div className="mt-12 border-t border-border pt-8">
           <p className="mb-4 text-sm text-muted-foreground">
-            NorthStar rielabora la notizia per orientamento, lavoro e business.
-            Per leggere il testo originale completo, vai alla fonte.
+            {t("news.detail.sourceNote")}
           </p>
           <Button asChild className="min-h-11 rounded-full">
             <a
@@ -214,7 +243,7 @@ export default function NewsDetail() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Leggi la notizia dalla fonte
+              {t("news.detail.readSource")}
               <ExternalLink className="ml-2 h-4 w-4" />
             </a>
           </Button>

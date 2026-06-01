@@ -6,6 +6,7 @@ import Dashboard from "./dashboard";
 
 type WendyPageContextCall = {
   page?: string;
+  journeyType?: string;
   adaptivePhase?: string;
   adaptiveNextAction?: {
     label: string;
@@ -33,7 +34,19 @@ const authState = vi.hoisted(() => ({
     journeyType: string;
     onboardingCompleted: boolean;
     avatarUrl: string | null;
+    journeyDecidedAt?: string | null;
   },
+}));
+const dashboardLayoutState = vi.hoisted(() => ({
+  layout: [
+    { id: "tools", position: 0, visible: true, size: "lg" },
+    { id: "clarity_path", position: 1, visible: true, size: "lg" },
+    { id: "discovery_feed", position: 2, visible: true, size: "lg" },
+    { id: "career_comparison", position: 3, visible: true, size: "lg" },
+    { id: "kpi_strip", position: 4, visible: true, size: "lg" },
+    { id: "week_timeline", position: 5, visible: true, size: "lg" },
+    { id: "diary_objectives", position: 6, visible: true, size: "lg" },
+  ],
 }));
 
 vi.mock("@/contexts/AuthContext", () => ({
@@ -49,15 +62,7 @@ vi.mock("@/hooks/useDashboardData", () => ({
 
 vi.mock("@/hooks/useDashboardLayout", () => ({
   useDashboardLayout: () => ({
-    layout: [
-      { id: "tools", position: 0, visible: true, size: "lg" },
-      { id: "clarity_path", position: 1, visible: true, size: "lg" },
-      { id: "discovery_feed", position: 2, visible: true, size: "lg" },
-      { id: "career_comparison", position: 3, visible: true, size: "lg" },
-      { id: "kpi_strip", position: 4, visible: true, size: "lg" },
-      { id: "week_timeline", position: 5, visible: true, size: "lg" },
-      { id: "diary_objectives", position: 6, visible: true, size: "lg" },
-    ],
+    layout: dashboardLayoutState.layout,
   }),
 }));
 
@@ -115,7 +120,7 @@ vi.mock("@/components/dashboard/DashboardDiscoveryFeed", () => ({
 }));
 
 vi.mock("@/components/dashboard/widgets/NextRoutineWidget", () => ({
-  NextRoutineWidget: () => null,
+  NextRoutineWidget: () => <section>Prossima routine</section>,
 }));
 
 vi.mock("wouter", () => ({
@@ -143,6 +148,15 @@ describe("Dashboard progress UX", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     apiFetchMock.mockResolvedValue({ ok: true });
+    dashboardLayoutState.layout = [
+      { id: "tools", position: 0, visible: true, size: "lg" },
+      { id: "clarity_path", position: 1, visible: true, size: "lg" },
+      { id: "discovery_feed", position: 2, visible: true, size: "lg" },
+      { id: "career_comparison", position: 3, visible: true, size: "lg" },
+      { id: "kpi_strip", position: 4, visible: true, size: "lg" },
+      { id: "week_timeline", position: 5, visible: true, size: "lg" },
+      { id: "diary_objectives", position: 6, visible: true, size: "lg" },
+    ];
     authState.user = {
       id: 7,
       name: "Ada",
@@ -324,5 +338,157 @@ describe("Dashboard progress UX", () => {
       sectionId: "discovery_feed",
     });
     expect(wendyContext?.savedSectorsCount).toBe(0);
+  });
+
+  it("renders the full adaptive dashboard shell for an indeciso user before the first test", async () => {
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      journeyType: "indeciso",
+      onboardingCompleted: false,
+      avatarUrl: null,
+    };
+    useDashboardDataMock.mockReturnValue({
+      data: {
+        user: {
+          journeyType: "indeciso",
+          name: "Ada",
+          email: "ada@example.com",
+          isPremium: false,
+          onboardingCompleted: false,
+        },
+        session: null,
+        objectives: [],
+        objectivesProgress: { done: 0, total: 0, percent: 0 },
+        upcomingEvents: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: refetchDashboardMock,
+    });
+    getJsonMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("api/test-sessions/latest")) {
+        return {
+          sessionId: null,
+          recommendations: [],
+        };
+      }
+      return { layout: [] };
+    });
+
+    renderDashboard();
+
+    expect(await screen.findByText("Dashboard hero")).toBeInTheDocument();
+    expect(await screen.findByText(/mappa della chiarezza/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /inizia il test/i })).toHaveAttribute("href", "/test");
+    const wendyContext = useWendyPageContextMock.mock.calls.at(-1)?.[0];
+    expect(wendyContext?.adaptivePhase).toBe("start_test");
+    expect(wendyContext?.adaptiveNextAction).toEqual({
+      label: "Inizia il test",
+      href: "/test",
+      sectionId: "clarity_path",
+    });
+  });
+
+  it("uses persisted dashboard decision state when auth context still says indeciso", async () => {
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      journeyType: "indeciso",
+      onboardingCompleted: true,
+      avatarUrl: null,
+    };
+    useDashboardDataMock.mockReturnValue({
+      data: {
+        user: {
+          journeyType: "dipendente",
+          journeyDecidedAt: "2026-06-01T10:00:00.000Z",
+          journeyDecisionSource: "percorso_page",
+          name: "Ada",
+          email: "ada@example.com",
+          isPremium: false,
+          onboardingCompleted: true,
+        },
+        session: null,
+        objectives: [],
+        objectivesProgress: { done: 0, total: 0, percent: 0 },
+        upcomingEvents: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: refetchDashboardMock,
+    });
+    getJsonMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("api/test-sessions/latest")) {
+        return {
+          sessionId: null,
+          recommendations: [],
+        };
+      }
+      return { layout: [] };
+    });
+
+    renderDashboard();
+
+    await screen.findByText("Dashboard hero");
+    const wendyContext = useWendyPageContextMock.mock.calls.at(-1)?.[0];
+    expect(wendyContext?.journeyType).toBe("dipendente");
+    expect(wendyContext?.adaptivePhase).toBe("active_journey");
+    expect(wendyContext?.adaptiveNextAction).toEqual({
+      label: "Apri prossima routine",
+      href: "/dashboard",
+      sectionId: "next_routine",
+    });
+  });
+
+  it("renders the active journey next routine above saved standard layout order", async () => {
+    authState.user = {
+      id: 7,
+      name: "Ada",
+      journeyType: "dipendente",
+      onboardingCompleted: true,
+      avatarUrl: null,
+    };
+    dashboardLayoutState.layout = [
+      { id: "week_timeline", position: 0, visible: true, size: "lg" },
+      { id: "kpi_strip", position: 1, visible: true, size: "lg" },
+      { id: "next_routine", position: 2, visible: false, size: "lg" },
+      { id: "tools", position: 3, visible: true, size: "lg" },
+    ];
+    useDashboardDataMock.mockReturnValue({
+      data: {
+        user: {
+          journeyType: "dipendente",
+          journeyDecidedAt: null,
+          journeyDecisionSource: null,
+          name: "Ada",
+          email: "ada@example.com",
+          isPremium: false,
+          onboardingCompleted: true,
+        },
+        session: null,
+        objectives: [],
+        objectivesProgress: { done: 0, total: 0, percent: 0 },
+        upcomingEvents: [],
+      },
+      isLoading: false,
+      isError: false,
+      refetch: refetchDashboardMock,
+    });
+    getJsonMock.mockImplementation(async (url: string) => {
+      if (url.endsWith("api/test-sessions/latest")) {
+        return {
+          sessionId: null,
+          recommendations: [],
+        };
+      }
+      return { layout: [] };
+    });
+
+    renderDashboard();
+
+    const nextRoutine = await screen.findByText(/prossima routine/i);
+    const timeline = await screen.findByText(/timeline settimanale/i);
+    expect(nextRoutine.compareDocumentPosition(timeline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

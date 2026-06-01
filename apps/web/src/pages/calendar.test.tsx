@@ -106,6 +106,13 @@ const event = {
   reminders: [],
 };
 
+function isoAtDayOffset(dayOffset: number, hour: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + dayOffset);
+  date.setHours(hour, 0, 0, 0);
+  return date.toISOString();
+}
+
 describe("calendar persistence states", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -182,5 +189,28 @@ describe("calendar persistence states", () => {
 
     await waitFor(() => expect(apiFetchMock).toHaveBeenCalledWith("/api/calendar/export.ics"));
     expect(URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+  });
+
+  it("renders an event on the visible day when it started before that day", async () => {
+    const overlappingEvent = {
+      ...event,
+      id: 15,
+      title: "Workshop multi-giorno",
+      startAt: isoAtDayOffset(-1, 9),
+      endAt: isoAtDayOffset(1, 17),
+    };
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("api/calendar/events?")) return Promise.resolve({ events: [overlappingEvent] });
+      if (url.includes("api/calendar/quota")) return Promise.resolve({ isPremium: false, eventCount: 1, eventLimit: 25 });
+      if (url.includes("api/sectors")) return Promise.resolve([]);
+      if (url.includes("api/objectives/me")) return Promise.resolve([]);
+      return Promise.resolve({});
+    });
+
+    renderCalendar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Giorno" }));
+
+    expect(await screen.findByText("Workshop multi-giorno")).toBeInTheDocument();
   });
 });

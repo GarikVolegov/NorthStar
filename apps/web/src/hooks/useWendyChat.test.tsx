@@ -394,6 +394,37 @@ describe("useWendyChat", () => {
     expect(sse.stop).toHaveBeenCalled();
   });
 
+  it("keeps one visible assistant slot while retrying transient stream errors", async () => {
+    vi.useFakeTimers();
+    let attempts = 0;
+    sse.start.mockImplementation(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        sse.options?.onError?.(new Error("temporary"));
+      }
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false, maxRetries: 1 }));
+    await act(async () => {
+      await result.current.sendMessage("non perdere il filo");
+    });
+
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "non perdere il filo" }),
+      expect.objectContaining({ role: "assistant", isStreaming: true }),
+    ]);
+
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "non perdere il filo" }),
+      expect.objectContaining({ role: "assistant", content: "", isStreaming: true }),
+    ]);
+  });
+
   it("shows a session message for authenticated stream failures", async () => {
     sse.start.mockImplementation(async () => {
       sse.options?.onError?.(new Error("HTTP_401: Token non valido"));
@@ -432,6 +463,35 @@ describe("useWendyChat", () => {
       role: "error",
       content: "Sessione scaduta. Effettua nuovamente il login.",
     });
+  });
+
+  it("manual retry keeps the original user message visible after an error", async () => {
+    let attempts = 0;
+    sse.start.mockImplementation(async () => {
+      attempts += 1;
+      if (attempts === 1) {
+        sse.options?.onError?.(new Error("temporary"));
+      }
+    });
+
+    const { result } = renderHook(() => useWendyChat({ ttsEnabled: false, maxRetries: 0 }));
+    await act(async () => {
+      await result.current.sendMessage("domanda importante");
+    });
+
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "domanda importante" }),
+      expect.objectContaining({ role: "error" }),
+    ]);
+
+    await act(async () => {
+      await result.current.retryLast();
+    });
+
+    expect(result.current.messages).toEqual([
+      expect.objectContaining({ role: "user", content: "domanda importante" }),
+      expect.objectContaining({ role: "assistant", content: "", isStreaming: true }),
+    ]);
   });
 
   it("reconnects when the stream closes without a done event", async () => {

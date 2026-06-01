@@ -155,7 +155,9 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
           setRetryState({ active: true, attempt: retriesRef.current, max: maxRetries });
           const delay = RECONNECT_DELAY_MS[Math.min(retriesRef.current - 1, RECONNECT_DELAY_MS.length - 1)] ?? 4000;
           setTimeout(() => {
-            void _doStream(lastUserMessageRef.current, lastContextPromptRef.current, lastIsPredefinedRef.current);
+            void _doStream(lastUserMessageRef.current, lastContextPromptRef.current, lastIsPredefinedRef.current, {
+              reuseAssistantMessage: true,
+            });
           }, delay);
           return;
         }
@@ -288,7 +290,9 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
       if (!isFatal && retriesRef.current < maxRetries) {
         retriesRef.current += 1;
         setRetryState({ active: true, attempt: retriesRef.current, max: maxRetries });
-        setTimeout(() => _doStream(lastUserMessageRef.current, lastContextPromptRef.current, lastIsPredefinedRef.current), 1000 * retriesRef.current);
+        setTimeout(() => _doStream(lastUserMessageRef.current, lastContextPromptRef.current, lastIsPredefinedRef.current, {
+          reuseAssistantMessage: true,
+        }), 1000 * retriesRef.current);
         return;
       }
       setRetryState({ active: false, attempt: retriesRef.current, max: maxRetries });
@@ -352,8 +356,16 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
 
   // Helpers
 
-  async function _doStream(text: string, contextPrompt?: string, isPredefined = false) {
-    const msgId = `assistant-${Date.now()}`;
+  async function _doStream(
+    text: string,
+    contextPrompt?: string,
+    isPredefined = false,
+    options: { reuseAssistantMessage?: boolean } = {},
+  ) {
+    const existingAssistantMsgId = assistantMsgIdRef.current;
+    const msgId = options.reuseAssistantMessage && existingAssistantMsgId
+      ? existingAssistantMsgId
+      : `assistant-${Date.now()}`;
     assistantMsgIdRef.current      = msgId;
     thinkingStartRef.current       = Date.now();
     firstChunkReceivedRef.current  = false;
@@ -372,11 +384,22 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
     lastContextPromptRef.current   = contextPrompt;
     lastIsPredefinedRef.current    = isPredefined;
 
-    setMessages((prev) => [
-      ...prev,
-      { id: msgId, role: 'assistant', content: '', timestamp: Date.now(),
-        isStreaming: true, context: contextPrompt },
-    ]);
+    setMessages((prev) => {
+      const streamingAssistant: ChatMessage = {
+        id: msgId,
+        role: 'assistant',
+        content: '',
+        timestamp: Date.now(),
+        isStreaming: true,
+        context: contextPrompt,
+      };
+
+      if (!options.reuseAssistantMessage || !prev.some((message) => message.id === msgId)) {
+        return [...prev, streamingAssistant];
+      }
+
+      return prev.map((message) => (message.id === msgId ? streamingAssistant : message));
+    });
 
     const labelIdx = Math.floor(Math.random() * THINKING_LABELS.length);
     setThinking({ active: true, label: THINKING_LABELS[labelIdx] ?? defaultThinkingLabel, startedAt: Date.now() });
@@ -498,7 +521,14 @@ export function useWendyChat(options: UseWendyChatOptions = {}): UseWendyChatRet
   const retryLast = useCallback(async () => {
     if (!lastUserMessageRef.current || isStreaming) return;
     retriesRef.current = 0;
-    setMessages((prev) => prev.filter((m) => m.role !== 'error').slice(0, -1));
+    const failedAssistantId = assistantMsgIdRef.current;
+    setMessages((prev) => {
+      if (failedAssistantId) {
+        return prev.filter((message) => message.id !== failedAssistantId);
+      }
+      const lastIndex = prev.length - 1;
+      return prev.filter((message, index) => index !== lastIndex || message.role !== 'error');
+    });
     await _doStream(lastUserMessageRef.current, lastContextPromptRef.current, lastIsPredefinedRef.current);
   }, [isStreaming]);
 

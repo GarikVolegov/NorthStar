@@ -52,11 +52,11 @@ function fallbackRewrite(input: NewsRewriteInput): NewsRewriteOutput {
     "### Cosa è successo",
     summary,
     "",
-    "### Perché conta per te",
+    "### Perché conta per l'utente",
     insight,
     "",
     "### Cosa fare adesso",
-    "Confronta il segnale con il tuo percorso, scegli una competenza da verificare e decidi se cambia una priorità concreta nelle prossime settimane.",
+    "Confronta il segnale con il tuo percorso: scegli una competenza da verificare questa settimana e decidi se aggiornare una priorità concreta.",
   ].join("\n");
 
   return { preview, content };
@@ -83,8 +83,9 @@ async function rewriteNewsForNorthStar(input: NewsRewriteInput): Promise<NewsRew
           "Rielabora segnali da fonti esterne senza copiare l'articolo originale.",
           "Rispondi solo JSON con preview e content.",
           "preview: massimo 240 caratteri, italiano chiaro.",
-          "content: markdown breve con sezioni: Per chi è, Cosa è successo, Perché conta per te, Cosa fare adesso.",
-          "La sezione finale deve essere pratica e verificabile: un piccolo uso concreto della notizia per percorso, competenze o decisioni.",
+          "content: markdown breve con sezioni: Per chi è, Cosa è successo, Perché conta per l'utente, Cosa fare adesso.",
+          "La sezione Perché conta per l'utente deve parlare alla persona che legge, non a NorthStar o all'app.",
+          "La sezione finale deve essere pratica e verificabile: una scelta, una competenza o un controllo da fare nel percorso dell'utente.",
           "Non inventare dati non presenti.",
         ].join(" "),
       },

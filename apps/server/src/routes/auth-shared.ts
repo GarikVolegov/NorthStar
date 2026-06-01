@@ -15,6 +15,8 @@ export interface JwtPayload {
   role: "user" | "admin";
   onboardingCompleted: boolean;
   journeyType: string | null;
+  journeyDecidedAt?: string | null;
+  journeyDecisionSource?: string | null;
   stripeSubscriptionId: string | null;
   testSessionId: number | null;
 }
@@ -34,6 +36,8 @@ export function buildJwtPayload(user: {
   role: string | null;
   onboardingCompleted: boolean | null;
   journeyType: string | null;
+  journeyDecidedAt?: Date | string | null;
+  journeyDecisionSource?: string | null;
   stripeSubscriptionId: string | null;
   testSessionId: number | null;
 }): JwtPayload {
@@ -44,6 +48,10 @@ export function buildJwtPayload(user: {
     role: user.role === "admin" ? "admin" : "user",
     onboardingCompleted: user.onboardingCompleted ?? false,
     journeyType: user.journeyType,
+    journeyDecidedAt: user.journeyDecidedAt instanceof Date
+      ? user.journeyDecidedAt.toISOString()
+      : user.journeyDecidedAt ?? null,
+    journeyDecisionSource: user.journeyDecisionSource ?? null,
     stripeSubscriptionId: user.stripeSubscriptionId,
     testSessionId: user.testSessionId,
   };

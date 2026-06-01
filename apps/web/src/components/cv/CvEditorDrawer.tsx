@@ -5,6 +5,16 @@
  */
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
@@ -32,7 +42,7 @@ import {
   User,
   Wrench,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -127,11 +137,33 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
   const [cv, setCv] = useState<GeneratedCv>(initialCv);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+  const savedCvSnapshotRef = useRef(JSON.stringify(initialCv));
+  const isDirty = JSON.stringify(cv) !== savedCvSnapshotRef.current;
 
   // Reset when drawer re-opens with fresh data
   useEffect(() => {
-    if (open) { setCv(initialCv); setSaved(false); setSaveError(null); }
+    if (open) {
+      setCv(initialCv);
+      savedCvSnapshotRef.current = JSON.stringify(initialCv);
+      setSaved(false);
+      setSaveError(null);
+      setDiscardDialogOpen(false);
+    }
   }, [open, initialCv]);
+
+  const requestClose = useCallback(() => {
+    if (isDirty) {
+      setDiscardDialogOpen(true);
+      return;
+    }
+    onClose();
+  }, [isDirty, onClose]);
+
+  const discardChanges = useCallback(() => {
+    setDiscardDialogOpen(false);
+    onClose();
+  }, [onClose]);
 
   const pi = cv.personalInfo;
   const setPI = (k: keyof typeof pi, v: string) =>
@@ -142,7 +174,8 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
     mutationFn: async (data: GeneratedCv) => {
       return patchJson<unknown>(`${BASE}api/cv/mine/generated`, { generated: data });
     },
-    onSuccess: () => {
+    onSuccess: (_result, savedCv) => {
+      savedCvSnapshotRef.current = JSON.stringify(savedCv);
       queryClient.invalidateQueries({ queryKey: ["cvs-mine", userId] });
       setSaved(true);
       setSaveError(null);
@@ -188,7 +221,7 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
     setCv((c) => ({ ...c, languages: c.languages.map((l, j) => j === i ? { ...l, [k]: v } : l) })), []);
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+    <Sheet open={open} onOpenChange={(v) => !v && requestClose()}>
       <SheetContent side="right" className="w-full sm:w-[520px] sm:max-w-[520px] flex flex-col p-0 gap-0 overflow-hidden">
         {/* Header */}
         <SheetHeader className="px-5 pt-5 pb-3 border-b shrink-0">
@@ -384,7 +417,7 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="ghost" size="sm" className="rounded-full text-xs" onClick={onClose}>
+            <Button variant="ghost" size="sm" className="rounded-full text-xs" onClick={requestClose}>
               Annulla
             </Button>
             <Button
@@ -401,6 +434,22 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
           </div>
         </div>
       </SheetContent>
+      <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Scartare le modifiche al CV?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hai modifiche non salvate. Se esci ora, il testo appena inserito verra' perso.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Continua a modificare</AlertDialogCancel>
+            <AlertDialogAction onClick={discardChanges}>
+              Scarta modifiche
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Sheet>
   );
 }

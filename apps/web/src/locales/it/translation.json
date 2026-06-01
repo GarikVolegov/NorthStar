@@ -1259,6 +1259,19 @@
     "yourSector": "Il tuo settore",
     "removeFromSaved": "Rimuovi dai salvati",
     "saveArticle": "Salva articolo",
+    "meaning": {
+      "audience": "Per chi è",
+      "happened": "Cosa è successo",
+      "why": "Perché conta per l'utente",
+      "practical": "Cosa fare adesso"
+    },
+    "detail": {
+      "unavailableTitle": "Notizia non disponibile",
+      "unavailableDesc": "Non siamo riusciti a caricare il dettaglio della notizia.",
+      "backToNews": "Torna alle news",
+      "sourceNote": "NorthStar rielabora la notizia per orientamento, lavoro e business. Per leggere il testo originale completo, vai alla fonte.",
+      "readSource": "Leggi la notizia dalla fonte"
+    },
     "sourceLabel": {
       "live": "Notizie aggiornate in tempo reale",
       "static": "Contenuto editoriale selezionato"
@@ -2664,6 +2677,7 @@
     "category": "Categoria",
     "priority": "Priorità",
     "status": "Stato",
+    "eventOptions": "Opzioni evento",
     "linkedSector": "Settore di riferimento",
     "noSector": "Nessun settore",
     "suggestedContent": "Contenuti suggeriti per {{name}}",

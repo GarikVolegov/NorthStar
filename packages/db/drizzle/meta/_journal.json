@@ -288,6 +288,13 @@
       "when": 1780236000000,
       "tag": "0050_nft_certificates_private_default",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1780342677895,
+      "tag": "0051_journey_decision_state",
+      "breakpoints": true
     }
   ]
 }
