@@ -455,7 +455,7 @@ export default function Dashboard() {
       case "career_comparison":
         return <DashboardCareerComparison sectorA={compSectorA} sectorB={compSectorB} />;
       case "wendy_prompts":
-        return <DashboardWendyPrompts />;
+        return <DashboardWendyPrompts adaptivePhase={adaptiveState.phase} />;
       case "kpi_strip":
         if (dashError) return null;
         return (
