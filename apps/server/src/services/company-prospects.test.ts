@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@workspace/ai-server", () => ({ searchWeb: vi.fn() }));
 vi.mock("@workspace/db", () => ({
@@ -9,10 +9,12 @@ vi.mock("@workspace/db", () => ({
 }));
 
 import {
+  createWebCompanyProspectProvider,
   createCompanyProspectService,
   type CompanyProspectProvider,
   type CompanyProspectRepository,
 } from "./company-prospects";
+import { searchWeb } from "@workspace/ai-server";
 
 const repository: CompanyProspectRepository = {
   async getProfession(id: number) {
@@ -24,6 +26,11 @@ const repository: CompanyProspectRepository = {
 };
 
 describe("company prospect service", () => {
+  beforeEach(() => {
+    vi.mocked(searchWeb).mockReset();
+    process.env[`TAVILY${"_API"}${"_KEY"}`] = "test-tavily-key";
+  });
+
   it("uses profile city and returns source-linked company prospects", async () => {
     const provider: CompanyProspectProvider = {
       configured: true,
@@ -120,5 +127,90 @@ describe("company prospect service", () => {
 
     expect(result.companies).toHaveLength(1);
     expect(result.companies[0]?.name).toBe("Studio Forma");
+  });
+
+  it("drops web results with non-http source URLs", async () => {
+    vi.mocked(searchWeb).mockResolvedValue([
+      {
+        id: -1,
+        content: "Studio Forma careers cerca Product Designer a Milano.",
+        source: "javascript:alert(1)",
+        sourceType: "web",
+        score: 0.9,
+        metadata: { title: "Studio Forma Careers", url: "javascript:alert(1)" },
+      },
+      {
+        id: -1,
+        content: "Studio Forma careers cerca Product Designer a Milano.",
+        source: "https://example.com/studio-forma-careers",
+        sourceType: "web",
+        score: 0.9,
+        metadata: { title: "Studio Forma Careers", url: "https://example.com/studio-forma-careers" },
+      },
+    ]);
+
+    const result = await createWebCompanyProspectProvider().search({
+      roleTitle: "Product Designer",
+      sectorName: "Design & UX",
+      city: "Milano",
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.sourceUrl).toBe("https://example.com/studio-forma-careers");
+  });
+
+  it("drops generic host and role-only results without clear company evidence", async () => {
+    vi.mocked(searchWeb).mockResolvedValue([
+      {
+        id: -1,
+        content: "Product Designer Milano offerte lavoro e annunci generici.",
+        source: "https://linkedin.com/jobs/search?keywords=Product%20Designer",
+        sourceType: "web",
+        score: 0.8,
+        metadata: { title: "Product Designer Milano", url: "https://linkedin.com/jobs/search?keywords=Product%20Designer" },
+      },
+      {
+        id: -1,
+        content: "Studio Forma lavora con noi Product Designer Milano team prodotto.",
+        source: "https://studioforma.example/careers/product-designer",
+        sourceType: "web",
+        score: 0.9,
+        metadata: { title: "Studio Forma - Careers", url: "https://studioforma.example/careers/product-designer" },
+      },
+    ]);
+
+    const result = await createWebCompanyProspectProvider().search({
+      roleTitle: "Product Designer",
+      sectorName: "Design & UX",
+      city: "Milano",
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.name).toBe("Studio Forma");
+    expect(result[0]?.sourceLabel).toBe("studioforma.example");
+  });
+
+  it("keeps valid prospects when one web query rejects", async () => {
+    vi.mocked(searchWeb)
+      .mockRejectedValueOnce(new Error("search failed"))
+      .mockResolvedValue([
+        {
+          id: -1,
+          content: "Studio Forma careers cerca Product Designer a Milano.",
+          source: "https://example.com/studio-forma-careers",
+          sourceType: "web",
+          score: 0.9,
+          metadata: { title: "Studio Forma Careers", url: "https://example.com/studio-forma-careers" },
+        },
+      ]);
+
+    const result = await createWebCompanyProspectProvider().search({
+      roleTitle: "Product Designer",
+      sectorName: "Design & UX",
+      city: "Milano",
+    });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.name).toBe("Studio Forma");
   });
 });

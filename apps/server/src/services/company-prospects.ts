@@ -76,6 +76,15 @@ function sourceLabel(url: string): string {
   }
 }
 
+function httpUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function suggestedSearchUrl(name: string, roleTitle: string, city: string): string {
   const query = `${name} ${roleTitle} ${city} lavora con noi`;
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
@@ -86,6 +95,36 @@ function inferName(title: string): string {
     .replace(/\s*[-|].*$/, "")
     .replace(/\b(lavora con noi|careers|jobs|assume|assunzioni)\b/gi, "")
     .trim();
+}
+
+function normalizedText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function isAmbiguousCompanyName(name: string, roleTitle: string, city: string): boolean {
+  const normalized = normalizedText(name);
+  if (!normalized) return true;
+  if (normalized.includes(".")) return true;
+  if (normalized === normalizedText(roleTitle) || normalized.includes(normalizedText(roleTitle))) return true;
+  if (normalized === normalizedText(city)) return true;
+  return /\b(job|jobs|career|careers|lavoro|offerte|annunci|assunzioni|lavora con noi)\b/.test(normalized);
+}
+
+function hasCompanyEvidence(input: {
+  url: string;
+  title: string;
+  content: string;
+  name: string;
+}): boolean {
+  const parsed = new URL(input.url);
+  const path = parsed.pathname.toLowerCase();
+  const titleAndContent = `${input.title} ${input.content}`.toLowerCase();
+  const nameTerms = normalizedText(input.name).split(" ").filter((term) => term.length > 2);
+  const mentionsName = nameTerms.length > 0 && nameTerms.every((term) => titleAndContent.includes(term));
+  const hasCareerPath = /\/(careers?|jobs?|lavora-con-noi|work-with-us|company)\b/.test(path);
+  const hasCareerText = /\b(careers?|jobs?|lavora con noi|assume|assunzioni|cerca|team)\b/.test(titleAndContent);
+
+  return mentionsName && (hasCareerPath || hasCareerText);
 }
 
 function truncateEvidence(value: string): string {
@@ -116,17 +155,25 @@ export function createWebCompanyProspectProvider(): CompanyProspectProvider {
         `site:linkedin.com/company ${city} ${roleTitle}`,
       ];
 
-      const chunks = (await Promise.all(queries.map((query) => searchWeb(query, 5)))).flat();
+      const settled = await Promise.allSettled(queries.map((query) => searchWeb(query, 5)));
+      const chunks = settled.flatMap((result) => result.status === "fulfilled" ? result.value : []);
       const prospects = chunks.flatMap((chunk) => {
         const metadata = chunk.metadata as { title?: unknown; url?: unknown } | undefined;
         const title = typeof metadata?.title === "string" ? metadata.title : "";
-        const url = typeof metadata?.url === "string"
+        const rawUrl = typeof metadata?.url === "string"
           ? metadata.url
           : typeof chunk.source === "string"
             ? chunk.source
             : "";
-        const name = inferName(title) || sourceLabel(url);
-        if (!name || !url) return [];
+        const url = httpUrl(rawUrl);
+        if (!url) return [];
+
+        const name = inferName(title);
+        if (
+          !name ||
+          isAmbiguousCompanyName(name, roleTitle, city) ||
+          !hasCompanyEvidence({ url, title, content: chunk.content, name })
+        ) return [];
 
         return [{
           name,
