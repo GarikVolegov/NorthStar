@@ -333,7 +333,7 @@ describe("Dashboard progress UX", () => {
     expect(wendyContext?.page).toBe("dashboard");
     expect(wendyContext?.adaptivePhase).toBe("explore_sectors");
     expect(wendyContext?.adaptiveNextAction).toEqual({
-      label: "Esplora settori",
+      label: "Scegli settore e ruolo",
       href: "/settori",
       sectionId: "discovery_feed",
     });

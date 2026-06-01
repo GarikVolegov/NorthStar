@@ -52,8 +52,8 @@ export function DashboardClarityPath({
       label: "Esplora il mondo",
       desc: savedSectorsCount > 0
         ? `${savedSectorsCount} ${savedSectorsCount === 1 ? "settore salvato" : "settori salvati"}`
-        : "Sfoglia i settori e salva quelli che ti interessano",
-      cta: "Esplora settori",
+        : "Sfoglia settori e ruoli per trovare una direzione concreta",
+      cta: "Scegli settore e ruolo",
       href: "/settori",
       done: savedSectorsCount >= 3,
       active: hasSession && savedSectorsCount < 3,

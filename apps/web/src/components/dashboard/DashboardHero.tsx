@@ -152,7 +152,7 @@ export function DashboardHero({
                     href="/settori"
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/20 px-4 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                   >
-                    Esplora settori →
+                    Scegli settore e ruolo →
                   </Link>
                 ) : !session ? (
                   <Link

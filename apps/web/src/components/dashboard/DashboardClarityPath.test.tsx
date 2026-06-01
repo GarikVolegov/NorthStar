@@ -19,13 +19,12 @@ describe("DashboardClarityPath", () => {
         savedSectorsCount={1}
         hasDecided={false}
         currentPhaseLabel="Esplora il mondo"
-        nextAction={{ label: "Esplora settori", href: "/settori" }}
       />,
     );
 
     expect(screen.getByText(/mappa della chiarezza/i)).toBeInTheDocument();
     expect(screen.getByText("1 / 4 step completati")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Esplora settori" })).toHaveAttribute("href", "/settori");
+    expect(screen.getByRole("link", { name: "Scegli settore e ruolo" })).toHaveAttribute("href", "/settori");
   });
 
   it("uses the adaptive phase to mark the decision step as current", () => {

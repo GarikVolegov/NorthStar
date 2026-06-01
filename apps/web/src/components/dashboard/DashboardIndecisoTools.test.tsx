@@ -58,7 +58,7 @@ describe("DashboardIndecisoTools", () => {
     renderWithClient(client);
 
     expect(screen.getByText(/prontezza non disponibile/i)).toBeInTheDocument();
-    expect(screen.getByText(/test di personalit/i)).toBeInTheDocument();
+    expect(screen.getByText("La Bussola")).toBeInTheDocument();
   });
 
   it("promotes the path selection tool when the adaptive phase is choose_path", () => {
@@ -103,7 +103,7 @@ describe("DashboardIndecisoTools", () => {
     expect(test.compareDocumentPosition(diary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("promotes sector exploration when the adaptive phase is explore_sectors", () => {
+  it("promotes sector and role selection when the adaptive phase is explore_sectors", () => {
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
@@ -125,7 +125,7 @@ describe("DashboardIndecisoTools", () => {
       adaptivePhase: "explore_sectors",
     });
 
-    const sectors = screen.getByText("Esplora settori");
+    const sectors = screen.getByText("Scegli settore e ruolo");
     const diary = screen.getByText("Il mio Diario");
     expect(sectors.compareDocumentPosition(diary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });

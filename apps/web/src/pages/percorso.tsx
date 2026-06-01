@@ -41,7 +41,7 @@ const PERSONAS: Persona[] = [
     tagline: "Non so ancora cosa fare",
     description:
       "Stai cercando la tua strada. Hai curiosità, idee confuse o semplicemente vuoi capire cosa ti appassiona davvero e dove potresti eccellere.",
-    tools: ["Test di personalità", "Esplora settori", "Coach AI", "Confronta carriere"],
+    tools: ["Test di personalità", "Scegli settore e ruolo", "Coach AI", "Confronta carriere"],
     color: "from-[hsl(43 20% 9%)] to-[hsl(43 15% 13%)]",
     accent: "text-primary",
     border: "border-primary/40",

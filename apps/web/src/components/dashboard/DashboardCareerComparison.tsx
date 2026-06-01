@@ -96,10 +96,10 @@ export function DashboardCareerComparison({
         <Scale className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
         <p className="text-sm font-semibold text-foreground">Confronto carriere bloccato</p>
         <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-          Salva almeno 3 settori dalla discovery per confrontare opzioni con abbastanza segnali.
+          Salva almeno 3 aree dalla discovery per confrontare opzioni con abbastanza segnali.
         </p>
         <Link href="/settori" className="mt-3 inline-block text-xs font-semibold text-primary hover:underline">
-          Esplora e salva settori -&gt;
+          Esplora aree e ruoli -&gt;
         </Link>
       </div>
     );
@@ -129,10 +129,10 @@ export function DashboardCareerComparison({
       <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-center">
         <Scale className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
         <p className="text-xs text-muted-foreground">
-          Hai un solo settore consigliato. Esplora di più per confrontare.
+          Hai una sola area consigliata. Esplora altre aree e ruoli per confrontare.
         </p>
         <Link href="/settori" className="mt-2 inline-block text-xs font-semibold text-primary hover:underline">
-          Esplora settori →
+          Esplora aree e ruoli →
         </Link>
       </div>
     );
