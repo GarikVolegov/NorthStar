@@ -12,6 +12,12 @@ vi.mock("@/contexts/WendyProvider", () => ({
   useOptionalWendy: () => wendyMock,
 }));
 
+function getFirstPromptButton(): HTMLElement {
+  const firstPrompt = screen.getAllByRole("button")[0];
+  if (!firstPrompt) throw new Error("Expected at least one Wendy prompt button");
+  return firstPrompt;
+}
+
 describe("DashboardWendyPrompts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -20,7 +26,7 @@ describe("DashboardWendyPrompts", () => {
   it("promotes a phase-specific Wendy prompt for sector exploration", () => {
     render(<DashboardWendyPrompts adaptivePhase="explore_sectors" />);
 
-    const firstPrompt = screen.getAllByRole("button")[0];
+    const firstPrompt = getFirstPromptButton();
     expect(firstPrompt).toHaveTextContent(/scegli 3 settori/i);
 
     fireEvent.click(firstPrompt);
@@ -32,6 +38,6 @@ describe("DashboardWendyPrompts", () => {
   it("promotes a path choice prompt when the user is ready to choose", () => {
     render(<DashboardWendyPrompts adaptivePhase="choose_path" />);
 
-    expect(screen.getAllByRole("button")[0]).toHaveTextContent(/prepara la scelta/i);
+    expect(getFirstPromptButton()).toHaveTextContent(/prepara la scelta/i);
   });
 });
