@@ -201,6 +201,14 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Le scritture candidature non dichiarano successo quando la persistenza non e disponibile: tornano 503 con `setupAction: run_migrations`.
 - La pagina candidature tollera DELETE 204, cosi la board resta coerente con un contratto REST senza body.
 
+## Tranche 18 Applicata
+
+- `/api/jobs` non e piu un placeholder: legge `job_posting_snapshots` e restituisce ruoli richiesti dal mercato come segnali aggregati, non annunci finti.
+- La job board resta read-only: create/update/delete tornano `405 JOBS_READ_ONLY`, perche NorthStar non possiede annunci individuali da modificare.
+- Il feed lavori usa ultimo profilo/test utente per ordinare i segnali quando disponibile, ma resta utile anche senza test con priorita volume/trend.
+- La pagina `/lavori` e stata rinominata semanticamente in "Segnali mercato": mostra periodo, fonte, conteggio aggregato, trend, skill e link a ricerca esterna.
+- Gli stati UX distinguono pipeline non collegata, snapshot vuoto reale, filtro senza risultati ed errore recuperabile senza esporre eccezioni tecniche come copy principale.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -346,9 +354,15 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/server run typecheck`
 - `pnpm --filter @northstar/web run typecheck`
 
+## Verifica Tranche 18
+
+- `pnpm --filter @northstar/server test src/routes/jobs.test.ts`
+- `pnpm --filter @northstar/web test src/pages/lavori.test.tsx`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+
 ## Backlog Prossima Tranche
 
-1. Sostituire route placeholder lavori con provider reale quando il prodotto lo richiede.
-2. Estendere mobile visual QA a WebKit/Safari e a viewport tablet.
-3. Aggiungere audit operativo per rate-limit provider news e trend errori fonti nel tempo.
-4. Estendere E2E referral/affiliate a WebKit quando la pipeline locale supporta browser Safari-like.
+1. Estendere mobile visual QA a WebKit/Safari e a viewport tablet.
+2. Aggiungere audit operativo per rate-limit provider news e trend errori fonti nel tempo.
+3. Estendere E2E referral/affiliate a WebKit quando la pipeline locale supporta browser Safari-like.
