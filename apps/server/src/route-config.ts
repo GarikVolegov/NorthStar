@@ -42,6 +42,7 @@ import wendyRouter from "./routes/wendy";
 import rolesRouter from "./routes/roles";
 import simulatedDaysRouter from "./routes/simulated-days";
 import skillBridgeRouter from "./routes/skill-bridge";
+import compassRouter from "./routes/compass";
 import searchRouter from "./routes/search";
 import searchRouteRouter from "./routes/search-route";
 import searchHybridRouter from "./routes/search-hybrid";
@@ -180,6 +181,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/wendy", router: wendyRouter, auth: "authenticated", description: "Wendy" },
   { path: "/api/simulated-days", router: simulatedDaysRouter, auth: "authenticated", description: "Simulazioni Try-a-Day" },
   { path: "/api/user/skill-bridge", router: skillBridgeRouter, auth: "authenticated", description: "Skill Bridge Map" },
+  { path: "/api/compass", router: compassRouter, auth: "authenticated", description: "Bussola indeciso" },
   { path: "/api/search", router: searchRouter, auth: "authenticated", description: "Search" },
   { path: "/api/search/route", router: searchRouteRouter, auth: "authenticated", description: "Search route" },
   { path: "/api/search/hybrid", router: searchHybridRouter, auth: "authenticated", description: "Hybrid search" },
