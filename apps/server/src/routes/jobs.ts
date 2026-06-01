@@ -9,6 +9,10 @@ import {
 } from "@workspace/db";
 import { sendOptionalReadFallback } from "../lib/persistence";
 import { requireAuth } from "../middleware/auth";
+import {
+  createCompanyProspectService,
+  type CompanyProspectService,
+} from "../services/company-prospects";
 
 const JOBS_NOT_CONFIGURED = {
   status: "not_configured",
@@ -296,6 +300,32 @@ function parseJobsFilterQuery(query: Record<string, unknown>): {
   };
 }
 
+function parseCompanyProspectQuery(query: Record<string, unknown>): {
+  filters: { professionId?: number; sectorId?: number; city?: string };
+  errors: Record<string, string[]>;
+} {
+  const professionId = parsePositiveIntQuery(query.professionId);
+  const sectorId = parsePositiveIntQuery(query.sectorId);
+  const city = typeof query.city === "string" && query.city.trim() ? query.city.trim() : undefined;
+  const errors: Record<string, string[]> = {};
+
+  if (professionId === null || professionId === undefined) {
+    errors.professionId = ["Deve essere un intero positivo."];
+  }
+  if (sectorId === null) errors.sectorId = ["Deve essere un intero positivo."];
+  if (typeof query.city === "string" && query.city.length > 120) errors.city = ["Massimo 120 caratteri."];
+  if (Array.isArray(query.city)) errors.city = ["Usa una sola citta."];
+
+  return {
+    filters: {
+      ...(typeof professionId === "number" ? { professionId } : {}),
+      ...(typeof sectorId === "number" ? { sectorId } : {}),
+      ...(city ? { city } : {}),
+    },
+    errors,
+  };
+}
+
 export function createDbJobsStore(): JobsStore {
   return {
     async list(userId, filters = {}) {
@@ -379,7 +409,13 @@ export function createMemoryJobsStore(response: JobsFeedResponse): JobsStore {
   };
 }
 
-export function createJobsRouter({ store = createDbJobsStore() }: { store?: JobsStore } = {}) {
+export function createJobsRouter({
+  store = createDbJobsStore(),
+  companyProspects = createCompanyProspectService(),
+}: {
+  store?: JobsStore;
+  companyProspects?: CompanyProspectService | undefined;
+} = {}) {
   const jobsRouter = Router();
 
   jobsRouter.get("/", requireAuth, async (req, res) => {
@@ -416,6 +452,31 @@ export function createJobsRouter({ store = createDbJobsStore() }: { store?: Jobs
         })
       ) return;
       res.status(500).json({ error: "Errore nel caricamento dei lavori" });
+    }
+  });
+
+  jobsRouter.get("/company-prospects", requireAuth, async (req, res) => {
+    const { filters, errors } = parseCompanyProspectQuery(req.query as Record<string, unknown>);
+    if (Object.keys(errors).length > 0 || !filters.professionId) {
+      res.status(400).json({
+        error: "Filtri ricerca aziende non validi",
+        code: "INVALID_COMPANY_PROSPECT_FILTERS",
+        details: errors,
+      });
+      return;
+    }
+
+    try {
+      const response = await companyProspects.search({
+        userId: req.user!.id,
+        professionId: filters.professionId,
+        sectorId: filters.sectorId,
+        city: filters.city,
+      });
+      res.json(response);
+    } catch (err) {
+      req.log?.error?.({ err }, "company prospects get error");
+      res.status(500).json({ error: "Errore nel caricamento delle aziende locali" });
     }
   });
 

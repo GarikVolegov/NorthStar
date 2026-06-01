@@ -148,10 +148,10 @@ function feed(overrides: Partial<JobsFeedResponse> = {}): JobsFeedResponse {
   };
 }
 
-function app(store: JobsStore = createMemoryJobsStore(feed())) {
+function app(store: JobsStore = createMemoryJobsStore(feed()), companyProspects?: { search: ReturnType<typeof vi.fn> }) {
   const instance = express();
   instance.use(express.json());
-  instance.use("/api/jobs", createJobsRouter({ store }));
+  instance.use("/api/jobs", createJobsRouter({ store, companyProspects }));
   return instance;
 }
 
@@ -438,6 +438,57 @@ describe("jobs routes", () => {
       personalized: false,
       source: "job_posting_snapshots",
       filter: { professionId: null, sectorId: null, fallback: null },
+    });
+  });
+
+  it("returns local company prospects for a selected role", async () => {
+    const companyProspects = {
+      search: vi.fn().mockResolvedValue({
+        companies: [{
+          name: "Studio Forma",
+          location: "Milano",
+          reason: "Lavora su prodotti digitali.",
+          evidence: "Pagina careers pubblica.",
+          sourceUrl: "https://example.com/studio-forma",
+          sourceLabel: "example.com",
+          confidence: "medium",
+          suggestedSearchUrl: "https://www.google.com/search?q=Studio%20Forma",
+        }],
+        basedOnProfession: "Product Designer",
+        basedOnSector: "Design & UX",
+        basedOnCity: "Milano",
+        status: "ok",
+        coverageNote: "Fonti disponibili.",
+      }),
+    };
+
+    const response = await request(app(undefined, companyProspects))
+      .get("/api/jobs/company-prospects?professionId=55&sectorId=2")
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(200);
+
+    expect(companyProspects.search).toHaveBeenCalledWith({
+      userId: 42,
+      professionId: 55,
+      sectorId: 2,
+      city: undefined,
+    });
+    expect(response.body.companies[0]).toMatchObject({ name: "Studio Forma" });
+  });
+
+  it("rejects invalid company prospect filters", async () => {
+    const response = await request(app())
+      .get(`/api/jobs/company-prospects?professionId=abc&city=${"x".repeat(121)}`)
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(400);
+
+    expect(response.body).toEqual({
+      error: "Filtri ricerca aziende non validi",
+      code: "INVALID_COMPANY_PROSPECT_FILTERS",
+      details: {
+        professionId: ["Deve essere un intero positivo."],
+        city: ["Massimo 120 caratteri."],
+      },
     });
   });
 
