@@ -14,12 +14,14 @@ import {
   isReadinessData,
 } from "./CommitmentReadinessWidget";
 import { JourneyToolsSection } from "./JourneyToolsSection";
+import type { AdaptiveDashboardPhase } from "./dashboard-adaptive-flow";
 
 interface Props {
   toolsProps: { journeyType?: string | null; sectorId?: number };
+  adaptivePhase?: AdaptiveDashboardPhase | undefined;
 }
 
-export function DashboardIndecisoTools({ toolsProps }: Props) {
+export function DashboardIndecisoTools({ toolsProps, adaptivePhase }: Props) {
   // Stessa queryKey del widget interno → React Query condivide il dato (no doppia chiamata).
   const { data } = useQuery({
     queryKey: ["discovery-readiness"],
@@ -38,6 +40,7 @@ export function DashboardIndecisoTools({ toolsProps }: Props) {
           journeyType={toolsProps.journeyType}
           {...(toolsProps.sectorId !== undefined ? { sectorId: toolsProps.sectorId } : {})}
           {...(readinessBand ? { readinessBand } : {})}
+          {...(adaptivePhase ? { adaptivePhase } : {})}
         />
       </div>
     </div>

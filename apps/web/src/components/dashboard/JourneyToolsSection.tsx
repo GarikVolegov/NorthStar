@@ -1,5 +1,6 @@
-import { ArrowRight, BarChart3, BookOpen, BrainCircuit, Briefcase, Building2, Compass, HeartHandshake, Mic2, Network, Newspaper, Rocket, Sparkles, Target, TrendingUp, Zap, type LucideIcon } from "lucide-react";
+import { ArrowRight, BarChart3, BookOpen, BrainCircuit, Briefcase, Building2, Compass, HeartHandshake, MapPin, Mic2, Network, Newspaper, Rocket, Sparkles, Target, TrendingUp, Zap, type LucideIcon } from "lucide-react";
 import { Link } from "wouter";
+import type { AdaptiveDashboardPhase } from "./dashboard-adaptive-flow";
 
 type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
 
@@ -9,6 +10,10 @@ interface ToolItem {
   title: string;
   desc: string;
   badge?: string;
+}
+
+function promoteTool(tools: ToolItem[], promoted: ToolItem): ToolItem[] {
+  return [promoted, ...tools.filter((tool) => tool.href !== promoted.href)];
 }
 
 /**
@@ -23,12 +28,40 @@ export function JourneyToolsSection({
   journeyType,
   sectorId,
   readinessBand,
+  adaptivePhase,
 }: {
   journeyType: string | null | undefined;
   sectorId?: number;
   readinessBand?: "low" | "mid" | "high";
+  adaptivePhase?: AdaptiveDashboardPhase;
 }) {
   const base = import.meta.env.BASE_URL || "/";
+  const diaryTool: ToolItem = {
+    href: "/diario",
+    icon: BookOpen,
+    title: "Il mio Diario",
+    desc: "Riflessioni, idee e crescita personale",
+  };
+  const choosePathTool: ToolItem = {
+    href: "/percorso",
+    icon: MapPin,
+    title: "Scegli percorso",
+    desc: "Trasforma la chiarezza raccolta in una direzione attiva",
+    badge: "Step",
+  };
+  const testTool: ToolItem = {
+    href: "/test",
+    icon: Zap,
+    title: "Test di personalita",
+    desc: "Mappa la tua personalita professionale",
+    badge: "Gratuito",
+  };
+  const exploreSectorsTool: ToolItem = {
+    href: "/settori",
+    icon: Target,
+    title: "Esplora settori",
+    desc: "28 settori - niente impegno, solo curiosita",
+  };
 
   // Set indeciso bandizzato (Ondata 1 — Discovery Engine adattivo).
   // Ordine: dal meno impegnativo al più impegnativo.
@@ -79,10 +112,14 @@ export function JourneyToolsSection({
   const journeyTools = (journeyType && TOOLS_BY_JOURNEY[journeyType as JourneyId])
     ? TOOLS_BY_JOURNEY[journeyType as JourneyId]
     : TOOLS_BY_JOURNEY.indeciso;
-  const tools: ToolItem[] = [
-    { href: "/diario", icon: BookOpen, title: "Il mio Diario", desc: "Riflessioni, idee e crescita personale" },
-    ...journeyTools,
-  ];
+  const baseTools: ToolItem[] = [diaryTool, ...journeyTools];
+  const tools: ToolItem[] = journeyType === "indeciso" && adaptivePhase === "choose_path"
+    ? promoteTool(baseTools, choosePathTool)
+    : journeyType === "indeciso" && adaptivePhase === "start_test"
+      ? promoteTool(baseTools, testTool)
+      : journeyType === "indeciso" && adaptivePhase === "explore_sectors"
+        ? promoteTool(baseTools, exploreSectorsTool)
+        : baseTools;
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

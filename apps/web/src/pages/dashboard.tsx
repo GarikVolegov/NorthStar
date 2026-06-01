@@ -379,7 +379,7 @@ export default function Dashboard() {
           {journeyMeta && <span className="text-xs text-muted-foreground">- {journeyMeta.label}</span>}
         </div>
         {isIndeciso ? (
-          <DashboardIndecisoTools toolsProps={toolsProps} />
+          <DashboardIndecisoTools toolsProps={toolsProps} adaptivePhase={adaptiveState.phase} />
         ) : (
           <JourneyToolsSection {...toolsProps} />
         )}
