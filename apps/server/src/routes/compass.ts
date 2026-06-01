@@ -61,7 +61,26 @@ router.post("/signal", requireAuth, async (req, res) => {
     }
 
     const valence = body.valence != null ? clampNum(body.valence, -1, 1, 0) : undefined;
-    const dims = (body.dims && typeof body.dims === "object") ? (body.dims as Record<string, number>) : undefined;
+    const refId = body.refId != null ? String(body.refId) : null;
+
+    // dims: per scene_swipe li deriva il SERVER dai pesi della scena (anti-gaming);
+    // per gli altri tool, accetta dims dal client.
+    let dims: Record<string, number> | undefined;
+    if (signalType === "scene_swipe" && refId && valence != null && valence > 0) {
+      const sceneIdNum = Number(refId);
+      if (Number.isInteger(sceneIdNum)) {
+        const [scene] = await db
+          .select({ riasecWeights: sceneCardsTable.riasecWeights })
+          .from(sceneCardsTable)
+          .where(eq(sceneCardsTable.id, sceneIdNum))
+          .limit(1);
+        const weights = (scene?.riasecWeights as Record<string, number>) ?? {};
+        dims = Object.fromEntries(Object.entries(weights).map(([k, v]) => [k, v * valence]));
+      }
+    } else if (body.dims && typeof body.dims === "object") {
+      dims = body.dims as Record<string, number>;
+    }
+
     const payload: Record<string, unknown> = {
       ...(valence != null ? { valence } : {}),
       ...(body.reactionMs != null ? { reactionMs: clampNum(body.reactionMs, 0, 600000, 0) } : {}),
@@ -72,7 +91,7 @@ router.post("/signal", requireAuth, async (req, res) => {
       userId,
       signalType,
       refType: typeof body.refType === "string" ? body.refType : null,
-      refId: body.refId != null ? String(body.refId) : null,
+      refId,
       payload,
       weight: clampNum(body.weight, 0, 5, 1),
     });
