@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import type React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import Sector from "./sector";
 
 const sectorState = vi.hoisted(() => ({
@@ -123,7 +123,18 @@ vi.mock("wouter", () => ({
   useParams: () => ({ id: "2" }),
 }));
 
+const scrollIntoViewMock = vi.fn();
+
 describe("Sector role decision flow", () => {
+  beforeEach(() => {
+    scrollIntoViewMock.mockClear();
+    Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+    window.history.replaceState({}, "", "/settore/2");
+  });
+
   it("promotes role choice before the deep browsing tabs", async () => {
     render(<Sector />);
 
@@ -132,5 +143,14 @@ describe("Sector role decision flow", () => {
       .toHaveAttribute("href", "/ruolo/55?fromSector=2");
     expect(screen.getByRole("link", { name: "Approfondisci" }))
       .toHaveAttribute("href", "/ruolo/55");
+  });
+
+  it("scrolls to the role choice section when opened with the ruoli hash", async () => {
+    window.history.replaceState({}, "", "/settore/2#ruoli");
+
+    render(<Sector />);
+
+    expect(await screen.findByText("Scegli il ruolo target")).toBeInTheDocument();
+    expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
   });
 });

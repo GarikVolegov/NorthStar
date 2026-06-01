@@ -11,7 +11,6 @@ const i18nState = vi.hoisted(() => ({
   language: "it",
   resolvedLanguage: "it",
 }));
-const dynamicTranslationMock = vi.hoisted(() => vi.fn(async ({ source }: { source: string }) => source));
 
 vi.mock("@/contexts/WendyProvider", () => ({
   useOptionalWendy: () => wendyMock,
@@ -21,11 +20,6 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     i18n: i18nState,
   }),
-}));
-
-vi.mock("@/lib/dynamic-translation", () => ({
-  DynamicText: ({ source }: { source: string }) => <span>{source}</span>,
-  getDynamicTranslation: dynamicTranslationMock,
 }));
 
 function getFirstPromptButton(): HTMLElement {
@@ -39,7 +33,6 @@ describe("DashboardWendyPrompts", () => {
     vi.clearAllMocks();
     i18nState.language = "it";
     i18nState.resolvedLanguage = "it";
-    dynamicTranslationMock.mockImplementation(async ({ source }: { source: string }) => source);
   });
 
   it("promotes a phase-specific Wendy prompt for choosing sector and role", async () => {
@@ -63,21 +56,15 @@ describe("DashboardWendyPrompts", () => {
     expect(getFirstPromptButton()).toHaveTextContent(/prepara la scelta/i);
   });
 
-  it("translates the prompt message dynamically before sending it to Wendy", async () => {
+  it("sends the source prompt message to Wendy without dynamic translation", async () => {
     i18nState.language = "en-US";
     i18nState.resolvedLanguage = "en-US";
-    dynamicTranslationMock.mockResolvedValueOnce("Help me choose a sector and role from my profile.");
     render(<DashboardWendyPrompts adaptivePhase="explore_sectors" />);
 
     fireEvent.click(getFirstPromptButton());
 
     await waitFor(() => {
-      expect(wendyMock.ask).toHaveBeenCalledWith("Help me choose a sector and role from my profile.");
+      expect(wendyMock.ask).toHaveBeenCalledWith(expect.stringMatching(/settore e ruolo/i));
     });
-    expect(dynamicTranslationMock).toHaveBeenCalledWith(expect.objectContaining({
-      locale: "en",
-      key: "dashboard.wendyPrompts.explore_sectors.message",
-      source: expect.stringMatching(/settore e ruolo/i),
-    }));
   });
 });

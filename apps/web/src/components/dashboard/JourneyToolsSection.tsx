@@ -1,8 +1,6 @@
 import { ArrowRight, BarChart3, BookOpen, BrainCircuit, Briefcase, Building2, Compass, HeartHandshake, MapPin, Mic2, Network, Newspaper, Rocket, Sparkles, Target, TrendingUp, Zap, type LucideIcon } from "lucide-react";
-import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import type { AdaptiveDashboardPhase, AdaptiveSectionPresentation } from "./dashboard-adaptive-flow";
-import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 
 type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
@@ -20,49 +18,16 @@ function promoteTool(tools: ToolItem[], promoted: ToolItem): ToolItem[] {
   return [promoted, ...tools.filter((tool) => tool.href !== promoted.href)];
 }
 
-function badgeTranslationKey(badge: string): string {
-  const badgeIds: Record<string, string> = {
-    AI: "ai",
-    Gratuito: "free",
-    "Inizia qui": "startHere",
-    Nuovo: "new",
-    Step: "step",
-    "60s": "sixtySeconds",
-  };
-
-  return `dashboard.journeyTools.badges.${badgeIds[badge] ?? badge.toLowerCase().replace(/\W+/g, "")}`;
-}
-
 function JourneyToolCard({
   tool,
   index,
-  locale,
   presentation,
 }: {
   tool: ToolItem;
   index: number;
-  locale: string;
   presentation?: AdaptiveSectionPresentation | undefined;
 }) {
   const { href, icon: Icon, title, desc, badge } = tool;
-  const translatedTitle = useDynamicTranslation({
-    locale,
-    source: title,
-    key: `dashboard.journeyTools.tools.${tool.id}.title`,
-    context: "Dashboard journey tool title",
-  });
-  const translatedDescription = useDynamicTranslation({
-    locale,
-    source: desc,
-    key: `dashboard.journeyTools.tools.${tool.id}.description`,
-    context: "Dashboard journey tool description",
-  });
-  const translatedBadge = useDynamicTranslation({
-    locale,
-    source: badge ?? "",
-    key: badge ? badgeTranslationKey(badge) : `dashboard.journeyTools.tools.${tool.id}.badge`,
-    context: "Dashboard journey tool badge",
-  });
 
   return (
     <Link href={href}>
@@ -78,13 +43,13 @@ function JourneyToolCard({
             <Icon className="w-5 h-5" />
           </div>
           {badge && (
-            <span className="text-xs font-semibold bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5">{translatedBadge}</span>
+            <span className="text-xs font-semibold bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5">{badge}</span>
           )}
         </div>
         <div>
-          <p className="font-semibold text-foreground text-sm leading-snug">{translatedTitle}</p>
+          <p className="font-semibold text-foreground text-sm leading-snug">{title}</p>
           {presentation?.priority !== "compact" && (
-            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{translatedDescription}</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{desc}</p>
           )}
         </div>
         <ArrowRight className="w-4 h-4 mt-auto self-end text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
@@ -114,8 +79,6 @@ export function JourneyToolsSection({
   adaptivePhase?: AdaptiveDashboardPhase;
   presentation?: AdaptiveSectionPresentation | undefined;
 }) {
-  const { i18n } = useTranslation();
-  const locale = i18n.resolvedLanguage ?? i18n.language ?? "it";
   const base = import.meta.env.BASE_URL || "/";
   const diaryTool: ToolItem = {
     id: "diary",
@@ -213,7 +176,6 @@ export function JourneyToolsSection({
           key={`${tool.id}-${tool.href}`}
           tool={tool}
           index={index}
-          locale={locale}
           presentation={presentation}
         />
       ))}

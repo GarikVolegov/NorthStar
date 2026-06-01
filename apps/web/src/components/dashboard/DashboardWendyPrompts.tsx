@@ -1,5 +1,4 @@
 import { useOptionalWendy } from "@/contexts/WendyProvider";
-import { DynamicText, getDynamicTranslation } from "@/lib/dynamic-translation";
 import {
   BrainCircuit,
   Compass,
@@ -14,7 +13,6 @@ import {
 import type { AdaptiveDashboardPhase } from "./dashboard-adaptive-flow";
 import type { AdaptiveSectionPresentation } from "./dashboard-adaptive-flow";
 import { cn } from "@/lib/utils";
-import { useTranslation } from "react-i18next";
 
 interface WendyPrompt {
   Icon: LucideIcon;
@@ -106,20 +104,12 @@ export function DashboardWendyPrompts({
   presentation?: AdaptiveSectionPresentation | undefined;
 }) {
   const wendy = useOptionalWendy();
-  const { i18n } = useTranslation();
   const prompts = getPrompts(adaptivePhase);
   const visiblePrompts = presentation?.priority === "compact" ? prompts.slice(0, 3) : prompts;
-  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
 
-  async function handlePrompt(prompt: WendyPrompt) {
+  function handlePrompt(prompt: WendyPrompt) {
     if (!wendy) return;
-    const message = await getDynamicTranslation({
-      locale,
-      source: prompt.message,
-      context: "Dashboard Wendy quick prompt sent to the AI coach",
-      key: `dashboard.wendyPrompts.${prompt.id}.message`,
-    });
-    wendy.ask(message);
+    wendy.ask(prompt.message);
     wendy.open();
   }
 
@@ -152,12 +142,7 @@ export function DashboardWendyPrompts({
             className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-2 text-xs font-medium text-foreground transition-all hover:border-primary/40 hover:bg-primary/8 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-95"
           >
             <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-            <DynamicText
-              locale={locale}
-              source={prompt.label}
-              context="Dashboard Wendy quick prompt button label"
-              translationKey={`dashboard.wendyPrompts.${prompt.id}.label`}
-            />
+            {prompt.label}
           </button>
         ))}
 

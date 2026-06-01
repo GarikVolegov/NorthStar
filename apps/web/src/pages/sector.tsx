@@ -126,6 +126,15 @@ export default function Sector() {
         },
   );
 
+  React.useEffect(() => {
+    if (!sector || window.location.hash !== "#ruoli") return;
+
+    document.getElementById("ruoli")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [sector?.id]);
+
   // Memoised: recomputed only when stats change or t() reference changes (lang switch).
   const chartData = useMemo<ChartEntry[]>(() => {
     if (!stats?.growthProjection) return [];
