@@ -106,6 +106,10 @@ describe("News page reliability states", () => {
     expect(await screen.findByText("news.noResults")).toBeInTheDocument();
     expect(screen.getByText(/pipeline non ha ancora registrato un fetch/i)).toBeInTheDocument();
     expect(screen.getByText(/Pipeline in avvio/i)).toBeInTheDocument();
+    expect(screen.getByText("Mai eseguito")).toBeInTheDocument();
+    expect(screen.getByText("Fonti attive")).toBeInTheDocument();
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("Non registrato")).toBeInTheDocument();
   });
 
   it("keeps provider diagnostics visible when the feed request fails", async () => {
@@ -118,6 +122,7 @@ describe("News page reliability states", () => {
           sourcesWithErrors: 2,
           refreshAction: "check_provider_keys",
           message: "GNews e Tavily hanno restituito errori: controlla chiavi provider o quota.",
+          lastRefreshError: "quota exceeded",
         },
       },
     });
@@ -128,5 +133,7 @@ describe("News page reliability states", () => {
     expect(await screen.findByText("news.loadError")).toBeInTheDocument();
     expect(screen.getByText(/GNews e Tavily hanno restituito errori/i)).toBeInTheDocument();
     expect(screen.getByText(/Controlla chiavi e limiti provider/i)).toBeInTheDocument();
+    expect(screen.getByText("Fonti degradate")).toBeInTheDocument();
+    expect(screen.getByText(/Ultimo errore refresh: quota exceeded/i)).toBeInTheDocument();
   });
 });

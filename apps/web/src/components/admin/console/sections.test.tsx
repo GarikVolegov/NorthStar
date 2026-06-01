@@ -222,6 +222,70 @@ describe("admin console sections", () => {
     expect(onTabChange).toHaveBeenCalledWith("launch");
   });
 
+  it("renders compact news provider diagnostics when control room data includes them", () => {
+    const withDiagnostics: AgentsOverview = {
+      ...agents,
+      controlRoom: {
+        ai: {
+          activeProvider: "openrouter",
+          openRouterConfigured: true,
+          openAiFallbackConfigured: true,
+          model: "gpt-4o-mini",
+          status: "configured",
+        },
+        configBlockers: [],
+        readyOutputs: {
+          realNews: { count: 12, status: "ready" },
+          pendingDiscovery: { count: 1, status: "attention" },
+          growthArticles: { count: 3, status: "ready" },
+          jobSnapshots: { count: 4, status: "ready" },
+        },
+        latestRuns: [],
+        newsDiagnostics: {
+          providerStatus: "degraded",
+          lastAttemptAt: "2026-05-20T09:30:00Z",
+          enabledSources: 4,
+          sourcesWithErrors: 2,
+          totalFetched: 37,
+          lastRefreshError: "GNews: quota exceeded",
+          refreshAction: "check_provider_keys",
+          message: "Controlla chiavi provider e rate limit.",
+        },
+      },
+    };
+
+    render(
+      <AgentsSection
+        data={withDiagnostics}
+        loading={false}
+        tab="overview"
+        onTabChange={vi.fn()}
+        agentDays="30"
+        onAgentDaysChange={vi.fn()}
+        agentFilter="all"
+        onAgentFilterChange={vi.fn()}
+        agentStatusFilter="all"
+        onAgentStatusFilterChange={vi.fn()}
+        newsSectorInput=""
+        onNewsSectorInputChange={vi.fn()}
+        agentsRunning={new Set()}
+        agentsResult={{}}
+        onRefresh={vi.fn()}
+        onOpenStatus={vi.fn()}
+        onLaunch={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Provider news")).toBeInTheDocument();
+    expect(screen.getByText("degraded")).toBeInTheDocument();
+    expect(screen.getByText("Fonti abilitate")).toBeInTheDocument();
+    expect(screen.getAllByText("4").length).toBeGreaterThan(0);
+    expect(screen.getByText("2")).toBeInTheDocument();
+    expect(screen.getByText("37")).toBeInTheDocument();
+    expect(screen.getByText("GNews: quota exceeded")).toBeInTheDocument();
+    expect(screen.getByText("Controlla chiavi provider e rate limit.")).toBeInTheDocument();
+  });
+
   it("renders pipeline launch cards without exposing atomic agents in the primary view", () => {
     const onLaunch = vi.fn();
     render(

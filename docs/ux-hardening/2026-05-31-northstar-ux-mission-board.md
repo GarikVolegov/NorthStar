@@ -183,6 +183,16 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Calendario e modale evento non sostituiscono errori di caricamento/salvataggio/eliminazione con griglie vuote o chiusure ottimistiche.
 - La scelta percorso autenticata usa `/api/journey-type/me/journey-type`, controlla `response.ok`, e non naviga ne aggiorna auth se il salvataggio fallisce.
 
+## Tranche 16 Applicata
+
+- Il diagnostico provider news ora vive in un helper backend riusabile: feed pubblico, control room admin e pipeline manuale leggono lo stesso contratto.
+- La diagnostica espone stato, fonti abilitate, fonti in errore, ultimo fetch/tentativo, totale fetched, staleness, ultimo errore e azione/label consigliata.
+- La pipeline admin `news-publishing` ritorna snapshot provider prima/dopo il run manuale, anche nei path di errore collector.
+- La console admin agenti mostra un pannello compatto "Provider news" con stato fonti, ultimo fetch, totale fetched, errore e CTA di refresh/pipeline.
+- La pagina News pubblica mostra stato provider e ultimo errore refresh senza lasciare l'utente davanti a vuoti o provider degradati non spiegati.
+- Gli E2E referral non dipendono piu da seed account: creano owner/referral temporanei, accettano il contratto auth reale e coprono dashboard affiliate mobile Pixel 5.
+- Il dev server locale e stato riavviato su `127.0.0.1:5173`; `/dashboard` risponde e il proxy API raggiunge il backend.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -311,10 +321,19 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/web exec vitest run --configLoader runner src/components/CvSection.test.tsx src/components/cv/CvEditorDrawer.test.tsx src/pages/calendar.test.tsx src/components/calendario/CalendarioEventoModal.test.tsx src/components/profile/ProfileSettings.test.tsx --pool=forks --maxWorkers=1`
 - `git diff --check`
 
+## Verifica Tranche 16
+
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/news.test.ts src/routes/admin/shared/pipelines.test.ts src/lib/admin-agent-control-room.test.ts --pool=forks --maxWorkers=1`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/news.test.tsx src/components/admin/console/sections.test.tsx --maxWorkers=1`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `PLAYWRIGHT_SKIP_WEBSERVER=1 BASE_URL=http://127.0.0.1:5173 API_URL=http://127.0.0.1:3001 TEST_API_URL=http://127.0.0.1:3001 pnpm exec playwright test e2e/referral-flow.spec.ts e2e/mobile/affiliate.mobile.spec.ts --project=chromium --workers=1`
+- Smoke locale: `GET http://127.0.0.1:5173/dashboard` -> 200 con root React; `GET /api/stats/summary` via proxy -> 401 atteso.
+- `git diff --check`
+
 ## Backlog Prossima Tranche
 
-1. Persistenza/storico stabile per stato provider news (`lastFetchAt`, `lastError`, rate limit) anche fuori dai run manuali.
-2. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
-3. Aggiungere pannello admin/manual refresh piu completo per fonti news, GNews/Tavily e stato provider.
-4. Estendere mobile visual QA a WebKit/Safari e a viewport tablet.
-5. Estendere E2E full-stack a referral, affiliate UI e mobile viewport, eliminando le ultime assunzioni su seed account.
+1. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
+2. Estendere mobile visual QA a WebKit/Safari e a viewport tablet.
+3. Aggiungere audit operativo per rate-limit provider news e trend errori fonti nel tempo.
+4. Estendere E2E referral/affiliate a WebKit quando la pipeline locale supporta browser Safari-like.

@@ -1,11 +1,15 @@
 import { Router } from "express";
 import type { Response } from "express";
 import { eq, desc, or, and, lt, ilike, sql, type SQL } from "drizzle-orm";
-import { db, discoverySourcesTable, newsArticlesTable } from "@workspace/db";
+import { db, newsArticlesTable } from "@workspace/db";
 import { PUBLIC_NEWS_SOURCES, runNewsPublisher } from "@workspace/ai-server";
 import { cacheGet, cacheSet } from "../lib/redis";
 import { clampContentLimit, readContentSearchQuery } from "../lib/content-search";
 import { mapNewsCategoryForUi, resolveNewsCategoryFilter } from "../lib/news-category";
+import {
+  buildNewsProviderDiagnostics,
+  type NewsProviderDiagnostics,
+} from "../lib/news-provider-diagnostics";
 
 const router = Router();
 
@@ -16,7 +20,6 @@ const NEWS_AUTO_REFRESH_COOLDOWN_MS = process.env.NODE_ENV === "test"
   : Number(process.env.NEWS_AUTO_REFRESH_COOLDOWN_MS) || 5 * 60 * 1000;
 type NewsArticleRow = typeof newsArticlesTable.$inferSelect;
 type NewsFeedStatus = "ok" | "empty" | "partial" | "error";
-type NewsProviderStatus = "ready" | "degraded" | "never_run" | "stale" | "not_configured" | "unavailable";
 type NewsRefreshReason = "empty" | "stale";
 
 type NewsRefreshResult = {
@@ -26,16 +29,6 @@ type NewsRefreshResult = {
   missingCoverage: number;
   durationMs: number;
   error?: string;
-};
-
-type NewsDiagnostics = {
-  providerStatus: NewsProviderStatus;
-  lastAttemptAt: string | null;
-  enabledSources: number;
-  sourcesWithErrors: number;
-  refreshAction: "wait_for_next_refresh" | "wait_for_startup_pipeline" | "check_provider_keys" | "configure_sources" | "retry_later";
-  message: string;
-  lastRefreshError?: string;
 };
 
 let newsRefreshInFlight: Promise<NewsRefreshResult> | null = null;
@@ -152,8 +145,8 @@ async function runAutoNewsRefresh(reason: NewsRefreshReason, log?: { warn?: (pay
   return newsRefreshInFlight;
 }
 
-async function diagnosticsWithRefreshError(refresh?: NewsRefreshResult): Promise<NewsDiagnostics> {
-  const diagnostics = await buildNewsDiagnostics();
+async function diagnosticsWithRefreshError(refresh?: NewsRefreshResult): Promise<NewsProviderDiagnostics> {
+  const diagnostics = await buildNewsProviderDiagnostics();
   if (refresh?.error) {
     return {
       ...diagnostics,
@@ -165,11 +158,11 @@ async function diagnosticsWithRefreshError(refresh?: NewsRefreshResult): Promise
   return diagnostics;
 }
 
-function isTotalProviderFailure(diagnostics: NewsDiagnostics): boolean {
+function isTotalProviderFailure(diagnostics: NewsProviderDiagnostics): boolean {
   return diagnostics.enabledSources > 0 && diagnostics.sourcesWithErrors >= diagnostics.enabledSources;
 }
 
-function sendNewsUnavailableWithDiagnostics(res: Response, diagnostics: NewsDiagnostics) {
+function sendNewsUnavailableWithDiagnostics(res: Response, diagnostics: NewsProviderDiagnostics) {
   res.status(503).json({
     news: [],
     nextCursor: null,
@@ -180,97 +173,8 @@ function sendNewsUnavailableWithDiagnostics(res: Response, diagnostics: NewsDiag
   });
 }
 
-async function buildNewsDiagnostics(): Promise<NewsDiagnostics> {
-  try {
-    const rows = await db
-      .select({
-        name: discoverySourcesTable.name,
-        sourceType: discoverySourcesTable.sourceType,
-        enabled: discoverySourcesTable.enabled,
-        lastFetchAt: discoverySourcesTable.lastFetchAt,
-        lastError: discoverySourcesTable.lastError,
-      })
-      .from(discoverySourcesTable)
-      .where(and(
-        eq(discoverySourcesTable.itemType, "news"),
-        eq(discoverySourcesTable.enabled, true),
-      ))
-      .limit(50);
-
-    const enabledSources = rows.length;
-    const sourcesWithErrors = rows.filter((row) => Boolean(row.lastError?.trim())).length;
-    const lastAttempt = rows
-      .map((row) => row.lastFetchAt)
-      .filter((date): date is Date => date instanceof Date)
-      .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
-
-    if (enabledSources === 0) {
-      return {
-        providerStatus: "not_configured",
-        lastAttemptAt: null,
-        enabledSources,
-        sourcesWithErrors,
-        refreshAction: "configure_sources",
-        message: "Nessuna fonte news attiva: configura GNews, Tavily o feed RSS dalla console admin.",
-      };
-    }
-
-    if (sourcesWithErrors > 0) {
-      return {
-        providerStatus: "degraded",
-        lastAttemptAt: lastAttempt?.toISOString() ?? null,
-        enabledSources,
-        sourcesWithErrors,
-        refreshAction: "check_provider_keys",
-        message: "Alcune fonti news hanno segnalato errori: controlla chiavi provider, rate limit o URL sorgente.",
-      };
-    }
-
-    if (!lastAttempt) {
-      return {
-        providerStatus: "never_run",
-        lastAttemptAt: null,
-        enabledSources,
-        sourcesWithErrors,
-        refreshAction: "wait_for_startup_pipeline",
-        message: "Le fonti news sono configurate, ma la pipeline non ha ancora registrato un fetch.",
-      };
-    }
-
-    const stale = Date.now() - lastAttempt.getTime() > 12 * 60 * 60 * 1000;
-    if (stale) {
-      return {
-        providerStatus: "stale",
-        lastAttemptAt: lastAttempt.toISOString(),
-        enabledSources,
-        sourcesWithErrors,
-        refreshAction: "retry_later",
-        message: "La pipeline news non aggiorna da diverse ore: verifica cron e provider se il feed resta fermo.",
-      };
-    }
-
-    return {
-      providerStatus: "ready",
-      lastAttemptAt: lastAttempt.toISOString(),
-      enabledSources,
-      sourcesWithErrors,
-      refreshAction: "wait_for_next_refresh",
-      message: "Le fonti news risultano attive; il feed si aggiornera al prossimo ciclo utile.",
-    };
-  } catch {
-    return {
-      providerStatus: "unavailable",
-      lastAttemptAt: null,
-      enabledSources: 0,
-      sourcesWithErrors: 0,
-      refreshAction: "retry_later",
-      message: "Non riesco a leggere lo stato delle fonti news in questo momento.",
-    };
-  }
-}
-
 async function sendNewsUnavailable(res: Response) {
-  sendNewsUnavailableWithDiagnostics(res, await buildNewsDiagnostics());
+  sendNewsUnavailableWithDiagnostics(res, await buildNewsProviderDiagnostics());
 }
 
 function newsSearchWhere(search: string): SQL<unknown> | undefined {
@@ -439,7 +343,7 @@ router.get("/", async (req, res) => {
       const cached = await cacheGet<ReturnType<typeof mapNewsItem>[]>(cacheKey);
       if (cached && cached.length > 0 && !isStaleMappedNewsItem(cached[0])) {
         const status = newsStatus(cached.length);
-        const diagnostics = status === "empty" ? await buildNewsDiagnostics() : undefined;
+        const diagnostics = status === "empty" ? await buildNewsProviderDiagnostics() : undefined;
         if (diagnostics && isTotalProviderFailure(diagnostics)) {
           sendNewsUnavailableWithDiagnostics(res, diagnostics);
           return;
@@ -560,7 +464,7 @@ router.get("/sector/:sectorName", async (req, res) => {
       : null;
 
     const status = newsStatus(mapped.length);
-    const diagnostics = status === "empty" ? await buildNewsDiagnostics() : undefined;
+    const diagnostics = status === "empty" ? await buildNewsProviderDiagnostics() : undefined;
     if (diagnostics && isTotalProviderFailure(diagnostics)) {
       sendNewsUnavailableWithDiagnostics(res, diagnostics);
       return;

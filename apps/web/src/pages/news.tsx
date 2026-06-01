@@ -8,7 +8,7 @@ import { deleteJson, getJson, postJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, BellOff, Bookmark, BookmarkCheck, Clock, ExternalLink, Newspaper, RefreshCw, Sparkles, Tag } from "lucide-react";
+import { AlertCircle, Bell, BellOff, Bookmark, BookmarkCheck, Clock, ExternalLink, Newspaper, RefreshCw, Sparkles, Tag } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "wouter";
@@ -47,6 +47,7 @@ interface NewsFeedResponse {
       | "configure_sources"
       | "retry_later";
     message: string;
+    lastRefreshError?: string;
   };
 }
 
@@ -69,6 +70,21 @@ const DIAGNOSTIC_ACTION_LABELS: Record<NonNullable<NewsFeedResponse["diagnostics
   configure_sources: "Configura le fonti news",
   retry_later: "Riprova tra poco",
 };
+
+const DIAGNOSTIC_STATUS_LABELS: Record<NonNullable<NewsFeedResponse["diagnostics"]>["providerStatus"], string> = {
+  ready: "Fonti operative",
+  degraded: "Fonti degradate",
+  never_run: "Mai eseguito",
+  stale: "Feed fermo",
+  not_configured: "Fonti da configurare",
+  unavailable: "Stato non disponibile",
+};
+
+function diagnosticTone(status: NonNullable<NewsFeedResponse["diagnostics"]>["providerStatus"]) {
+  if (status === "ready") return "border-success-muted bg-success-surface text-success";
+  if (status === "degraded" || status === "stale") return "border-warning-muted bg-warning-surface text-warning";
+  return "border-destructive/25 bg-destructive/10 text-destructive";
+}
 
 function readDiagnosticsFromError(error: unknown): NewsFeedResponse["diagnostics"] | undefined {
   if (!error || typeof error !== "object") return undefined;
@@ -101,26 +117,54 @@ function CategoryFallbackImage({ category, emoji }: { category: string; emoji: s
 
 function NewsDiagnosticsPanel({ diagnostics }: { diagnostics: NonNullable<NewsFeedResponse["diagnostics"]> }) {
   const { t } = useTranslation();
+  const tone = diagnosticTone(diagnostics.providerStatus);
 
   return (
-    <div className="mx-auto mt-5 max-w-lg rounded-2xl border border-primary/15 bg-primary/5 px-5 py-4 text-left">
-      <p className="text-sm font-medium text-foreground">
-        {diagnostics.message}
-      </p>
-      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-        <span className="rounded-full bg-background px-2.5 py-1">
-          {t(`news.diagnostics.${diagnostics.refreshAction}`, {
-            defaultValue: DIAGNOSTIC_ACTION_LABELS[diagnostics.refreshAction],
-          })}
-        </span>
-        {diagnostics.lastAttemptAt && (
-          <span>
-            {t("news.diagnostics.lastAttempt", {
-              defaultValue: "Ultimo tentativo",
-            })}: {new Date(diagnostics.lastAttemptAt).toLocaleString("it-IT")}
-          </span>
-        )}
+    <div className={cn("mx-auto mt-5 max-w-xl rounded-2xl border px-5 py-4 text-left", tone)} role="status">
+      <div className="flex items-start gap-3">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-background/70 px-2.5 py-1 text-xs font-semibold">
+              {t(`news.diagnostics.status.${diagnostics.providerStatus}`, {
+                defaultValue: DIAGNOSTIC_STATUS_LABELS[diagnostics.providerStatus],
+              })}
+            </span>
+            <span className="rounded-full bg-background/70 px-2.5 py-1 text-xs font-medium">
+              {t(`news.diagnostics.${diagnostics.refreshAction}`, {
+                defaultValue: DIAGNOSTIC_ACTION_LABELS[diagnostics.refreshAction],
+              })}
+            </span>
+          </div>
+          <p className="mt-3 text-sm font-medium text-foreground">
+            {diagnostics.message}
+          </p>
+        </div>
       </div>
+
+      <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+        <div className="rounded-lg bg-background/65 px-3 py-2">
+          <p className="text-muted-foreground">{t("news.diagnostics.enabledSources", { defaultValue: "Fonti attive" })}</p>
+          <p className="font-semibold text-foreground">{diagnostics.enabledSources}</p>
+        </div>
+        <div className="rounded-lg bg-background/65 px-3 py-2">
+          <p className="text-muted-foreground">{t("news.diagnostics.sourcesWithErrors", { defaultValue: "Con errori" })}</p>
+          <p className="font-semibold text-foreground">{diagnostics.sourcesWithErrors}</p>
+        </div>
+        <div className="rounded-lg bg-background/65 px-3 py-2">
+          <p className="text-muted-foreground">{t("news.diagnostics.lastAttempt", { defaultValue: "Ultimo tentativo" })}</p>
+          <p className="font-semibold text-foreground">
+            {diagnostics.lastAttemptAt
+              ? new Date(diagnostics.lastAttemptAt).toLocaleString("it-IT")
+              : t("news.diagnostics.noAttempt", { defaultValue: "Non registrato" })}
+          </p>
+        </div>
+      </div>
+      {diagnostics.lastRefreshError && (
+        <p className="mt-3 break-words rounded-lg bg-background/65 px-3 py-2 text-xs font-medium text-foreground">
+          {t("news.diagnostics.lastRefreshError", { defaultValue: "Ultimo errore refresh" })}: {diagnostics.lastRefreshError}
+        </p>
+      )}
     </div>
   );
 }

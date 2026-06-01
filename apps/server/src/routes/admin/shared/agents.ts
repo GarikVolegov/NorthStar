@@ -332,6 +332,7 @@ export function emptyAgentsOverview(days: number, reason?: string) {
         jobSnapshots: { count: 0, status: "blocked_or_empty" },
       },
       latestRuns: [],
+      newsDiagnostics: null,
     },
   };
 }

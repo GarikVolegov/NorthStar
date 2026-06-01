@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAgentControlRoomSnapshot,
   buildAgentConfigBlockers,
   summarizeReadyOutputs,
 } from "./admin-agent-control-room";
@@ -38,5 +39,41 @@ describe("admin agent control room", () => {
       growthArticles: { count: 0, status: "empty" },
       jobSnapshots: { count: 0, status: "blocked_or_empty" },
     });
+  });
+
+  it("includes reusable news provider diagnostics in the control room snapshot", () => {
+    const newsDiagnostics = {
+      status: "ready",
+      providerStatus: "ready",
+      enabledSources: 2,
+      sourcesWithErrors: 0,
+      totalFetched: 18,
+      lastFetchAt: "2026-05-31T08:00:00.000Z",
+      lastAttemptAt: "2026-05-31T08:00:00.000Z",
+      stalenessMs: 0,
+      refreshAction: "wait_for_next_refresh",
+      nextAction: "wait_for_next_refresh",
+      actionLabel: "Attendi prossimo refresh",
+      message: "Ready",
+    } as const;
+
+    const snapshot = buildAgentControlRoomSnapshot({
+      realNews: 12,
+      pendingDiscovery: 0,
+      growthArticles: 2,
+      jobSnapshots: 3,
+      latestNews: [],
+      latestGrowthArticles: [],
+      latestRuns: [],
+      newsDiagnostics,
+    });
+
+    expect(snapshot.readyOutputs.realNews).toMatchObject({
+      count: 12,
+      status: "ready",
+      providerStatus: "ready",
+      diagnostics: newsDiagnostics,
+    });
+    expect(snapshot.newsDiagnostics).toEqual(newsDiagnostics);
   });
 });

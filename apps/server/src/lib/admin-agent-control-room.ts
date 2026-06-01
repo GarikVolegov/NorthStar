@@ -8,6 +8,7 @@ import {
 } from "@workspace/db";
 import { getOpenAIFallbackConfig, PUBLIC_NEWS_SOURCES } from "@workspace/ai-server";
 import { desc, eq, sql } from "drizzle-orm";
+import { buildNewsProviderDiagnostics, type NewsProviderDiagnostics } from "./news-provider-diagnostics";
 
 export type AgentConfigBlocker = {
   key: string;
@@ -26,6 +27,7 @@ export type AgentReadyOutputsInput = {
   jobSnapshots: number;
   latestNews: Array<{ id: number; title: string; source: string; createdAt: Date | string }>;
   latestGrowthArticles: Array<{ id: number; title: string; status: string; createdAt: Date | string }>;
+  newsDiagnostics?: NewsProviderDiagnostics | null;
 };
 
 export function buildAgentConfigBlockers(env: Record<string, string | undefined> = process.env): AgentConfigBlocker[] {
@@ -76,6 +78,12 @@ export function summarizeReadyOutputs(input: AgentReadyOutputsInput) {
       count: input.realNews,
       status: input.realNews > 0 ? "ready" : "empty",
       latest: input.latestNews,
+      ...(input.newsDiagnostics
+        ? {
+            providerStatus: input.newsDiagnostics.providerStatus,
+            diagnostics: input.newsDiagnostics,
+          }
+        : {}),
     },
     pendingDiscovery: {
       count: input.pendingDiscovery,
@@ -90,7 +98,32 @@ export function summarizeReadyOutputs(input: AgentReadyOutputsInput) {
       count: input.jobSnapshots,
       status: input.jobSnapshots > 0 ? "ready" : "blocked_or_empty",
     },
-  } satisfies Record<string, { count: number; status: ReadyOutputStatus; latest?: unknown[] }>;
+  } satisfies Record<string, {
+    count: number;
+    status: ReadyOutputStatus;
+    latest?: unknown[];
+    providerStatus?: NewsProviderDiagnostics["providerStatus"];
+    diagnostics?: NewsProviderDiagnostics;
+  }>;
+}
+
+export function buildAgentControlRoomSnapshot(input: AgentReadyOutputsInput & {
+  latestRuns: Array<{
+    id: number;
+    agentName: string;
+    status: string;
+    startedAt: Date | string;
+    errorMessage: string | null;
+  }>;
+  newsDiagnostics?: NewsProviderDiagnostics | null;
+}) {
+  return {
+    ai: getAiProviderStatus(),
+    configBlockers: buildAgentConfigBlockers(),
+    readyOutputs: summarizeReadyOutputs(input),
+    latestRuns: input.latestRuns,
+    newsDiagnostics: input.newsDiagnostics ?? null,
+  };
 }
 
 export function getAiProviderStatus(env: Record<string, string | undefined> = process.env) {
@@ -115,6 +148,7 @@ export async function buildAgentControlRoom() {
     latestNews,
     latestGrowthArticles,
     latestRuns,
+    newsDiagnostics,
   ] = await Promise.all([
     db
       .select({ count: sql<number>`count(*)::int` })
@@ -162,19 +196,17 @@ export async function buildAgentControlRoom() {
       .from(agentRunsTable)
       .orderBy(desc(agentRunsTable.startedAt))
       .limit(8),
+    buildNewsProviderDiagnostics(),
   ]);
 
-  return {
-    ai: getAiProviderStatus(),
-    configBlockers: buildAgentConfigBlockers(),
-    readyOutputs: summarizeReadyOutputs({
-      realNews: Number(realNewsRows[0]?.count ?? 0),
-      pendingDiscovery: Number(pendingDiscoveryRows[0]?.count ?? 0),
-      growthArticles: Number(growthRows[0]?.count ?? 0),
-      jobSnapshots: Number(jobRows[0]?.count ?? 0),
-      latestNews,
-      latestGrowthArticles,
-    }),
+  return buildAgentControlRoomSnapshot({
+    realNews: Number(realNewsRows[0]?.count ?? 0),
+    pendingDiscovery: Number(pendingDiscoveryRows[0]?.count ?? 0),
+    growthArticles: Number(growthRows[0]?.count ?? 0),
+    jobSnapshots: Number(jobRows[0]?.count ?? 0),
+    latestNews,
+    latestGrowthArticles,
     latestRuns,
-  };
+    newsDiagnostics,
+  });
 }

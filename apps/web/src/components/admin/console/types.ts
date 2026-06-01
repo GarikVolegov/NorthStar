@@ -49,6 +49,29 @@ export type AgentRun = {
   createdAt: string;
 };
 
+export type NewsProviderDiagnostics = {
+  status?: "ready" | "degraded" | "never_run" | "stale" | "not_configured" | "unavailable" | string;
+  providerStatus: "ready" | "degraded" | "never_run" | "stale" | "not_configured" | "unavailable" | string;
+  lastAttemptAt: string | null;
+  lastFetchAt?: string | null;
+  enabledSources: number;
+  sourcesWithErrors: number;
+  totalFetched?: number | null;
+  stalenessMs?: number | null;
+  refreshAction:
+    | "wait_for_next_refresh"
+    | "wait_for_startup_pipeline"
+    | "check_provider_keys"
+    | "configure_sources"
+    | "retry_later"
+    | string;
+  nextAction?: string;
+  actionLabel?: string;
+  message: string;
+  lastRefreshError?: string | null;
+  lastError?: string | null;
+};
+
 export type AgentsOverview = {
   generatedAt: string;
   persistenceUnavailable?: boolean;
@@ -145,6 +168,7 @@ export type AgentsOverview = {
       startedAt: string;
       errorMessage: string | null;
     }>;
+    newsDiagnostics?: NewsProviderDiagnostics | null;
   };
   runnablePipelines?: Array<{
     key: string;

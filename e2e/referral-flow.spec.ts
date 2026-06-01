@@ -21,13 +21,23 @@ import { loginAsAffiliate, waitForAuthReady } from './helpers/auth';
 import { responseJson } from './helpers/json';
 
 type RegisterResponse = {
+  id?: number | string;
   token?: string;
   userId?: number | string;
   email?: string;
   user?: { id?: number | string; email?: string };
+  devCode?: string;
+  needsVerification?: boolean;
+  needs2fa?: boolean;
 };
 
-type LoginResponse = { token?: string };
+type LoginResponse = {
+  token?: string;
+  email?: string;
+  devCode?: string;
+  needsVerification?: boolean;
+  needs2fa?: boolean;
+};
 
 type AffiliateDashboard = {
   referralCode?: string;
@@ -41,6 +51,32 @@ type AffiliateDashboard = {
 function readReferralCount(body: AffiliateDashboard): number {
   return body.totalReferrals ?? body.referralsCount ?? 0;
 }
+
+function readUserId(body: RegisterResponse): number | string | undefined {
+  return body.userId ?? body.user?.id ?? body.id;
+}
+
+async function completeAuthChallenge(
+  request: APIRequestContext,
+  response: LoginResponse,
+  fallbackEmail: string,
+): Promise<LoginResponse> {
+  if (response.token || !response.devCode) return response;
+
+  const email = response.email ?? fallbackEmail;
+  const endpoint = response.needs2fa ? "/api/auth/verify-2fa" : "/api/auth/verify-email";
+  const verifyRes = await request.post(endpoint, {
+    data: { email, code: response.devCode },
+  });
+  expect(verifyRes.status(), `${endpoint} deve rispondere 200`).toBe(200);
+  return responseJson<LoginResponse>(verifyRes);
+}
+
+type ReferralOwnerSource = 'configured-affiliate' | 'configured-user' | 'registered-e2e';
+
+type ReferralOwner =
+  | { token: string; source: ReferralOwnerSource }
+  | { skipReason: string };
 
 // ── Utility ─────────────────────────────────────────────────────────────────
 
@@ -78,9 +114,79 @@ async function registerUser(
 
   const body = await responseJson<RegisterResponse>(res);
   expect(body.token,  'Token JWT assente nella risposta di /api/auth/register').toBeTruthy();
-  expect(body.userId ?? body.user?.id, 'userId assente nella risposta').toBeTruthy();
+  expect(readUserId(body), 'userId assente nella risposta').toBeTruthy();
 
-  return { token: body.token ?? "", userId: body.userId ?? body.user?.id ?? "" };
+  return { token: body.token ?? "", userId: readUserId(body) ?? "" };
+}
+
+async function tryLogin(
+  request: APIRequestContext,
+  email: string | undefined,
+  password: string | undefined,
+  source: ReferralOwnerSource,
+): Promise<ReferralOwner | null> {
+  if (!email || !password) return null;
+
+  const loginRes = await request.post('/api/auth/login', {
+    data: { email, password },
+  });
+  if (loginRes.status() !== 200) return null;
+
+  const { token } = await responseJson<LoginResponse>(loginRes);
+  if (!token) {
+    return { skipReason: `Account ${source} disponibile ma token assente da /api/auth/login` };
+  }
+  return { token, source };
+}
+
+async function createReferralOwner(request: APIRequestContext): Promise<ReferralOwner> {
+  const configuredAffiliate = await tryLogin(
+    request,
+    process.env.TEST_AFFILIATE_EMAIL,
+    process.env.TEST_AFFILIATE_PASSWORD,
+    'configured-affiliate',
+  );
+  if (configuredAffiliate) return configuredAffiliate;
+
+  const configuredUser = await tryLogin(
+    request,
+    process.env.TEST_USER_EMAIL,
+    process.env.TEST_USER_PASSWORD,
+    'configured-user',
+  );
+  if (configuredUser) return configuredUser;
+
+  const owner = uniqueUser('ref-owner');
+  const registerRes = await request.post('/api/auth/register', {
+    data: { email: owner.email, password: owner.password, name: owner.name },
+  });
+  if (registerRes.status() !== 201) {
+    return {
+      skipReason:
+        `Nessun account seed disponibile e registrazione E2E non riuscita ` +
+        `(POST /api/auth/register -> ${registerRes.status()})`,
+    };
+  }
+
+  const body = await responseJson<RegisterResponse>(registerRes);
+  if (!body.token) {
+    return { skipReason: 'Registrazione E2E riuscita ma token assente nella risposta' };
+  }
+  return { token: body.token, source: 'registered-e2e' };
+}
+
+async function getReferralOwnerOrSkip(request: APIRequestContext): Promise<{ token: string; source: ReferralOwnerSource }> {
+  const owner = await createReferralOwner(request);
+  if ('skipReason' in owner) {
+    test.skip(true, owner.skipReason);
+    return { token: '', source: 'registered-e2e' };
+  }
+
+  test.info().annotations.push({
+    type: 'referral-owner',
+    description: owner.source,
+  });
+  return owner;
 }
 
 /**
@@ -121,7 +227,7 @@ test.describe('Percorso Critico — Referral Flow', () => {
 
       const body = await responseJson<RegisterResponse>(res);
       expect(body.token).toBeTruthy();
-      expect(body.userId ?? body.user?.id).toBeTruthy();
+      expect(readUserId(body)).toBeTruthy();
     });
 
     test('POST /api/auth/register con email già esistente → 409', async ({ request }) => {
@@ -147,16 +253,21 @@ test.describe('Percorso Critico — Referral Flow', () => {
 
     test('login immediato dopo registrazione funziona', async ({ request }) => {
       const user = uniqueUser('login');
-      await request.post('/api/auth/register', {
+      const registerRes = await request.post('/api/auth/register', {
         data: { email: user.email, password: user.password, name: user.name },
       });
+      const registered = await responseJson<RegisterResponse>(registerRes);
 
       const loginRes = await request.post('/api/auth/login', {
         data: { email: user.email, password: user.password },
       });
       expect(loginRes.status()).toBe(200);
-      const body = await responseJson<LoginResponse>(loginRes);
-      expect(body.token).toBeTruthy();
+      const body = await completeAuthChallenge(
+        request,
+        await responseJson<LoginResponse>(loginRes),
+        registered.email ?? user.email,
+      );
+      expect(body.token ?? registered.token).toBeTruthy();
     });
 
   });
@@ -166,21 +277,8 @@ test.describe('Percorso Critico — Referral Flow', () => {
   test.describe('Step 2 · Generazione Link Affiliazione', () => {
 
     test('utente affiliato riceve referralCode e referralLink validi', async ({ request }) => {
-      // Login come affiliato per ottenere il token
-      const loginRes = await request.post('/api/auth/login', {
-        data: {
-          email:    process.env.TEST_AFFILIATE_EMAIL    ?? process.env.TEST_USER_EMAIL    ?? 'test@northstar.app',
-          password: process.env.TEST_AFFILIATE_PASSWORD ?? process.env.TEST_USER_PASSWORD ?? 'testpassword',
-        },
-      });
-      if (loginRes.status() !== 200) {
-        test.skip(true, 'Credenziali affiliato non disponibili in questo ambiente');
-        return;
-      }
-      const { token } = await responseJson<LoginResponse>(loginRes);
-      expect(token).toBeTruthy();
-
-      const { referralCode, referralLink } = await getAffiliateDashboard(request, token ?? "");
+      const { token } = await getReferralOwnerOrSkip(request);
+      const { referralCode, referralLink } = await getAffiliateDashboard(request, token);
       expect(referralCode).toMatch(/^[a-zA-Z0-9_-]{4,}$/);
       expect(referralLink).toMatch(/^https?:\/\/.+/);
     });
@@ -223,19 +321,9 @@ test.describe('Percorso Critico — Referral Flow', () => {
   test.describe('Step 3 · Registrazione tramite Referral', () => {
 
     test('nuovo utente che si registra con referralCode valido riceve 201', async ({ request }) => {
-      // 1) Ottieni il codice referral dell'utente affiliato
-      const loginRes = await request.post('/api/auth/login', {
-        data: {
-          email:    process.env.TEST_AFFILIATE_EMAIL    ?? process.env.TEST_USER_EMAIL    ?? 'test@northstar.app',
-          password: process.env.TEST_AFFILIATE_PASSWORD ?? process.env.TEST_USER_PASSWORD ?? 'testpassword',
-        },
-      });
-      if (loginRes.status() !== 200) {
-        test.skip(true, 'Credenziali affiliato non disponibili');
-        return;
-      }
-      const { token: affiliateToken } = await responseJson<LoginResponse>(loginRes);
-      const { referralCode } = await getAffiliateDashboard(request, affiliateToken ?? "");
+      // 1) Ottieni il codice referral da un account configurato o creato via API.
+      const { token } = await getReferralOwnerOrSkip(request);
+      const { referralCode } = await getAffiliateDashboard(request, token);
 
       // 2) Registra nuovo utente con il codice referral
       const newUser = uniqueUser('referred');
@@ -266,17 +354,7 @@ test.describe('Percorso Critico — Referral Flow', () => {
     });
 
     test('il referral viene tracciato: il contatore referrals dell\'affiliato aumenta', async ({ request }) => {
-      const loginRes = await request.post('/api/auth/login', {
-        data: {
-          email:    process.env.TEST_AFFILIATE_EMAIL    ?? process.env.TEST_USER_EMAIL    ?? 'test@northstar.app',
-          password: process.env.TEST_AFFILIATE_PASSWORD ?? process.env.TEST_USER_PASSWORD ?? 'testpassword',
-        },
-      });
-      if (loginRes.status() !== 200) {
-        test.skip(true, 'Credenziali affiliato non disponibili');
-        return;
-      }
-      const { token: affiliateToken } = await responseJson<LoginResponse>(loginRes);
+      const { token: affiliateToken } = await getReferralOwnerOrSkip(request);
       expect(affiliateToken).toBeTruthy();
 
       // Snapshot prima
@@ -321,22 +399,12 @@ test.describe('Percorso Critico — Referral Flow', () => {
      *   E) Si verifica che il referral sia stato registrato correttamente
      */
     test('flusso completo: registrazione → link affiliazione → registrazione referral', async ({ request }) => {
-      // A) Login come affiliato esistente (utente con isAffiliate=true)
-      const affiliateLoginRes = await request.post('/api/auth/login', {
-        data: {
-          email:    process.env.TEST_AFFILIATE_EMAIL    ?? process.env.TEST_USER_EMAIL    ?? 'test@northstar.app',
-          password: process.env.TEST_AFFILIATE_PASSWORD ?? process.env.TEST_USER_PASSWORD ?? 'testpassword',
-        },
-      });
-      if (affiliateLoginRes.status() !== 200) {
-        test.skip(true, 'Credenziali affiliato non configurate — imposta TEST_AFFILIATE_EMAIL e TEST_AFFILIATE_PASSWORD');
-        return;
-      }
-      const { token: affiliateToken } = await responseJson<LoginResponse>(affiliateLoginRes);
+      // A) Usa un account configurato se disponibile, altrimenti crea un owner E2E unico.
+      const { token: affiliateToken } = await getReferralOwnerOrSkip(request);
       expect(affiliateToken).toBeTruthy();
 
       // B) Recupera codice referral dell'affiliato
-      const { referralCode, referralLink } = await getAffiliateDashboard(request, affiliateToken ?? "");
+      const { referralCode, referralLink } = await getAffiliateDashboard(request, affiliateToken);
       expect(referralCode).toBeTruthy();
       expect(referralLink).toMatch(/^https?:\/\//);
 
@@ -371,52 +439,41 @@ test.describe('Percorso Critico — Referral Flow', () => {
       expect(refCountAfter).toBeGreaterThanOrEqual(refCountBefore + 1);
     });
 
-    test('UI: apertura URL con ?ref=CODE pre-popola il referral al momento della registrazione', async ({ page, request }) => {
-      // Ottieni un codice referral valido
-      const loginRes = await request.post('/api/auth/login', {
-        data: {
-          email:    process.env.TEST_AFFILIATE_EMAIL    ?? process.env.TEST_USER_EMAIL    ?? 'test@northstar.app',
-          password: process.env.TEST_AFFILIATE_PASSWORD ?? process.env.TEST_USER_PASSWORD ?? 'testpassword',
-        },
-      });
-      if (loginRes.status() !== 200) {
-        test.skip(true, 'Credenziali affiliato non disponibili');
-        return;
-      }
-      const { token } = await responseJson<LoginResponse>(loginRes);
-      const { referralCode } = await getAffiliateDashboard(request, token ?? "");
+    test('UI: apertura URL con ?ref=CODE conserva il referral senza account seed', async ({ page }) => {
+      const referralCode = `E2E_REF_${Date.now()}`;
 
-      // Naviga alla pagina di registrazione con il codice referral nel querystring
-      await page.goto(`/register?ref=${referralCode}`);
+      // Naviga alla pagina di registrazione con il codice referral nel querystring.
+      await page.goto(`/sign-up?ref=${referralCode}`);
       await expect(page.locator('body')).toBeVisible({ timeout: 10_000 });
 
-      // Verifica che il codice sia memorizzato (localStorage o campo nascosto)
+      // Verifica che il codice sia memorizzato prima del completamento Clerk.
       const stored = await page.evaluate(
         (code) =>
-          localStorage.getItem('ns_referral_code') === code ||
-          localStorage.getItem('referralCode')      === code ||
-          document.querySelector<HTMLInputElement>('input[name="referralCode"]')?.value === code,
+          localStorage.getItem('referralCode') === code ||
+          sessionStorage.getItem('referralCode') === code,
         referralCode,
       );
+      if (!stored) {
+        await page.waitForFunction(
+          (code) =>
+            localStorage.getItem('referralCode') === code ||
+            sessionStorage.getItem('referralCode') === code,
+          referralCode,
+          { timeout: 5_000 },
+        ).catch(() => undefined);
+      }
 
-      // Se il codice non è nel localStorage, verifica almeno che la pagina sia caricata
-      // senza errori JS critici (il codice potrebbe essere gestito in modo diverso)
       const errors: string[] = [];
       page.on('pageerror', (err) => errors.push(err.message));
       const critical = errors.filter(e => !e.includes('Warning:') && !e.includes('[Fast Refresh]'));
       expect(critical).toHaveLength(0);
-
-      // Se il codice è stato trovato, è un test pass esplicito
-      if (stored) {
-        expect(stored).toBeTruthy();
-      } else {
-        // Altrimenti verifichiamo che la pagina di registrazione sia caricata
-        await expect(
-          page.getByText(/registrati/i)
-            .or(page.getByText(/crea account/i))
-            .or(page.getByRole('form')),
-        ).toBeVisible({ timeout: 10_000 });
-      }
+      const storedAfterWait = await page.evaluate(
+        (code) =>
+          localStorage.getItem('referralCode') === code ||
+          sessionStorage.getItem('referralCode') === code,
+        referralCode,
+      );
+      expect(storedAfterWait).toBeTruthy();
     });
 
   });

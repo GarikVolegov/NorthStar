@@ -60,6 +60,26 @@ type AgentsSectionProps = {
   ) => void;
 };
 
+function newsProviderStatusClass(status: string) {
+  if (status === "ready") return "bg-success-surface text-success";
+  if (status === "degraded" || status === "stale") {
+    return "bg-warning-surface text-warning";
+  }
+  if (status === "not_configured" || status === "unavailable") {
+    return "bg-danger-surface text-danger";
+  }
+  return "bg-muted text-muted-foreground";
+}
+
+function newsProviderActionLabel(action: string) {
+  if (action === "wait_for_next_refresh") return "Attendi prossimo refresh";
+  if (action === "wait_for_startup_pipeline") return "Avvia pipeline news";
+  if (action === "check_provider_keys") return "Controlla chiavi provider";
+  if (action === "configure_sources") return "Configura fonti news";
+  if (action === "retry_later") return "Riprova piu tardi";
+  return action;
+}
+
 export function AgentsSection({
   data,
   loading,
@@ -106,6 +126,9 @@ export function AgentsSection({
     }) ?? [];
   const pipelines = data?.runnablePipelines ?? [];
   const advancedAgents = data?.advancedRunnableAgents ?? data?.runnableAgents ?? [];
+  const hasNewsLaunch =
+    pipelines.some((pipeline) => pipeline.key === "news-publishing") ||
+    advancedAgents.some((agent) => agent.key === "news-research");
   const pipelineIcon = (key: string) => {
     if (key === "news-publishing") return Newspaper;
     if (key === "growth-research-review") return FileText;
@@ -261,7 +284,7 @@ export function AgentsSection({
           {tab === "overview" && (
             <div className="space-y-3">
               {data.controlRoom && (
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 xl:grid-cols-4 gap-3">
                   <div className="border rounded-xl p-4 bg-card">
                     <div className="flex items-center justify-between gap-2">
                       <h4 className="font-semibold">Risultati pronti</h4>
@@ -319,6 +342,143 @@ export function AgentsSection({
                         ))}
                       </div>
                     )}
+                  </div>
+                  <div className="border rounded-xl p-4 bg-card">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h4 className="font-semibold">Provider news</h4>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Stato fetch e fonti pubbliche
+                        </p>
+                      </div>
+                      {data.controlRoom.newsDiagnostics ? (
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "shrink-0 text-xs",
+                            newsProviderStatusClass(
+                              data.controlRoom.newsDiagnostics.providerStatus,
+                            ),
+                          )}
+                        >
+                          {data.controlRoom.newsDiagnostics.providerStatus}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="shrink-0 text-xs">
+                          n/d
+                        </Badge>
+                      )}
+                    </div>
+
+                    {data.controlRoom.newsDiagnostics ? (
+                      <>
+                        <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">
+                              Fonti abilitate
+                            </p>
+                            <p className="font-semibold">
+                              {data.controlRoom.newsDiagnostics.enabledSources}
+                            </p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">
+                              Fonti in errore
+                            </p>
+                            <p
+                              className={cn(
+                                "font-semibold",
+                                data.controlRoom.newsDiagnostics
+                                  .sourcesWithErrors > 0 && "text-danger",
+                              )}
+                            >
+                              {
+                                data.controlRoom.newsDiagnostics
+                                  .sourcesWithErrors
+                              }
+                            </p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">
+                              Ultimo fetch
+                            </p>
+                            <p className="truncate font-semibold">
+                              {data.controlRoom.newsDiagnostics.lastAttemptAt
+                                ? fmtShortDate(
+                                    data.controlRoom.newsDiagnostics
+                                      .lastAttemptAt,
+                                  )
+                                : "Mai"}
+                            </p>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs text-muted-foreground">
+                              Totale fetched
+                            </p>
+                            <p className="font-semibold">
+                              {data.controlRoom.newsDiagnostics.totalFetched ??
+                                "N/D"}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="mt-3 space-y-2 text-xs">
+                          <p className="break-words text-muted-foreground">
+                            {data.controlRoom.newsDiagnostics.message}
+                          </p>
+                          {(data.controlRoom.newsDiagnostics.lastRefreshError ||
+                            data.controlRoom.newsDiagnostics.lastError) && (
+                            <p className="break-words text-danger">
+                              {data.controlRoom.newsDiagnostics
+                                .lastRefreshError ||
+                                data.controlRoom.newsDiagnostics.lastError}
+                            </p>
+                          )}
+                          <Badge variant="outline" className="max-w-full text-xs">
+                            <span className="min-w-0 truncate">
+                              {newsProviderActionLabel(
+                                data.controlRoom.newsDiagnostics.refreshAction,
+                              )}
+                            </span>
+                          </Badge>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="mt-4 text-sm text-muted-foreground">
+                        Diagnostica provider news non disponibile in questo
+                        snapshot.
+                      </p>
+                    )}
+
+                    <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onRefresh}
+                        disabled={loading}
+                        className="min-h-10"
+                      >
+                        <RefreshCw
+                          className={cn(
+                            "h-4 w-4 mr-2",
+                            loading && "animate-spin",
+                          )}
+                        />
+                        Aggiorna
+                      </Button>
+                      {hasNewsLaunch && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onTabChange("launch")}
+                          className="min-h-10"
+                        >
+                          <Play className="h-4 w-4 mr-2" />
+                          Pipeline
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}

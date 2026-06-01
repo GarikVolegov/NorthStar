@@ -46,12 +46,12 @@ const publishedRows = [
     summary: "Le imprese italiane cercano profili software e competenze digitali.",
     imageUrl: null,
     content: "Dettaglio",
-    publishedAt: new Date("2026-05-30T10:00:00.000Z"),
+    publishedAt: new Date("2026-06-01T10:00:00.000Z"),
     sectorNames: ["Tecnologia & Software"],
     category: "tech_lavoro",
     relevanceScore: 0.7,
     searchQuery: "lavoro tecnologia software competenze digitali Italia",
-    createdAt: new Date("2026-05-30T10:10:00.000Z"),
+    createdAt: new Date("2026-06-01T10:10:00.000Z"),
   },
   {
     id: 11,
@@ -63,12 +63,12 @@ const publishedRows = [
     summary: "La sanita italiana assume nuovi profili e investe in formazione.",
     imageUrl: null,
     content: "Dettaglio",
-    publishedAt: new Date("2026-05-29T09:00:00.000Z"),
+    publishedAt: new Date("2026-06-01T09:00:00.000Z"),
     sectorNames: ["Sanita & Life Sciences"],
     category: "sanita_lavoro",
     relevanceScore: 0.66,
     searchQuery: "lavoro sanita life sciences professioni Italia",
-    createdAt: new Date("2026-05-29T09:10:00.000Z"),
+    createdAt: new Date("2026-06-01T09:10:00.000Z"),
   },
 ];
 
@@ -158,6 +158,7 @@ describe("news routes", () => {
         enabled: true,
         lastFetchAt: new Date("2026-05-31T08:00:00.000Z"),
         lastError: null,
+        totalFetched: 7,
       },
       {
         name: "Tavily lavoro",
@@ -165,6 +166,7 @@ describe("news routes", () => {
         enabled: true,
         lastFetchAt: null,
         lastError: "rate limit",
+        totalFetched: 0,
       },
     ]);
 
@@ -177,11 +179,17 @@ describe("news routes", () => {
       source: "live",
       status: "empty",
       diagnostics: {
+        status: "degraded",
         providerStatus: "degraded",
         enabledSources: 2,
         sourcesWithErrors: 1,
+        totalFetched: 7,
+        lastFetchAt: "2026-05-31T08:00:00.000Z",
         lastAttemptAt: "2026-05-31T08:00:00.000Z",
+        stalenessMs: expect.any(Number),
         refreshAction: "check_provider_keys",
+        nextAction: "check_provider_keys",
+        actionLabel: expect.any(String),
       },
     });
   });

@@ -35,6 +35,23 @@ function agentRunSnapshot(id: number, input: AgentRunSnapshotInput) {
   };
 }
 
+function stableNewsDiagnostics() {
+  return {
+    status: "ready",
+    providerStatus: "ready",
+    enabledSources: 1,
+    sourcesWithErrors: 0,
+    totalFetched: 10,
+    lastFetchAt: "2026-06-01T08:00:00.000Z",
+    lastAttemptAt: "2026-06-01T08:00:00.000Z",
+    stalenessMs: 0,
+    refreshAction: "wait_for_next_refresh",
+    nextAction: "wait_for_next_refresh",
+    actionLabel: "Attendi prossimo refresh",
+    message: "Ready",
+  } as const;
+}
+
 describe("admin runnable pipelines", () => {
   it("exposes task-oriented pipelines without atomic agents as primary actions", () => {
     expect(RUNNABLE_PIPELINES.map((pipeline) => pipeline.key)).toEqual([
@@ -70,6 +87,7 @@ describe("admin runnable pipelines", () => {
           order.push("publisher");
           return { transferred: 4, seeded: 0, missingCoverage: [], durationMs: 100 };
         }),
+        loadNewsProviderDiagnostics: vi.fn(async () => stableNewsDiagnostics()),
         writeAgentRunSnapshot,
       },
     });
@@ -82,6 +100,51 @@ describe("admin runnable pipelines", () => {
       inputSummary: JSON.stringify({ sectorNames: ["Economia"] }),
     }));
     expect(result).toMatchObject({ ok: true, runId: 41, added: 4 });
+  });
+
+  it("returns news provider diagnostics before and after a manual publishing pipeline", async () => {
+    const before = {
+      status: "stale",
+      providerStatus: "stale",
+      enabledSources: 2,
+      sourcesWithErrors: 0,
+      totalFetched: 12,
+      lastFetchAt: "2026-05-30T08:00:00.000Z",
+      lastAttemptAt: "2026-05-30T08:00:00.000Z",
+      refreshAction: "retry_later",
+      nextAction: "retry_later",
+      actionLabel: "Riprova piu tardi",
+      message: "Stale",
+    };
+    const after = {
+      ...before,
+      status: "ready",
+      providerStatus: "ready",
+      totalFetched: 17,
+      lastFetchAt: "2026-05-31T08:00:00.000Z",
+      lastAttemptAt: "2026-05-31T08:00:00.000Z",
+      refreshAction: "wait_for_next_refresh",
+      nextAction: "wait_for_next_refresh",
+      actionLabel: "Attendi prossimo refresh",
+      message: "Ready",
+    };
+
+    const result = await runNewsPublishingPipeline({
+      body: {},
+      startedAt: new Date("2026-05-26T10:00:00Z"),
+      deps: {
+        loadNewsProviderDiagnostics: vi.fn()
+          .mockResolvedValueOnce(before)
+          .mockResolvedValueOnce(after),
+        runCollector: vi.fn(async () => ({ totalCollected: 12, totalInserted: 8, bySource: {}, errors: [], durationMs: 100 })),
+        runEnricher: vi.fn(async () => ({ processed: 6, enriched: 6, skipped: 0, filtered: 0, retried: 0, durationMs: 100, errors: [] })),
+        runNewsPublisher: vi.fn(async () => ({ transferred: 4, seeded: 0, missingCoverage: [], durationMs: 100 })),
+        writeAgentRunSnapshot: vi.fn(async (input: AgentRunSnapshotInput) => agentRunSnapshot(46, input)),
+      },
+    });
+
+    expect(result.providerDiagnosticsBefore).toEqual(before);
+    expect(result.providerDiagnostics).toEqual(after);
   });
 
   it("returns actionable news source diagnostics for empty provider results", async () => {
@@ -109,6 +172,7 @@ describe("admin runnable pipelines", () => {
           })),
           runEnricher: vi.fn(async () => ({ processed: 0, enriched: 0, skipped: 0, filtered: 0, retried: 0, durationMs: 100, errors: [] })),
           runNewsPublisher: vi.fn(async () => ({ transferred: 0, seeded: 0, missingCoverage: [], durationMs: 100 })),
+          loadNewsProviderDiagnostics: vi.fn(async () => stableNewsDiagnostics()),
           writeAgentRunSnapshot: vi.fn(async (input: AgentRunSnapshotInput) => agentRunSnapshot(45, input)),
         },
       });
@@ -151,6 +215,7 @@ describe("admin runnable pipelines", () => {
         runCollector: vi.fn(async () => {
           throw new Error("collector down");
         }),
+        loadNewsProviderDiagnostics: vi.fn(async () => stableNewsDiagnostics()),
         writeAgentRunSnapshot,
       },
     });

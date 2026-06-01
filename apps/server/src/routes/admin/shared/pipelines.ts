@@ -19,6 +19,10 @@ import {
   RUNNABLE_PIPELINES,
   writeAgentRunSnapshot,
 } from "./agents";
+import {
+  buildNewsProviderDiagnostics,
+  type NewsProviderDiagnostics,
+} from "../../../lib/news-provider-diagnostics";
 
 export { RUNNABLE_PIPELINES };
 
@@ -40,6 +44,10 @@ type NewsSourceDiagnostic = {
   lastError: string | null;
   action: string;
 };
+
+async function loadDefaultNewsProviderDiagnostics(): Promise<NewsProviderDiagnostics> {
+  return buildNewsProviderDiagnostics();
+}
 
 function compactJson(value: unknown, max = 1000): string {
   return JSON.stringify(value).slice(0, max);
@@ -145,6 +153,7 @@ export async function runNewsPublishingPipeline({
     runCollector: typeof runCollector;
     runEnricher: typeof runEnricher;
     runNewsPublisher: typeof runNewsPublisher;
+    loadNewsProviderDiagnostics: () => Promise<NewsProviderDiagnostics | null>;
     writeAgentRunSnapshot: AgentRunWriter;
   }>;
 }): Promise<PipelineResponse> {
@@ -152,13 +161,16 @@ export async function runNewsPublishingPipeline({
   const collect = deps.runCollector ?? runCollector;
   const enrich = deps.runEnricher ?? runEnricher;
   const publish = deps.runNewsPublisher ?? runNewsPublisher;
+  const loadProviderDiagnostics = deps.loadNewsProviderDiagnostics ?? loadDefaultNewsProviderDiagnostics;
   const writeRun = deps.writeAgentRunSnapshot ?? writeAgentRunSnapshot;
+  const providerDiagnosticsBefore = await loadProviderDiagnostics();
 
   let collector: Awaited<ReturnType<typeof runCollector>>;
   try {
     collector = await collect();
   } catch (err) {
     const warnings = [`collector: ${warningText(err)}`];
+    const providerDiagnostics = await loadProviderDiagnostics();
     const run = await writeRun({
       agentName: "news-publishing",
       taskType: "manual_pipeline_run",
@@ -168,7 +180,14 @@ export async function runNewsPublishingPipeline({
       outputSummary: compactJson({ warnings }),
       errorMessage: warnings.join(" | "),
     });
-    return { ok: false, runId: run.id, warnings, error: String(err) };
+    return {
+      ok: false,
+      runId: run.id,
+      warnings,
+      error: String(err),
+      providerDiagnosticsBefore,
+      providerDiagnostics,
+    };
   }
   let enricher: Awaited<ReturnType<typeof runEnricher>> | null = null;
   try {
@@ -189,6 +208,7 @@ export async function runNewsPublishingPipeline({
   }
 
   const output = { collector, enricher, publisher, warnings };
+  const providerDiagnostics = await loadProviderDiagnostics();
   const sourceDiagnostics = buildNewsSourceDiagnostics(collector);
   const status =
     warnings.length && !collector.totalInserted && !publisher?.transferred
@@ -212,6 +232,8 @@ export async function runNewsPublishingPipeline({
     collector,
     enricher,
     publisher,
+    providerDiagnosticsBefore,
+    providerDiagnostics,
     sourceDiagnostics,
     warnings,
   };
