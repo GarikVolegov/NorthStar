@@ -47,7 +47,7 @@ const PHASE_ITEMS: Record<NavPhase, MobileNavItem[]> = {
   ],
   indeciso: [
     { href: "/dashboard", label: NAV_LABELS.northStar, brand: true },
-    { href: "/test", icon: FlaskConical, label: NAV_LABELS.test },
+    { href: "/bussola", icon: Compass, label: NAV_LABELS.bussola },
     { href: "/settori", icon: Layers, label: NAV_LABELS.aree },
     { href: "/ruoli", icon: Briefcase, label: NAV_LABELS.lavori },
     GROWTH_NAV_ITEM,

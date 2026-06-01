@@ -69,8 +69,9 @@ export function JourneyToolsSection({
   // Set indeciso bandizzato (Ondata 1 — Discovery Engine adattivo).
   // Ordine: dal meno impegnativo al più impegnativo.
   const INDECISO_FULL: ToolItem[] = [
+    { href: "/bussola",               icon: Compass,        title: "La Bussola",             desc: "Il tuo hub: scopri cosa ti muove e avanza verso una direzione", badge: "Inizia qui" },
     { href: "/mood",                  icon: HeartHandshake, title: "Mood check-in",          desc: "60s: dimmi come stai, ti suggerisco UNA cosa da fare", badge: "60s" },
-    { href: "/diario?mode=indizi",    icon: Compass,        title: "Diario degli Indizi",    desc: "Annota un momento di energia o curiosità",            badge: "Nuovo" },
+    { href: "/diario?mode=indizi",    icon: Sparkles,       title: "Diario degli Indizi",    desc: "Annota un momento di energia o curiosità",            badge: "Nuovo" },
     { href: "/coach?mode=socratic",   icon: BrainCircuit,   title: "Sessione Socratica",     desc: "4 step strutturati per fare chiarezza con Wendy",     badge: "AI" },
     { href: "/test",                  icon: Zap,            title: "Test di personalità",    desc: "Mappa la tua personalità professionale",              badge: "Gratuito" },
     { href: "/settori",               icon: Target,         title: "Esplora settori",        desc: "28 settori — niente impegno, solo curiosità" },

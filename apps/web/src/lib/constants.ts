@@ -208,6 +208,7 @@ export const ERROR_MESSAGES = {
 export const NAV_LABELS = {
   home: "Home",
   northStar: "NorthStar",
+  bussola: "Bussola",
   test: "Test",
   aree: "Aree",
   lavori: "Offerte",
