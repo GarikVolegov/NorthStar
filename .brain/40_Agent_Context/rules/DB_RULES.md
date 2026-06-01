@@ -71,8 +71,8 @@ await db.insert(users).values([
 - [ ] FK con ON DELETE esplicito (CASCADE o RESTRICT)
 - [ ] Drizzle schema in packages/db/src/schema/<table>.ts
 - [ ] Esportata in packages/db/src/schema/index.ts
-- [ ] Migration generata con pnpm db:generate
-- [ ] Migration testata con pnpm db:migrate
+- [ ] Schema applicato con pnpm db:push (NON db:generate — vedi sezione Migrazioni)
+- [ ] Verificato su DB reale (.env.local → Neon)
 ```
 
 ### Dump di produzione
@@ -220,21 +220,31 @@ Tutte le tabelle sono definite in `packages/db/src/schema/` e re-esportate da `i
 - `ck_coach_memory_confidence_range` — CHECK confidence BETWEEN 0 AND 1
 - `updated_at` trigger — funzione SQL in `updatedAt-trigger.sql` per auto-aggiornamento automatico
 
-### Migrazioni
+### Migrazioni — workflow REALE (aggiornato 2026-06)
+
+> **Fonte di verità = lo schema TS** in `packages/db/src/schema/*.ts`.
+> Lo si applica con **`pnpm db:push`** (schema-diff diretto). Questo è il workflow
+> ufficiale.
 
 ```bash
-# Genera migration dopo aver modificato lo schema
-pnpm db:generate
-
-# Applica in dev locale (push diretto, senza file migration)
+# 1) Modifica lo schema TS in packages/db/src/schema/<table>.ts (+ re-export in index.ts)
+# 2) Applica con push (schema-diff, env-aware via scripts/push.mjs → .env.local)
 pnpm db:push
 
-# Applica via migration file (produzione/staging)
-pnpm db:migrate
-
-# Esegui seed dati di sviluppo
+# Seed dati di sviluppo
 pnpm db:seed
 ```
+
+**⚠️ `pnpm db:generate` / `db:migrate` sono LEGACY e attualmente NON usabili.**
+La baseline degli snapshot drizzle è obsoleta (ferma a uno stato vecchio) e
+`db:generate` si blocca su un prompt interattivo di rename
+(`user_profile_settings`). I file in `packages/db/drizzle/*.sql` sono **record
+storici**: alcuni sono stati scritti a mano in modo **idempotente**
+(`CREATE TABLE IF NOT EXISTS`, `DO $$ … EXCEPTION WHEN duplicate_object`) e
+applicati direttamente. Possono esistere numeri di file duplicati (es. `0049_*`):
+è ininfluente sotto `db:push`. Se in futuro si vuole ripristinare
+`db:generate`, serve un **rebaseline** dedicato (squash a una baseline 0000 =
+schema attuale + mark applicato su `__drizzle_migrations`), non un ritocco al journal.
 
 - La configurazione Drizzle è in `packages/db/drizzle.config.ts`
 - Una migration per feature/branch — mai accumulare modifiche non correlate in una migration
