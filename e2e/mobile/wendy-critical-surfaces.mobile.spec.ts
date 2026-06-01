@@ -7,8 +7,9 @@
 
 import { expect, devices, test, type Locator, type Page } from "@playwright/test";
 import { loginViaApi, waitForAuthReady } from "../helpers/auth";
+import { projectBrowserDevice } from "../helpers/responsiveDevices";
 
-test.use({ ...devices["Pixel 5"] });
+test.use(projectBrowserDevice(devices["Pixel 5"]));
 
 function searchInput(page: Page) {
   return page.getByRole("combobox").or(page.getByRole("textbox")).first();

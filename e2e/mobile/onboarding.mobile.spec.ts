@@ -5,6 +5,7 @@
  */
 
 import { expect, devices, test } from "@playwright/test";
+import { projectBrowserDevice } from "../helpers/responsiveDevices";
 
 const MOBILE_DEVICES = [
   { name: "Pixel 5", device: devices["Pixel 5"] },
@@ -13,14 +14,9 @@ const MOBILE_DEVICES = [
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5173";
 
-function mobileUse(device: typeof devices["Pixel 5"]) {
-  const { defaultBrowserType: _defaultBrowserType, ...use } = device;
-  return use;
-}
-
 for (const { name, device } of MOBILE_DEVICES) {
   test.describe(`Onboarding mobile - ${name}`, () => {
-    test.use(mobileUse(device));
+    test.use(projectBrowserDevice(device));
 
     test("home page carica e mostra CTA principale", async ({ page }) => {
       await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });

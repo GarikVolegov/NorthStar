@@ -89,8 +89,9 @@ function JobCard({ job }: { job: Job }) {
             href={job.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="p-1.5 rounded-full border border-border text-muted-foreground hover:text-primary hover:border-primary/30 transition-all block"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-border text-muted-foreground transition-all hover:border-primary/30 hover:text-primary"
             title="Apri ricerca esterna"
+            aria-label={`Apri ricerca esterna per ${job.title}`}
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
@@ -206,7 +207,7 @@ export default function Lavori() {
                   key={key}
                   onClick={() => setFilterType(key)}
                   className={cn(
-                    "text-xs px-3 py-1.5 rounded-full border font-medium transition-all whitespace-nowrap",
+                    "min-h-11 whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-all",
                     filterType === key
                       ? "bg-primary text-primary-foreground border-primary"
                       : "border-border text-muted-foreground hover:text-foreground",

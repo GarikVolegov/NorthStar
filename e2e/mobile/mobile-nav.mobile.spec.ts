@@ -5,8 +5,9 @@
  */
 
 import { expect, devices, test } from "@playwright/test";
+import { projectBrowserDevice } from "../helpers/responsiveDevices";
 
-test.use({ ...devices["Pixel 5"] });
+test.use(projectBrowserDevice(devices["Pixel 5"]));
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:5173";
 

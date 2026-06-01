@@ -73,7 +73,7 @@ export function AppCard({
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       className={cn(
-        "bg-background rounded-xl border border-l-4 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing",
+        "group bg-background rounded-xl border border-l-4 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing",
         meta.border,
         isDragging && "opacity-50 scale-[0.97]",
       )}
@@ -88,10 +88,11 @@ export function AppCard({
           </div>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="p-1 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0 -mt-0.5 -mr-0.5 group"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8 sm:opacity-0 sm:group-hover:opacity-100"
             disabled={deleting}
+            aria-label={`Elimina candidatura ${app.company}`}
           >
-            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3 opacity-0 group-hover:opacity-100" />}
+            {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
           </button>
         </div>
 
@@ -128,23 +129,26 @@ export function AppCard({
       </div>
 
       {/* ── Footer: date, url, notes toggle, status ── */}
-      <div className="flex items-center gap-1.5 px-3 pb-2.5 pt-0">
-        <span className="text-[11px] text-muted-foreground flex items-center gap-1 mr-auto">
+      <div className="flex flex-wrap items-center gap-1.5 px-3 pb-2.5 pt-0">
+        <span className="flex min-w-0 basis-full items-center gap-1 text-[11px] text-muted-foreground">
           <Calendar className="w-2.5 h-2.5" />{formatDate(app.appliedAt)}
         </span>
 
         {app.url && (
           <a href={app.url} target="_blank" rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-primary transition-colors" title="Apri offerta">
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
+            title="Apri offerta"
+            aria-label={`Apri offerta ${app.company}`}>
             <ExternalLink className="w-3 h-3" />
           </a>
         )}
 
         <button
           onClick={(e) => { e.stopPropagation(); onCoverLetter(); }}
-          className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-violet-600 transition-colors"
+          className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-violet-600"
           title="Genera lettera di presentazione AI"
+          aria-label={`Genera lettera di presentazione per ${app.company}`}
         >
           <Sparkles className="w-3 h-3" />
         </button>
@@ -153,12 +157,13 @@ export function AppCard({
         <button
           onClick={(e) => { e.stopPropagation(); setNotesOpen((o) => !o); }}
           className={cn(
-            "flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md transition-colors",
+            "flex h-11 min-w-11 items-center justify-center gap-1 rounded-lg px-2 text-[11px] font-medium transition-colors",
             notesOpen
               ? "bg-primary/10 text-primary"
               : "text-muted-foreground hover:text-foreground hover:bg-muted",
           )}
           title={notesOpen ? "Chiudi diario" : "Apri diario note"}
+          aria-label={notesOpen ? `Chiudi diario note ${app.company}` : `Apri diario note ${app.company}`}
         >
           <StickyNote className="w-3 h-3" />
           {notesLog.length > 0 ? notesLog.length : ""}
@@ -169,7 +174,8 @@ export function AppCard({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button onClick={(e) => e.stopPropagation()}
-              className={cn("text-[11px] font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1 hover:opacity-80 transition-opacity", meta.badge)}>
+              className={cn("flex min-h-11 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold transition-opacity hover:opacity-80", meta.badge)}
+              aria-label={`Cambia stato candidatura ${app.company}: ${meta.label}`}>
               {meta.emoji} {meta.label} <ChevronDown className="w-2.5 h-2.5" />
             </button>
           </DropdownMenuTrigger>
@@ -205,7 +211,8 @@ export function AppCard({
                   <button
                     onClick={() => deleteNoteMutation.mutate(i)}
                     disabled={deleteNoteMutation.isPending}
-                    className="opacity-0 group-hover/note:opacity-100 p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all shrink-0"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted-foreground opacity-100 transition-all hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover/note:opacity-100"
+                    aria-label={`Elimina nota ${i + 1}`}
                   >
                     <X className="w-2.5 h-2.5" />
                   </button>
@@ -230,13 +237,14 @@ export function AppCard({
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitNote(); }
               }}
               placeholder={t("candidature.addNotePlaceholder")}
-              className="flex-1 min-w-0 text-xs bg-muted/60 border border-input rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50 transition-shadow"
+              className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-muted/60 px-3 text-xs transition-shadow placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
             />
             <button
               onClick={submitNote}
               disabled={!noteInput.trim() || addNoteMutation.isPending}
-              className="p-1.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
               title="Aggiungi nota (Invio)"
+              aria-label="Aggiungi nota"
             >
               {addNoteMutation.isPending
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

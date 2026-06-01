@@ -393,7 +393,7 @@ export function SearchDialog({
                         <button
                           type="button"
                           onClick={askCurrentQuery}
-                          className="flex min-h-10 w-full items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-3 text-left text-sm font-semibold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                          className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-3 text-left text-sm font-semibold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                         >
                           <Search className="h-4 w-4" />
                           <span className="min-w-0 truncate">Chiedi a Wendy di guidarti su "{query}"</span>

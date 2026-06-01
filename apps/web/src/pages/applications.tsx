@@ -178,7 +178,7 @@ export default function Candidature() {
               </p>
             </div>
             {!applicationsNotConfigured && (
-              <Button onClick={() => openAdd()} className="rounded-full gap-2 shrink-0">
+              <Button onClick={() => openAdd()} className="min-h-11 shrink-0 gap-2 rounded-full">
                 <Plus className="w-4 h-4" /> {t("candidature.add")}
               </Button>
             )}
@@ -208,7 +208,7 @@ export default function Candidature() {
                   key={v}
                   onClick={() => setView(v)}
                   className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                    "flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors",
                     view === v ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                 >
@@ -308,7 +308,7 @@ export default function Candidature() {
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
               {t("candidature.startTrackingDesc")}
             </p>
-            <Button onClick={() => openAdd()} className="rounded-full gap-2">
+            <Button onClick={() => openAdd()} className="min-h-11 gap-2 rounded-full">
               <Plus className="w-4 h-4" /> {t("candidature.addFirst")}
             </Button>
             <Button asChild variant="link" className="mt-2 text-primary">
@@ -376,7 +376,7 @@ export default function Candidature() {
 
                     <button
                       onClick={() => openAdd(status)}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 border border-dashed border-border transition-colors"
+                      className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-dashed border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                     >
                       <Plus className="w-3.5 h-3.5" /> {t("candidature.addTo", { status: t(`candidature.status.${status}`).toLowerCase() })}
                     </button>
@@ -404,14 +404,14 @@ export default function Candidature() {
                   <Building2 className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.company")}
                 </Label>
                 <Input value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                  placeholder="es. Google Italia" className="h-9 rounded-xl text-sm" />
+                  placeholder="es. Google Italia" className="h-11 rounded-xl text-sm" />
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
                   <Briefcase className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.role")}
                 </Label>
                 <Input value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                  placeholder="es. UX Designer" className="h-9 rounded-xl text-sm" />
+                  placeholder="es. UX Designer" className="h-11 rounded-xl text-sm" />
               </div>
             </div>
 
@@ -420,14 +420,14 @@ export default function Candidature() {
                 <Link2 className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.link")} <span className="font-normal text-muted-foreground">({t("candidature.optional")})</span>
               </Label>
               <Input value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-                placeholder="https://..." className="h-9 rounded-xl text-sm" type="url" />
+                placeholder="https://..." className="h-11 rounded-xl text-sm" type="url" />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label className="text-xs font-semibold mb-1.5 block">{t("candidature.statusLbl")}</Label>
                 <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as AppStatus }))}
-                  className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                  className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
                   {COLUMNS.map((s) => <option key={s} value={s}>{STATUS_META[s].emoji} {t(`candidature.status.${s}`)}</option>)}
                 </select>
               </div>
@@ -436,7 +436,7 @@ export default function Candidature() {
                   <MapPin className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.location")}
                 </Label>
                 <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                  placeholder="es. Milano / Remote" className="h-9 rounded-xl text-sm" />
+                  placeholder="es. Milano / Remote" className="h-11 rounded-xl text-sm" />
               </div>
             </div>
 
@@ -445,7 +445,7 @@ export default function Candidature() {
                 <DollarSign className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.salary")} <span className="font-normal text-muted-foreground">({t("candidature.optional")})</span>
               </Label>
               <Input value={form.salary} onChange={(e) => setForm((f) => ({ ...f, salary: e.target.value }))}
-                placeholder="es. 45.000 € / 3.500 € mese" className="h-9 rounded-xl text-sm" />
+                placeholder="es. 45.000 € / 3.500 € mese" className="h-11 rounded-xl text-sm" />
             </div>
 
             <div>
@@ -465,10 +465,10 @@ export default function Candidature() {
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" className="rounded-xl" onClick={() => { setAddOpen(false); setEditApp(null); }}>
+            <Button variant="outline" className="min-h-11 rounded-xl" onClick={() => { setAddOpen(false); setEditApp(null); }}>
               {t("candidature.cancel")}
             </Button>
-            <Button className="rounded-xl gap-2" onClick={handleSubmit}
+            <Button className="min-h-11 gap-2 rounded-xl" onClick={handleSubmit}
               disabled={createMutation.isPending || updateMutation.isPending}>
               {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
               {editApp ? t("candidature.saveChanges") : t("candidature.add")}

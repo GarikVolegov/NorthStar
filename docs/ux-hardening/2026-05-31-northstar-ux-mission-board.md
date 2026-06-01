@@ -209,6 +209,15 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - La pagina `/lavori` e stata rinominata semanticamente in "Segnali mercato": mostra periodo, fonte, conteggio aggregato, trend, skill e link a ricerca esterna.
 - Gli stati UX distinguono pipeline non collegata, snapshot vuoto reale, filtro senza risultati ed errore recuperabile senza esporre eccezioni tecniche come copy principale.
 
+## Tranche 19 Applicata
+
+- Playwright ora espone progetti responsive opt-in: `tablet-chromium` per gli smoke tablet critici e `mobile-webkit` per Safari-like mobile, senza raddoppiare la suite ordinaria.
+- Gli spec mobile rimuovono `defaultBrowserType` dai device descriptor, cosi il browser scelto dal project non viene sovrascritto dai singoli test.
+- Nuovo smoke tablet copre `/candidature` e Search/Wendy a 768px: verifica no overflow documento, kanban scrollabile, dialog candidatura e controlli touch da almeno 44px.
+- Le card candidatura e il dialog add/edit hanno tap target 44px su azioni, input, status dropdown, note e CTA; i controlli hover-only restano accessibili su touch.
+- Search/Wendy usa input e CTA da 44px al breakpoint tablet, evitando il target da 40px emerso dal test.
+- `/lavori` usa target touch da 44px per filtri e link esterno dei segnali mercato.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -361,8 +370,16 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/server run typecheck`
 - `pnpm --filter @northstar/web run typecheck`
 
+## Verifica Tranche 19
+
+- `pnpm --filter @northstar/web run typecheck`
+- `pnpm --filter @northstar/web test src/pages/applications.test.tsx src/components/search/SearchDialog.test.tsx`
+- `pnpm exec playwright test e2e/mobile/tablet-critical-surfaces.mobile.spec.ts --project=chromium --workers=1`
+- `PLAYWRIGHT_RESPONSIVE_PROJECTS=1 pnpm exec playwright test e2e/mobile/tablet-critical-surfaces.mobile.spec.ts --project=tablet-chromium --workers=1`
+- `PLAYWRIGHT_RESPONSIVE_PROJECTS=1 pnpm exec playwright test e2e/mobile/mobile-nav.mobile.spec.ts --project=mobile-webkit --workers=1`
+
 ## Backlog Prossima Tranche
 
-1. Estendere mobile visual QA a WebKit/Safari e a viewport tablet.
+1. Estendere E2E referral/affiliate a WebKit ora che il browser Safari-like locale e disponibile.
 2. Aggiungere audit operativo per rate-limit provider news e trend errori fonti nel tempo.
-3. Estendere E2E referral/affiliate a WebKit quando la pipeline locale supporta browser Safari-like.
+3. Aggiungere smoke tablet per `/news` con diagnostica provider e tab categoria overflow-safe.

@@ -18,8 +18,9 @@
 
 import { test, expect, devices } from '@playwright/test';
 import { responseJson } from '../helpers/json';
+import { projectBrowserDevice } from '../helpers/responsiveDevices';
 
-test.use({ ...devices['Pixel 5'] });
+test.use(projectBrowserDevice(devices['Pixel 5']));
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:5173';
 const ENABLE_PWA = process.env.ENABLE_PWA_TESTS === 'true' || process.env.CI === 'true';
