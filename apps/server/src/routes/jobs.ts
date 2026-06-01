@@ -41,8 +41,14 @@ export interface JobCardRecord {
   isAggregate: true;
 }
 
+export interface JobsFilterContext {
+  professionId?: number;
+  sectorId?: number;
+}
+
 export interface JobsFeedResponse {
   jobs: JobCardRecord[];
+  basedOnProfession: string | null;
   basedOnSector: string | null;
   totalCount: number;
   status: "ok" | "empty" | "not_configured";
@@ -51,10 +57,15 @@ export interface JobsFeedResponse {
   personalized: boolean;
   source: "job_posting_snapshots";
   period: string | null;
+  filter: {
+    professionId: number | null;
+    sectorId: number | null;
+    fallback: "sector" | null;
+  };
 }
 
 export interface JobsStore {
-  list(userId: number): Promise<JobsFeedResponse>;
+  list(userId: number, filters?: JobsFilterContext): Promise<JobsFeedResponse>;
   find(id: number, userId: number): Promise<JobCardRecord | null>;
 }
 
@@ -208,7 +219,20 @@ async function latestPeriod(): Promise<string | null> {
   return row?.period ?? null;
 }
 
-async function snapshotRows(period: string, id?: number): Promise<SnapshotRow[]> {
+async function snapshotRows(input: {
+  period?: string;
+  id?: number;
+  professionId?: number;
+  sectorId?: number;
+}): Promise<SnapshotRow[]> {
+  const where = input.id
+    ? eq(jobPostingSnapshotsTable.id, input.id)
+    : input.professionId
+      ? eq(jobPostingSnapshotsTable.professionId, input.professionId)
+      : input.sectorId
+        ? eq(jobPostingSnapshotsTable.sectorId, input.sectorId)
+        : eq(jobPostingSnapshotsTable.period, input.period ?? "");
+
   const rows = await db
     .select({
       id: jobPostingSnapshotsTable.id,
@@ -230,47 +254,108 @@ async function snapshotRows(period: string, id?: number): Promise<SnapshotRow[]>
     .from(jobPostingSnapshotsTable)
     .leftJoin(sectorsTable, eq(jobPostingSnapshotsTable.sectorId, sectorsTable.id))
     .leftJoin(professionsTable, eq(jobPostingSnapshotsTable.professionId, professionsTable.id))
-    .where(id
-      ? eq(jobPostingSnapshotsTable.id, id)
-      : eq(jobPostingSnapshotsTable.period, period))
-    .orderBy(desc(jobPostingSnapshotsTable.count))
-    .limit(id ? 1 : 24);
+    .where(where)
+    .orderBy(desc(jobPostingSnapshotsTable.period), desc(jobPostingSnapshotsTable.count))
+    .limit(input.id ? 1 : 24);
 
   return rows;
 }
 
+function parsePositiveIntQuery(value: unknown): number | undefined | null {
+  if (value == null || value === "") return undefined;
+  if (Array.isArray(value)) return null;
+  const raw = String(value);
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isInteger(parsed) && parsed > 0 && String(parsed) === raw ? parsed : null;
+}
+
+function parseJobsFilterQuery(query: Record<string, unknown>): {
+  filters: JobsFilterContext;
+  errors: Record<string, string[]>;
+} {
+  const professionId = parsePositiveIntQuery(query.professionId);
+  const sectorId = parsePositiveIntQuery(query.sectorId);
+  const errors: Record<string, string[]> = {};
+
+  if (professionId === null) errors.professionId = ["Deve essere un intero positivo."];
+  if (sectorId === null) errors.sectorId = ["Deve essere un intero positivo."];
+
+  return {
+    filters: {
+      ...(typeof professionId === "number" ? { professionId } : {}),
+      ...(typeof sectorId === "number" ? { sectorId } : {}),
+    },
+    errors,
+  };
+}
+
 export function createDbJobsStore(): JobsStore {
   return {
-    async list(userId) {
+    async list(userId, filters = {}) {
       const [profile, period] = await Promise.all([latestProfile(userId), latestPeriod()]);
       if (!period) {
         return {
           jobs: [],
+          basedOnProfession: null,
           basedOnSector: null,
           totalCount: 0,
           status: "empty",
           personalized: false,
           source: "job_posting_snapshots",
           period: null,
+          filter: {
+            professionId: filters.professionId ?? null,
+            sectorId: filters.sectorId ?? null,
+            fallback: null,
+          },
         };
       }
 
-      const jobs = (await snapshotRows(period)).map((row) => mapSnapshot(row, profile));
+      let fallback: "sector" | null = null;
+      let rows: SnapshotRow[] = [];
+
+      if (filters.professionId) {
+        rows = await snapshotRows({ professionId: filters.professionId });
+        if (rows.length === 0 && filters.sectorId) {
+          rows = await snapshotRows({ sectorId: filters.sectorId });
+          fallback = "sector";
+        }
+      } else if (filters.sectorId) {
+        rows = await snapshotRows({ sectorId: filters.sectorId });
+      } else {
+        rows = await snapshotRows({ period });
+      }
+
+      const jobs = rows.map((row) => mapSnapshot(row, profile));
       jobs.sort((a, b) => b.matchScore - a.matchScore || b.count - a.count);
+      const firstProfession = rows.find((row) => row.professionTitle)?.professionTitle ?? null;
+      const firstSector = rows.find((row) => row.sectorName)?.sectorName ?? basedOnSectorName(profile, jobs);
+
       return {
         jobs,
-        basedOnSector: basedOnSectorName(profile, jobs),
+        basedOnProfession: filters.professionId && fallback === null ? firstProfession : null,
+        basedOnSector: firstSector,
         totalCount: jobs.length,
         status: jobs.length > 0 ? "ok" : "empty",
-        personalized: Boolean(profile?.confirmedSectorId || profile?.recommendations.length),
+        personalized: Boolean(
+          filters.professionId ||
+          filters.sectorId ||
+          profile?.confirmedSectorId ||
+          profile?.recommendations.length,
+        ),
         source: "job_posting_snapshots",
-        period,
+        period: rows[0]?.period ?? period,
+        filter: {
+          professionId: filters.professionId ?? null,
+          sectorId: filters.sectorId ?? null,
+          fallback,
+        },
       };
     },
 
     async find(id, userId) {
       const profile = await latestProfile(userId);
-      const [row] = await snapshotRows("", id);
+      const [row] = await snapshotRows({ id });
       return row ? mapSnapshot(row, profile) : null;
     },
   };
@@ -291,20 +376,36 @@ export function createJobsRouter({ store = createDbJobsStore() }: { store?: Jobs
   const jobsRouter = Router();
 
   jobsRouter.get("/", requireAuth, async (req, res) => {
+    const { filters, errors } = parseJobsFilterQuery(req.query as Record<string, unknown>);
+    if (Object.keys(errors).length > 0) {
+      res.status(400).json({
+        error: "Filtri lavoro non validi",
+        code: "INVALID_JOB_FILTERS",
+        details: errors,
+      });
+      return;
+    }
+
     try {
-      const response = await store.list(req.user!.id);
+      const response = await store.list(req.user!.id, filters);
       res.json(response);
     } catch (err) {
       req.log?.error?.({ err }, "jobs get error");
       if (
         sendOptionalReadFallback(req, res, err, "jobs.list", {
           jobs: [],
+          basedOnProfession: null,
           basedOnSector: null,
           totalCount: 0,
           ...JOBS_NOT_CONFIGURED,
           personalized: false,
           source: "job_posting_snapshots",
           period: null,
+          filter: {
+            professionId: filters.professionId ?? null,
+            sectorId: filters.sectorId ?? null,
+            fallback: null,
+          },
         })
       ) return;
       res.status(500).json({ error: "Errore nel caricamento dei lavori" });

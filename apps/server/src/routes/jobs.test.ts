@@ -1,8 +1,9 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import request from "supertest";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createDbJobsStore,
   createJobsRouter,
   createMemoryJobsStore,
   type JobCardRecord,
@@ -10,12 +11,57 @@ import {
   type JobsStore,
 } from "./jobs";
 
+const dbMock = vi.hoisted(() => {
+  const state = {
+    queryResults: [] as unknown[][],
+    selectCalls: [] as Array<{
+      selection: unknown;
+      from?: unknown;
+      wheres: unknown[];
+      orderByArgs: unknown[];
+      limitValue?: number;
+    }>,
+  };
+
+  return {
+    state,
+    db: {
+      select(selection: unknown) {
+        const call = { selection, wheres: [], orderByArgs: [] } as typeof state.selectCalls[number];
+        state.selectCalls.push(call);
+        const builder = {
+          from(table: unknown) {
+            call.from = table;
+            return builder;
+          },
+          leftJoin() {
+            return builder;
+          },
+          where(condition: unknown) {
+            call.wheres.push(condition);
+            return builder;
+          },
+          orderBy(...args: unknown[]) {
+            call.orderByArgs = args;
+            return builder;
+          },
+          limit(value: number) {
+            call.limitValue = value;
+            return Promise.resolve(state.queryResults.shift() ?? []);
+          },
+        };
+        return builder;
+      },
+    },
+  };
+});
+
 vi.mock("../lib/jwt-secret", () => ({
   JWT_SECRET: "test-secret",
 }));
 
 vi.mock("@workspace/db", () => ({
-  db: {},
+  db: dbMock.db,
   usersTable: { clerkId: "users.clerk_id" },
   jobPostingSnapshotsTable: {
     id: "job_posting_snapshots.id",
@@ -90,12 +136,14 @@ function feed(overrides: Partial<JobsFeedResponse> = {}): JobsFeedResponse {
   const jobs = overrides.jobs ?? [job()];
   return {
     jobs,
+    basedOnProfession: null,
     basedOnSector: "Design & UX",
     totalCount: jobs.length,
     status: jobs.length > 0 ? "ok" : "empty",
     personalized: true,
     source: "job_posting_snapshots",
     period: "2026-06",
+    filter: { professionId: null, sectorId: null, fallback: null },
     ...overrides,
   };
 }
@@ -107,7 +155,49 @@ function app(store: JobsStore = createMemoryJobsStore(feed())) {
   return instance;
 }
 
+function snapshot(overrides: Partial<{
+  id: number;
+  roleTitle: string;
+  sectorId: number | null;
+  professionId: number | null;
+  count: number;
+  period: string;
+  geography: string;
+  topSkills: string[];
+  avgSalaryMin: number | null;
+  avgSalaryMax: number | null;
+  growthRate: number | null;
+  source: string;
+  sectorName: string | null;
+  professionTitle: string | null;
+  professionSalaryRange: string | null;
+}> = {}) {
+  return {
+    id: 55,
+    roleTitle: "product designer",
+    sectorId: 2,
+    professionId: 55,
+    count: 64,
+    period: "2026-06",
+    geography: "IT",
+    topSkills: ["figma", "research"],
+    avgSalaryMin: 32000,
+    avgSalaryMax: 45000,
+    growthRate: 0.1,
+    source: "adzuna",
+    sectorName: "Design & UX",
+    professionTitle: "Product Designer",
+    professionSalaryRange: "32k-45k",
+    ...overrides,
+  };
+}
+
 describe("jobs routes", () => {
+  beforeEach(() => {
+    dbMock.state.queryResults = [];
+    dbMock.state.selectCalls = [];
+  });
+
   it("returns market-backed job role signals instead of a provider placeholder", async () => {
     const response = await request(app())
       .get("/api/jobs")
@@ -115,12 +205,14 @@ describe("jobs routes", () => {
       .expect(200);
 
     expect(response.body).toMatchObject({
+      basedOnProfession: null,
       basedOnSector: "Design & UX",
       totalCount: 1,
       status: "ok",
       personalized: true,
       source: "job_posting_snapshots",
       period: "2026-06",
+      filter: { professionId: null, sectorId: null, fallback: null },
     });
     expect(response.body.jobs[0]).toMatchObject({
       title: "UX Designer",
@@ -146,12 +238,142 @@ describe("jobs routes", () => {
 
     expect(response.body).toMatchObject({
       jobs: [],
+      basedOnProfession: null,
       basedOnSector: null,
       totalCount: 0,
       status: "empty",
       personalized: false,
       source: "job_posting_snapshots",
       period: null,
+      filter: { professionId: null, sectorId: null, fallback: null },
+    });
+  });
+
+  it("passes explicit profession and sector filters to the jobs store", async () => {
+    const store: JobsStore = {
+      list: vi.fn().mockResolvedValue(feed({
+        basedOnProfession: "Product Designer",
+        basedOnSector: "Design & UX",
+        filter: { professionId: 55, sectorId: 2, fallback: null },
+      })),
+      find: vi.fn(),
+    };
+
+    const response = await request(app(store))
+      .get("/api/jobs?professionId=55&sectorId=2")
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(200);
+
+    expect(store.list).toHaveBeenCalledWith(42, { professionId: 55, sectorId: 2 });
+    expect(response.body).toMatchObject({
+      basedOnProfession: "Product Designer",
+      basedOnSector: "Design & UX",
+      filter: { professionId: 55, sectorId: 2, fallback: null },
+    });
+  });
+
+  it("rejects invalid explicit job filters", async () => {
+    const response = await request(app())
+      .get("/api/jobs?professionId=-1&sectorId=abc")
+      .set("Authorization", `Bearer ${token()}`)
+      .expect(400);
+
+    expect(response.body).toEqual({
+      error: "Filtri lavoro non validi",
+      code: "INVALID_JOB_FILTERS",
+      details: {
+        professionId: ["Deve essere un intero positivo."],
+        sectorId: ["Deve essere un intero positivo."],
+      },
+    });
+  });
+
+  it("documents role-filtered feed metadata through the memory store contract", async () => {
+    const response = feed({
+      jobs: [job({ title: "Product Designer" })],
+      basedOnProfession: "Product Designer",
+      basedOnSector: "Design & UX",
+      filter: { professionId: 55, sectorId: 2, fallback: null },
+    });
+
+    await expect(createMemoryJobsStore(response).list(42, { professionId: 55, sectorId: 2 }))
+      .resolves
+      .toMatchObject({
+        basedOnProfession: "Product Designer",
+        basedOnSector: "Design & UX",
+        filter: { professionId: 55, sectorId: 2, fallback: null },
+      });
+  });
+
+  it("documents sector fallback metadata through the memory store contract", async () => {
+    const response = feed({
+      jobs: [job({ title: "UX Researcher" })],
+      basedOnProfession: null,
+      basedOnSector: "Design & UX",
+      filter: { professionId: 999, sectorId: 2, fallback: "sector" },
+    });
+
+    await expect(createMemoryJobsStore(response).list(42, { professionId: 999, sectorId: 2 }))
+      .resolves
+      .toMatchObject({
+        basedOnProfession: null,
+        basedOnSector: "Design & UX",
+        filter: { professionId: 999, sectorId: 2, fallback: "sector" },
+      });
+  });
+
+  it("filters DB snapshots by explicit profession before sector context", async () => {
+    dbMock.state.queryResults = [
+      [{ confirmedSectorId: null, recommendations: [] }],
+      [{ period: "2026-06" }],
+      [snapshot()],
+    ];
+
+    const response = await createDbJobsStore().list(42, { professionId: 55, sectorId: 2 });
+
+    expect(response).toMatchObject({
+      basedOnProfession: "Product Designer",
+      basedOnSector: "Design & UX",
+      totalCount: 1,
+      personalized: true,
+      period: "2026-06",
+      filter: { professionId: 55, sectorId: 2, fallback: null },
+    });
+    expect(response.jobs[0]).toMatchObject({
+      title: "Product Designer",
+      sector: "Design & UX",
+      count: 64,
+    });
+  });
+
+  it("falls back to DB sector snapshots when an explicit profession has no market signals", async () => {
+    dbMock.state.queryResults = [
+      [{ confirmedSectorId: null, recommendations: [] }],
+      [{ period: "2026-06" }],
+      [],
+      [snapshot({
+        id: 77,
+        roleTitle: "ux researcher",
+        professionId: 77,
+        professionTitle: "UX Researcher",
+        count: 38,
+      })],
+    ];
+
+    const response = await createDbJobsStore().list(42, { professionId: 999, sectorId: 2 });
+
+    expect(response).toMatchObject({
+      basedOnProfession: null,
+      basedOnSector: "Design & UX",
+      totalCount: 1,
+      personalized: true,
+      period: "2026-06",
+      filter: { professionId: 999, sectorId: 2, fallback: "sector" },
+    });
+    expect(response.jobs[0]).toMatchObject({
+      title: "UX Researcher",
+      sector: "Design & UX",
+      count: 38,
     });
   });
 
@@ -184,11 +406,13 @@ describe("jobs routes", () => {
 
     expect(response.body).toMatchObject({
       jobs: [],
+      basedOnProfession: null,
       status: "not_configured",
       reason: "jobs_provider_not_connected",
       action: "connect_jobs_provider",
       personalized: false,
       source: "job_posting_snapshots",
+      filter: { professionId: null, sectorId: null, fallback: null },
     });
   });
 
