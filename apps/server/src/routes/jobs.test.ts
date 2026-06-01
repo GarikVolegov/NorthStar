@@ -346,6 +346,31 @@ describe("jobs routes", () => {
     });
   });
 
+  it("keeps explicit profession filters constrained to the latest snapshot period", async () => {
+    dbMock.state.queryResults = [
+      [{ confirmedSectorId: null, recommendations: [] }],
+      [{ period: "2026-06" }],
+      [
+        snapshot({ id: 55, count: 64, period: "2026-06" }),
+        snapshot({ id: 44, count: 92, period: "2026-05" }),
+      ],
+    ];
+
+    const response = await createDbJobsStore().list(42, { professionId: 55, sectorId: 2 });
+
+    expect(response).toMatchObject({
+      totalCount: 1,
+      period: "2026-06",
+      filter: { professionId: 55, sectorId: 2, fallback: null },
+    });
+    expect(response.jobs).toHaveLength(1);
+    expect(response.jobs[0]).toMatchObject({
+      id: 55,
+      period: "2026-06",
+      count: 64,
+    });
+  });
+
   it("falls back to DB sector snapshots when an explicit profession has no market signals", async () => {
     dbMock.state.queryResults = [
       [{ confirmedSectorId: null, recommendations: [] }],

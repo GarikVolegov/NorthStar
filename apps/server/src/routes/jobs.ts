@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { Router } from "express";
 import {
   db,
@@ -228,9 +228,15 @@ async function snapshotRows(input: {
   const where = input.id
     ? eq(jobPostingSnapshotsTable.id, input.id)
     : input.professionId
-      ? eq(jobPostingSnapshotsTable.professionId, input.professionId)
+      ? and(
+        eq(jobPostingSnapshotsTable.period, input.period ?? ""),
+        eq(jobPostingSnapshotsTable.professionId, input.professionId),
+      )
       : input.sectorId
-        ? eq(jobPostingSnapshotsTable.sectorId, input.sectorId)
+        ? and(
+          eq(jobPostingSnapshotsTable.period, input.period ?? ""),
+          eq(jobPostingSnapshotsTable.sectorId, input.sectorId),
+        )
         : eq(jobPostingSnapshotsTable.period, input.period ?? "");
 
   const rows = await db
@@ -258,7 +264,8 @@ async function snapshotRows(input: {
     .orderBy(desc(jobPostingSnapshotsTable.period), desc(jobPostingSnapshotsTable.count))
     .limit(input.id ? 1 : 24);
 
-  return rows;
+  if (input.id || !input.period) return rows;
+  return rows.filter((row) => row.period === input.period);
 }
 
 function parsePositiveIntQuery(value: unknown): number | undefined | null {
@@ -315,13 +322,13 @@ export function createDbJobsStore(): JobsStore {
       let rows: SnapshotRow[] = [];
 
       if (filters.professionId) {
-        rows = await snapshotRows({ professionId: filters.professionId });
+        rows = await snapshotRows({ period, professionId: filters.professionId });
         if (rows.length === 0 && filters.sectorId) {
-          rows = await snapshotRows({ sectorId: filters.sectorId });
+          rows = await snapshotRows({ period, sectorId: filters.sectorId });
           fallback = "sector";
         }
       } else if (filters.sectorId) {
-        rows = await snapshotRows({ sectorId: filters.sectorId });
+        rows = await snapshotRows({ period, sectorId: filters.sectorId });
       } else {
         rows = await snapshotRows({ period });
       }
