@@ -148,11 +148,10 @@ export default function Settori() {
                 Esplora con criterio
               </div>
               <h1 className="text-3xl font-bold leading-tight text-foreground md:text-5xl">
-                Scegli i settori da una piramide, non da una lista infinita.
+                Scegli un&apos;area, poi il ruolo su cui puntare.
               </h1>
               <p className="mt-4 max-w-2xl text-sm leading-relaxed text-muted-foreground md:text-base">
-                La classifica si adatta ai tuoi filtri, al test e alla modalita di lavoro che preferisci.
-                Senza profilo, parte dai segnali generali di mercato.
+                La classifica ti aiuta a scegliere il settore; dentro ogni settore trovi i ruoli concreti da approfondire fino ai lavori reali.
               </p>
             </div>
           </AnimateOnScroll>
@@ -372,7 +371,7 @@ export default function Settori() {
 
               <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
                 {ranked.map((sector, index) => (
-                  <Link key={sector.id} href={`/settore/${sector.id}`}>
+                  <Link key={sector.id} href={`/settore/${sector.id}#ruoli`}>
                     <div className="grid gap-4 p-4 transition-colors hover:bg-primary/5 md:grid-cols-[auto_1fr_auto] md:items-center">
                       <div className="flex items-center gap-3">
                         <span className="w-8 text-sm font-bold tabular-nums text-muted-foreground">

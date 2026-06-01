@@ -40,7 +40,7 @@ describe("dashboard adaptive flow", () => {
 
     expect(result.phase).toBe("explore_sectors");
     expect(result.nextAction).toEqual({
-      label: "Esplora settori",
+      label: "Scegli settore e ruolo",
       href: "/settori",
       sectionId: "discovery_feed",
     });

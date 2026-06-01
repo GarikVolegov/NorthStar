@@ -170,6 +170,17 @@ describe("Settori adaptive pyramid", () => {
     expect(screen.getByTestId("advanced-sector-filters")).not.toBeVisible();
   });
 
+  it("frames sector selection as the first step before choosing a role", async () => {
+    renderSettori();
+
+    await screen.findByTestId("sector-pyramid");
+
+    expect(screen.getByText(/scegli un'area, poi il ruolo su cui puntare/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/apri ruoli del settore/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Design & UX/i }).map((link) => link.getAttribute("href")))
+      .toEqual(expect.arrayContaining(["/settore/2#ruoli"]));
+  });
+
   it("updates the pyramid when compact filters change the result set", async () => {
     renderSettori();
 

@@ -238,6 +238,54 @@ export default function Sector() {
 
       <SectorPremiumTools sectorId={id} t={t} onOpenWendy={() => wendy.open()} />
 
+      <section id="ruoli" className="mb-12 rounded-3xl border border-primary/20 bg-primary/5 p-5 md:p-6">
+        <div className="mb-5 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-primary">Prossima decisione</p>
+            <h2 className="text-2xl font-serif font-bold">Scegli il ruolo target</h2>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              Il settore orienta il mercato; il ruolo decide quali competenze costruire e quali lavori cercare.
+            </p>
+          </div>
+          <Button asChild variant="outline" className="rounded-full">
+            <Link href={`/ruoli?sectorId=${id}`}>Vedi tutti i ruoli</Link>
+          </Button>
+        </div>
+        {isLoadingRoles ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3].map((item) => <Skeleton key={item} className="h-44 rounded-2xl" />)}
+          </div>
+        ) : roles && roles.length > 0 ? (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {roles.slice(0, 6).map((role) => (
+              <article key={role.id} className="rounded-2xl border bg-card p-5">
+                <h3 className="font-semibold text-foreground">{role.title}</h3>
+                {role.description && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{role.description}</p>}
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {role.skills?.slice(0, 3).map((skill) => (
+                    <span key={skill} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{skill}</span>
+                  ))}
+                </div>
+                <div className="mt-5 flex flex-col gap-2">
+                  <Button asChild className="rounded-full">
+                    <Link href={`/ruolo/${role.id}?fromSector=${id}`} aria-label={`Scegli questo ruolo ${role.title}`}>
+                      Scegli questo ruolo
+                    </Link>
+                  </Button>
+                  <Button asChild variant="ghost" className="rounded-full">
+                    <Link href={`/ruolo/${role.id}`}>Approfondisci</Link>
+                  </Button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-sm text-muted-foreground">
+            Non ci sono ancora ruoli collegati a questo settore.
+          </p>
+        )}
+      </section>
+
       {/* Deep Dive Tabs */}
       <Tabs defaultValue="overview" className="w-full">
         <TabsList className="w-full flex justify-start border-b rounded-none h-auto bg-transparent p-0 mb-8 space-x-6 overflow-x-auto">

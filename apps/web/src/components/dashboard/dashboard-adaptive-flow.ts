@@ -46,7 +46,7 @@ const INDECISO_PHASE_ORDER: Record<AdaptiveDashboardPhase, string[]> = {
 
 const NEXT_ACTION_BY_PHASE: Record<AdaptiveDashboardPhase, AdaptiveNextAction> = {
   start_test: { label: "Inizia il test", href: "/test", sectionId: "clarity_path" },
-  explore_sectors: { label: "Esplora settori", href: "/settori", sectionId: "discovery_feed" },
+  explore_sectors: { label: "Scegli settore e ruolo", href: "/settori", sectionId: "discovery_feed" },
   compare_options: { label: "Confronta opzioni", href: "/settori", sectionId: "career_comparison" },
   choose_path: { label: "Scegli percorso", href: "/percorso", sectionId: "tools" },
   active_journey: { label: "Apri prossima routine", href: "/dashboard", sectionId: "next_routine" },

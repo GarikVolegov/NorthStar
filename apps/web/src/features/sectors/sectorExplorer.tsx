@@ -193,7 +193,7 @@ export function PyramidCard({
 
   return (
     <Link
-      href={`/settore/${sector.id}`}
+      href={`/settore/${sector.id}#ruoli`}
       className={cn("block", variant === "base" && "shrink-0")}
     >
       <article
@@ -308,7 +308,7 @@ export function PyramidCard({
             ))}
           </div>
           <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
-            Apri <ArrowRight className="h-3 w-3" />
+            Apri ruoli del settore <ArrowRight className="h-3 w-3" />
           </span>
         </div>
       </article>
