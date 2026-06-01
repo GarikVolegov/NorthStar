@@ -89,10 +89,10 @@ export default function Candidature() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return deleteJson<ApplicationsResponse>(`${BASE}api/applications/${id}`);
+      return deleteJson<ApplicationsResponse | null>(`${BASE}api/applications/${id}`);
     },
     onSuccess: (response) => {
-      if (response.status === "not_configured") {
+      if (response?.status === "not_configured") {
         setMutationError(applicationsNotConfiguredMessage);
         return;
       }

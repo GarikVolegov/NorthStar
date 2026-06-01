@@ -193,6 +193,14 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Gli E2E referral non dipendono piu da seed account: creano owner/referral temporanei, accettano il contratto auth reale e coprono dashboard affiliate mobile Pixel 5.
 - Il dev server locale e stato riavviato su `127.0.0.1:5173`; `/dashboard` risponde e il proxy API raggiunge il backend.
 
+## Tranche 17 Applicata
+
+- Le candidature non sono piu una route placeholder: GET/POST/PATCH/DELETE usano `jobApplicationsTable` con ownership utente e stato empty reale.
+- Il contratto API mappa `interview` della UI su `interviewing` del DB e normalizza `withdrawn` verso lo stato UI recuperabile.
+- Il diario note inline delle candidature ora ha persistenza backend con add/delete note e fallback operativo se la migration manca.
+- Le scritture candidature non dichiarano successo quando la persistenza non e disponibile: tornano 503 con `setupAction: run_migrations`.
+- La pagina candidature tollera DELETE 204, cosi la board resta coerente con un contratto REST senza body.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -331,9 +339,16 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - Smoke locale: `GET http://127.0.0.1:5173/dashboard` -> 200 con root React; `GET /api/stats/summary` via proxy -> 401 atteso.
 - `git diff --check`
 
+## Verifica Tranche 17
+
+- `pnpm --filter @northstar/server test src/routes/applications.test.ts`
+- `pnpm --filter @northstar/web test src/pages/applications.test.tsx`
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+
 ## Backlog Prossima Tranche
 
-1. Sostituire route placeholder di candidature/lavori con persistenza o provider reale quando il prodotto lo richiede.
+1. Sostituire route placeholder lavori con provider reale quando il prodotto lo richiede.
 2. Estendere mobile visual QA a WebKit/Safari e a viewport tablet.
 3. Aggiungere audit operativo per rate-limit provider news e trend errori fonti nel tempo.
 4. Estendere E2E referral/affiliate a WebKit quando la pipeline locale supporta browser Safari-like.
