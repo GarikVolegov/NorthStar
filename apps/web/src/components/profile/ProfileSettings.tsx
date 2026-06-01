@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { cn } from "@/lib/utils";
-import { patchJson } from "@/lib/apiClient";
+import { ApiClientError, deleteJson, getJson, patchJson } from "@/lib/apiClient";
 import type { AuthUser } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAppAudio } from "@/contexts/AppAudioProvider";
@@ -25,19 +25,23 @@ import { useLefty } from "@/hooks/useLefty";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AtSign,
+  AlertCircle,
   Bell,
   Bot,
   Calendar,
+  Download,
   Flame,
   Globe,
   Hand,
   KeyRound,
   LayoutDashboard,
+  Loader2,
   Mail,
   MapPin,
   Palette,
   Pencil,
   ShieldCheck,
+  Trash2,
   Trophy,
   User,
   Volume2,
@@ -53,6 +57,10 @@ function formatDate(iso: string) {
     month: "long",
     year: "numeric",
   });
+}
+
+function apiErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiClientError ? error.message : error instanceof Error ? error.message : fallback;
 }
 
 type CompletionData = {
@@ -150,6 +158,10 @@ export function ProfileSettings({
   const [tone, setTone] = useState<string>(initialTone ?? "auto");
   const [toneSaving, setToneSaving] = useState(false);
   const [toneError, setToneError] = useState<string | null>(null);
+  const [accountActionError, setAccountActionError] = useState<string | null>(null);
+  const [accountActionSuccess, setAccountActionSuccess] = useState<string | null>(null);
+  const [exportingAccount, setExportingAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const soundscapeEnabled = appAudio.snapshot.supported && !appAudio.snapshot.muted;
   const emailVerified = user.emailVerified === true;
 
@@ -179,6 +191,54 @@ export function ProfileSettings({
       setToneError("Impossibile salvare il tono di Wendy. Riprova tra poco.");
     } finally {
       setToneSaving(false);
+    }
+  }
+
+  async function handleAccountExport() {
+    setExportingAccount(true);
+    setAccountActionError(null);
+    setAccountActionSuccess(null);
+    try {
+      const payload = await getJson<unknown>(`${BASE}api/account/export`);
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json",
+      });
+      const href = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = href;
+      anchor.download = `northstar-account-${user.id}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(href);
+      setAccountActionSuccess("Export account pronto. Il file contiene solo dati restituiti dal server.");
+    } catch (error) {
+      setAccountActionError(
+        `Esportazione non riuscita: ${apiErrorMessage(error, "riprova tra poco")}. Nessun file e' stato generato.`,
+      );
+    } finally {
+      setExportingAccount(false);
+    }
+  }
+
+  async function handleAccountDelete() {
+    const confirmed = window.confirm(
+      "Richiedere l'eliminazione dell'account? L'operazione anonimizza subito i dati principali e avvia la rimozione definitiva.",
+    );
+    if (!confirmed) return;
+
+    setDeletingAccount(true);
+    setAccountActionError(null);
+    setAccountActionSuccess(null);
+    try {
+      await deleteJson(`${BASE}api/account`);
+      setAccountActionSuccess("Eliminazione account avviata. Lo stato verra' aggiornato dal server.");
+    } catch (error) {
+      setAccountActionError(
+        `Eliminazione non avviata: ${apiErrorMessage(error, "riprova tra poco")}. Nessuna modifica all'account e' stata applicata.`,
+      );
+    } finally {
+      setDeletingAccount(false);
     }
   }
 
@@ -312,8 +372,59 @@ export function ProfileSettings({
             />
           </AccordionTrigger>
           <AccordionContent>
-            <div className="pb-1">
+            <div className="space-y-4 pb-1">
               <PrivacyCard userId={user.id} />
+              <div className="border-t border-border pt-3">
+                <div className="mb-2">
+                  <p className="text-sm font-medium">Dati account</p>
+                  <p className="text-xs text-muted-foreground">
+                    Esporta una copia dei dati o richiedi l'eliminazione senza stati ottimistici.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="justify-center gap-1.5 rounded-full"
+                    disabled={exportingAccount || deletingAccount}
+                    onClick={handleAccountExport}
+                  >
+                    {exportingAccount ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Download className="h-3.5 w-3.5" />
+                    )}
+                    Esporta dati account
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="justify-center gap-1.5 rounded-full border-destructive/30 text-destructive hover:bg-destructive/10"
+                    disabled={exportingAccount || deletingAccount}
+                    onClick={handleAccountDelete}
+                  >
+                    {deletingAccount ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-3.5 w-3.5" />
+                    )}
+                    Richiedi eliminazione account
+                  </Button>
+                </div>
+                {accountActionError && (
+                  <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive" role="alert">
+                    <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{accountActionError}</span>
+                  </p>
+                )}
+                {accountActionSuccess && (
+                  <p className="mt-2 text-xs font-medium text-emerald-700" role="status">
+                    {accountActionSuccess}
+                  </p>
+                )}
+              </div>
             </div>
           </AccordionContent>
         </AccordionItem>

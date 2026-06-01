@@ -28,7 +28,9 @@ export function CoverLetterDialog({ app, onClose }: { app: Application; onClose:
         jobDescription,
       });
       if (data.error) throw new Error(data.error);
-      setText(data.text ?? "");
+      const generatedText = data.text?.trim() ?? "";
+      if (!generatedText) throw new Error("La lettera AI non e disponibile. Riprova tra poco.");
+      setText(generatedText);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Errore generazione");
     } finally {
@@ -75,7 +77,7 @@ export function CoverLetterDialog({ app, onClose }: { app: Application; onClose:
               : <><Sparkles className="w-4 h-4" /> {text ? "Rigenera lettera" : "Genera lettera AI"}</>}
           </Button>
           {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+            <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20" role="alert">
               <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
               <p className="text-xs text-destructive">{error}</p>
             </div>

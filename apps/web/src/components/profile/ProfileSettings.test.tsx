@@ -6,13 +6,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProfileSettings } from "./ProfileSettings";
 
 const patchJsonMock = vi.hoisted(() => vi.fn());
+const getJsonMock = vi.hoisted(() => vi.fn());
+const deleteJsonMock = vi.hoisted(() => vi.fn());
 const updateUserMock = vi.hoisted(() => vi.fn());
 const setMutedMock = vi.hoisted(() => vi.fn());
 const setIsLeftyMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/apiClient", () => ({
-  patchJson: patchJsonMock,
-}));
+vi.mock("@/lib/apiClient", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/apiClient")>("@/lib/apiClient");
+  return {
+    ...actual,
+    deleteJson: deleteJsonMock,
+    getJson: getJsonMock,
+    patchJson: patchJsonMock,
+  };
+});
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
@@ -78,6 +86,24 @@ function renderWithClient(children: ReactNode) {
 describe("ProfileSettings", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    if (!URL.createObjectURL) {
+      Object.defineProperty(URL, "createObjectURL", {
+        value: vi.fn(() => "blob:account-export"),
+        configurable: true,
+      });
+    } else {
+      vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:account-export");
+    }
+    if (!URL.revokeObjectURL) {
+      Object.defineProperty(URL, "revokeObjectURL", {
+        value: vi.fn(),
+        configurable: true,
+      });
+    } else {
+      vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+    }
+    vi.spyOn(document.body, "appendChild");
+    vi.spyOn(document.body, "removeChild");
   });
 
   it("reports Wendy tone save failures and keeps the previous tone selected", async () => {
@@ -108,5 +134,53 @@ describe("ProfileSettings", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Automatico/i })).toHaveClass("border-primary/40");
     expect(screen.getByRole("button", { name: /Conciso/i })).not.toHaveClass("border-primary/40");
+  });
+
+  it("reports account export failures without creating a download", async () => {
+    getJsonMock.mockRejectedValue(new Error("Export account non disponibile"));
+    const user = userEvent.setup();
+
+    renderWithClient(
+      <ProfileSettings
+        user={{
+          id: 7,
+          name: "Ada",
+          email: "ada@example.com",
+          testSessionId: null,
+          emailVerified: true,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Privacy/i }));
+    await user.click(screen.getByRole("button", { name: "Esporta dati account" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Export account non disponibile");
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Esporta dati account" })).toBeEnabled();
+  });
+
+  it("reports account delete failures and says the account was not changed", async () => {
+    deleteJsonMock.mockRejectedValue(new Error("Eliminazione account non disponibile"));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+
+    renderWithClient(
+      <ProfileSettings
+        user={{
+          id: 7,
+          name: "Ada",
+          email: "ada@example.com",
+          testSessionId: null,
+          emailVerified: true,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Privacy/i }));
+    await user.click(screen.getByRole("button", { name: "Richiedi eliminazione account" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Nessuna modifica all'account");
+    expect(screen.getByRole("button", { name: "Richiedi eliminazione account" })).toBeEnabled();
   });
 });

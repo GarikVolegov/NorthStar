@@ -64,12 +64,12 @@ describe("applications routes", () => {
     });
   });
 
-  it("does not report a placeholder create as a persisted application", async () => {
+  it("fails a placeholder create with an unavailable status instead of reporting a persisted application", async () => {
     const response = await request(app())
       .post("/api/applications")
       .set("Authorization", `Bearer ${token()}`)
       .send({ company: "NorthStar", role: "UX Reliability" })
-      .expect(201);
+      .expect(503);
 
     expect(response.body).toEqual({
       status: "not_configured",
@@ -78,12 +78,12 @@ describe("applications routes", () => {
     });
   });
 
-  it("does not report placeholder update and delete operations as successful writes", async () => {
+  it("fails placeholder update and delete operations instead of reporting successful writes", async () => {
     const update = await request(app())
       .patch("/api/applications/1")
       .set("Authorization", `Bearer ${token()}`)
       .send({ status: "interview" })
-      .expect(200);
+      .expect(503);
 
     expect(update.body).toEqual({
       status: "not_configured",
@@ -94,7 +94,7 @@ describe("applications routes", () => {
     const deletion = await request(app())
       .delete("/api/applications/1")
       .set("Authorization", `Bearer ${token()}`)
-      .expect(200);
+      .expect(503);
 
     expect(deletion.body).toEqual({
       status: "not_configured",

@@ -66,4 +66,15 @@ describe("lavori page reliability states", () => {
     expect(await screen.findByText(/Completa il test di orientamento/i)).toBeInTheDocument();
     expect(screen.queryByText("Offerte lavoro non ancora collegate")).not.toBeInTheDocument();
   });
+
+  it("shows a recoverable API error instead of the provider setup state when jobs loading fails", async () => {
+    getJsonMock.mockRejectedValue(new Error("jobs_unavailable"));
+
+    renderLavori();
+
+    expect(await screen.findByText("Offerte non disponibili")).toBeInTheDocument();
+    expect(screen.getByText("jobs_unavailable")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Riprova" })).toBeInTheDocument();
+    expect(screen.queryByText("Offerte lavoro non ancora collegate")).not.toBeInTheDocument();
+  });
 });

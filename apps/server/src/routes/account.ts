@@ -3,8 +3,31 @@ import { eq } from "drizzle-orm";
 import { db, usersTable, userProfileSettingsTable, nftCertificatesTable, userObjectivesTable, coachSessionsTable, voiceSessionsTable, messages, conversations, businessIdeasTable, coachMemoryFactsTable, coachMemoryPatternsTable, sessionSummariesTable, affiliateAccountsTable, affiliateCommissionsTable, affiliateWithdrawalsTable, affiliateReferralsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
+import { isPersistenceSchemaError } from "../lib/persistence";
 
 const router = Router();
+
+function sendAccountPersistenceError(
+  req: Request,
+  res: Response,
+  err: unknown,
+  code: "ACCOUNT_EXPORT_UNAVAILABLE" | "ACCOUNT_DELETE_UNAVAILABLE",
+) {
+  if (!isPersistenceSchemaError(err)) return false;
+  req.log?.warn?.(
+    { err, route: code, userId: req.user?.id, persistenceUnavailable: true },
+    "account persistence unavailable",
+  );
+  res.status(503).json({
+    status: "error",
+    code,
+    error: "Persistenza account non disponibile. Riprova quando il database e' stato ripristinato.",
+    action: "retry_after_persistence_restored",
+    persistenceUnavailable: true,
+    setupAction: "run_migrations",
+  });
+  return true;
+}
 
 async function getUserRelatedData(userId: number) {
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, userId)).limit(1);
@@ -79,7 +102,13 @@ router.get("/export", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (err) {
     req.log?.error?.({ err }, "account export error");
-    res.status(500).json({ error: "Errore durante l'esportazione dei dati" });
+    if (sendAccountPersistenceError(req, res, err, "ACCOUNT_EXPORT_UNAVAILABLE")) return;
+    res.status(500).json({
+      status: "error",
+      code: "ACCOUNT_EXPORT_FAILED",
+      error: "Errore durante l'esportazione dei dati",
+      action: "retry_account_export",
+    });
   }
 });
 
@@ -99,7 +128,12 @@ router.get("/status", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (err) {
     req.log?.error?.({ err }, "account status error");
-    res.status(500).json({ error: "Errore durante il recupero dello stato" });
+    res.status(500).json({
+      status: "error",
+      code: "ACCOUNT_STATUS_FAILED",
+      error: "Errore durante il recupero dello stato",
+      action: "retry_account_status",
+    });
   }
 });
 
@@ -115,12 +149,21 @@ router.delete("/", requireAuth, async (req: Request, res: Response) => {
       .limit(1);
 
     if (!user) {
-      res.status(404).json({ error: "Utente non trovato" });
+      res.status(404).json({
+        code: "ACCOUNT_NOT_FOUND",
+        error: "Utente non trovato",
+        action: "refresh_session",
+      });
       return;
     }
 
     if (user.deletedAt) {
-      res.status(400).json({ error: "Account già in fase di eliminazione" });
+      res.status(409).json({
+        code: "ACCOUNT_DELETE_ALREADY_REQUESTED",
+        error: "Account gia' in fase di eliminazione",
+        action: "check_account_status",
+        deletedAt: user.deletedAt,
+      });
       return;
     }
 
@@ -185,7 +228,13 @@ router.delete("/", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (err) {
     req.log?.error?.({ err }, "account delete error");
-    res.status(500).json({ error: "Errore durante l'eliminazione dell'account" });
+    if (sendAccountPersistenceError(req, res, err, "ACCOUNT_DELETE_UNAVAILABLE")) return;
+    res.status(500).json({
+      status: "error",
+      code: "ACCOUNT_DELETE_FAILED",
+      error: "Errore durante l'eliminazione dell'account",
+      action: "retry_account_delete",
+    });
   }
 });
 

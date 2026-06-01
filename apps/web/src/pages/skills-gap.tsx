@@ -7,6 +7,7 @@ import { useGetSector } from "@workspace/api-client-react";
 import {
   ArrowLeft,
   ArrowRight,
+  AlertTriangle,
   Loader2,
   Plus,
   RefreshCw,
@@ -20,6 +21,11 @@ const BASE = import.meta.env.BASE_URL || "/";
 
 type Step = "select" | "analyzing" | "results";
 type Level = "junior" | "mid" | "senior";
+type StreamError = {
+  title: string;
+  message: string;
+  retryable: boolean;
+};
 
 const LEVEL_LABELS: Record<Level, string> = {
   junior: "Junior (0-2 anni)",
@@ -100,6 +106,64 @@ const PROGRESS_TEXTS = [
   "Preparazione del rapporto finale…",
 ];
 
+function streamErrorFromUnknown(error: unknown): StreamError {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const normalized = message.toLowerCase();
+  if (normalized.includes("provider_not_configured") || normalized.includes("not_configured")) {
+    return {
+      title: "AI non configurata",
+      message: "Il provider AI non e configurato. L'analisi non e stata aggiornata.",
+      retryable: false,
+    };
+  }
+  if (
+    normalized.includes("malformed") ||
+    normalized.includes("empty_stream") ||
+    normalized.includes("incomplete")
+  ) {
+    return {
+      title: "Risposta AI incompleta",
+      message: "Lo stream dell'analisi si e interrotto o contiene dati non validi. Riprova senza perdere le competenze selezionate.",
+      retryable: true,
+    };
+  }
+  return {
+    title: "Analisi non completata",
+    message: "Non sono riuscito a completare l'analisi. Riprova tra poco.",
+    retryable: true,
+  };
+}
+
+function readSseContent(data: unknown) {
+  if (typeof data !== "object" || data === null) return "";
+  if ("content" in data && typeof data.content === "string") return data.content;
+  if ("value" in data && typeof data.value === "string") return data.value;
+  return "";
+}
+
+function isSseDone(data: unknown) {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    (("type" in data && data.type === "done") ||
+      ("done" in data && data.done === true))
+  );
+}
+
+function readSseError(data: unknown) {
+  if (
+    typeof data !== "object" ||
+    data === null ||
+    !("type" in data) ||
+    data.type !== "error"
+  ) {
+    return null;
+  }
+  const code = "code" in data && typeof data.code === "string" ? data.code : "stream_failed";
+  const message = "message" in data && typeof data.message === "string" ? data.message : "Errore stream";
+  return new Error(`${code}: ${message}`);
+}
+
 export default function SkillsGap() {
   const params = useParams();
   const [, setLocation] = useLocation();
@@ -110,6 +174,7 @@ export default function SkillsGap() {
   const [customSkill, setCustomSkill] = useState("");
   const [level, setLevel] = useState<Level>("junior");
   const [result, setResult] = useState("");
+  const [streamError, setStreamError] = useState<StreamError | null>(null);
   const [progressIdx, setProgressIdx] = useState(0);
   const [, setIsStreaming] = useState(false);
 
@@ -136,6 +201,7 @@ export default function SkillsGap() {
   async function analyze() {
     setStep("analyzing");
     setResult("");
+    setStreamError(null);
     setProgressIdx(0);
     setIsStreaming(true);
 
@@ -159,11 +225,17 @@ export default function SkillsGap() {
         credentials: "include",
       });
 
-      if (!res.ok || !res.body) throw new Error("Errore rete");
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { code?: string; error?: string; message?: string } | null;
+        throw new Error(body?.code ?? body?.error ?? body?.message ?? `HTTP ${res.status}`);
+      }
+      if (!res.body) throw new Error("empty_stream");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let sawMalformedEvent = false;
+      let sawTerminalEvent = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -173,25 +245,38 @@ export default function SkillsGap() {
         buffer = lines.pop() ?? "";
         for (const line of lines) {
           if (!line.startsWith("data: ")) continue;
+          let data: unknown;
           try {
-            const data = JSON.parse(line.slice(6)) as unknown;
-            const content =
-              typeof data === "object" && data !== null && "content" in data && typeof data.content === "string"
-                ? data.content
-                : "";
-            if (content) {
-              accumulated += content;
-              setResult(accumulated);
-            }
+            data = JSON.parse(line.slice(6)) as unknown;
           } catch {
-            /* skip */
+            sawMalformedEvent = true;
+            continue;
+          }
+          const streamFailure = readSseError(data);
+          if (streamFailure) throw streamFailure;
+          if (isSseDone(data)) {
+            sawTerminalEvent = true;
+            continue;
+          }
+          const content = readSseContent(data);
+          if (content) {
+            accumulated += content;
+            setResult(accumulated);
           }
         }
       }
 
+      buffer += decoder.decode();
+      if (buffer.trim()) {
+        sawMalformedEvent = true;
+      }
+      if (sawMalformedEvent) throw new Error("malformed_sse");
+      if (!sawTerminalEvent || !accumulated.trim()) throw new Error("empty_stream");
+
       setStep("results");
-    } catch {
-      setResult("Errore nell'analisi. Riprova.");
+    } catch (error) {
+      setStreamError(streamErrorFromUnknown(error));
+      setResult("");
       setStep("results");
     }
 
@@ -393,6 +478,37 @@ export default function SkillsGap() {
       {/* Step 3 — Results */}
       {step === "results" && (
         <div className="space-y-4">
+          {streamError && (
+            <Card role="alert" className="border-destructive/35 bg-destructive/5">
+              <CardContent className="pt-6 space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-full bg-destructive/10 text-destructive flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <div className="space-y-1">
+                    <h2 className="font-semibold text-base">{streamError.title}</h2>
+                    <p className="text-sm text-muted-foreground">{streamError.message}</p>
+                  </div>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button onClick={analyze} disabled={!streamError.retryable}>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Riprova analisi
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setStreamError(null);
+                      setStep("select");
+                    }}
+                  >
+                    Modifica competenze
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {readiness !== null && (
             <Card>
               <CardContent className="pt-6">
@@ -425,13 +541,15 @@ export default function SkillsGap() {
             </Card>
           )}
 
-          <Card>
-            <CardContent className="pt-6">
-              <MarkdownContent content={result} />
-            </CardContent>
-          </Card>
+          {!streamError && (
+            <Card>
+              <CardContent className="pt-6">
+                <MarkdownContent content={result} />
+              </CardContent>
+            </Card>
+          )}
 
-          <div className="flex gap-3">
+          {!streamError && <div className="flex gap-3">
             <Button
               variant="outline"
               className="flex-1"
@@ -450,7 +568,7 @@ export default function SkillsGap() {
               Vai alla Roadmap
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-          </div>
+          </div>}
         </div>
       )}
     </div>

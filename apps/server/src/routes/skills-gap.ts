@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, sectorsTable } from "@workspace/db";
@@ -20,6 +20,38 @@ const LEVEL_LABELS: Record<string, string> = {
   mid: "Mid-level (2-5 anni di esperienza)",
   senior: "Senior (5+ anni di esperienza)",
 };
+
+function writeSse(res: Response, event: Record<string, unknown>) {
+  if (!res.writableEnded) {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  }
+}
+
+function aiStreamError(err: unknown, fallbackCode = "stream_failed") {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("not_configured") ||
+    normalized.includes("not configured") ||
+    normalized.includes("api key") ||
+    normalized.includes("provider")
+  ) {
+    return {
+      type: "error",
+      code: "provider_not_configured",
+      message: "Il provider AI non e configurato. Controlla le chiavi del servizio e riprova.",
+      retryable: false,
+      action: "configure_provider",
+    };
+  }
+  return {
+    type: "error",
+    code: fallbackCode,
+    message: "Non sono riuscito a completare l'analisi. Riprova tra poco.",
+    retryable: true,
+    action: "retry",
+  };
+}
 
 router.post("/analyze", requireAuth, wendyLimiter, async (req, res) => {
   const userId = req.user!.id;
@@ -87,23 +119,31 @@ Sii diretto, motivante e specifico. Evita generalità.`;
 
     const chunks: string[] = [];
     for await (const delta of stream) {
+      if (!delta) continue;
       chunks.push(delta);
-      res.write(`data: ${JSON.stringify({ content: delta })}\n\n`);
+      writeSse(res, { type: "token", content: delta, value: delta });
+    }
+
+    const fullResponse = chunks.join("");
+    if (!fullResponse.trim()) {
+      writeSse(res, aiStreamError(new Error("empty stream"), "empty_stream"));
+      res.end();
+      return;
     }
 
     recordLlmUsage({
       userId,
       model: "google/gemini-flash-1.5",
       promptTokens,
-      completionTokens: estimateTokens(chunks.join("")),
+      completionTokens: estimateTokens(fullResponse),
       requestType: "skills-gap",
     });
 
-    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    writeSse(res, { type: "done", done: true });
     res.end();
   } catch (err) {
     req.log?.error({ err }, "skills-gap analyze failed");
-    res.write(`data: ${JSON.stringify({ content: "\n\nErrore durante l'analisi. Riprova." })}\n\n`);
+    writeSse(res, aiStreamError(err));
     res.end();
   }
 });

@@ -103,6 +103,29 @@ const JOURNEY_DESTINATION: Record<JourneyType, string> = {
   investitore: "/settori",
 };
 
+async function readJourneySaveError(response: Response): Promise<string> {
+  try {
+    const body = (await response.json()) as { error?: unknown; message?: unknown };
+    const message =
+      typeof body.error === "string"
+        ? body.error
+        : typeof body.message === "string"
+          ? body.message
+          : null;
+    if (message) return message;
+  } catch {
+    // Ignore malformed error payloads and fall back to the status-aware copy.
+  }
+
+  if (response.status === 401) {
+    return "Sessione scaduta. Accedi di nuovo prima di salvare il percorso.";
+  }
+  if (response.status === 400) {
+    return "Scelta non valida. Seleziona di nuovo il profilo e riprova.";
+  }
+  return "Non sono riuscito a salvare il percorso. Riprova tra poco.";
+}
+
 export default function Percorso() {
   const { user, login, token } = useAuth();
   const [, setLocation] = useLocation();
@@ -111,22 +134,33 @@ export default function Percorso() {
     (user?.journeyType as JourneyType) ?? null
   );
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function handleConfirm() {
     if (!selected) return;
 
     if (user && token) {
       setSaving(true);
+      setSaveError(null);
       try {
-        await apiFetch(`${BASE}api/journey-type/${user.id}/journey-type`, {
+        const response = await apiFetch(`${BASE}api/journey-type/me/journey-type`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ journeyType: selected }),
         });
+        if (!response.ok) {
+          throw new Error(await readJourneySaveError(response));
+        }
         login({ ...user, journeyType: selected }, token);
         toast({ title: "Piano salvato!", description: `Hai scelto: ${PERSONAS.find((p) => p.id === selected)?.label}` });
-      } catch {
-        toast({ title: "Errore", description: "Non è stato possibile salvare il piano.", variant: "destructive" });
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Non sono riuscito a salvare il percorso. Riprova tra poco.";
+        setSaveError(message);
+        toast({ title: "Salvataggio non riuscito", description: message, variant: "destructive" });
+        return;
       } finally {
         setSaving(false);
       }
@@ -180,7 +214,10 @@ export default function Percorso() {
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.07, duration: 0.4 }}
-                onClick={() => setSelected(persona.id)}
+                onClick={() => {
+                  setSelected(persona.id);
+                  setSaveError(null);
+                }}
                 className={`text-left p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer group relative overflow-hidden ${
                   isSelected
                     ? `${persona.border} bg-gradient-to-br ${persona.color} shadow-lg shadow-black/30`
@@ -263,6 +300,15 @@ export default function Percorso() {
               </span>
               . Puoi cambiarlo in qualsiasi momento dal tuo profilo.
             </p>
+            {saveError && (
+              <div
+                role="alert"
+                aria-live="polite"
+                className="max-w-sm rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive text-center"
+              >
+                {saveError}
+              </div>
+            )}
             <button
               onClick={handleConfirm}
               disabled={saving}

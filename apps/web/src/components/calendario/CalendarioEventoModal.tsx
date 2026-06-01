@@ -64,7 +64,7 @@ interface Props {
   defaultDate: Date;
   editingEvent: CalendarEvent | null;
   onSaved: () => void;
-  onDeleted: (id: number) => void;
+  onDeleted: (id: number) => Promise<void> | void;
 }
 
 export function CalendarioEventoModal({
@@ -79,6 +79,8 @@ export function CalendarioEventoModal({
   const { t } = useTranslation();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [persistenceError, setPersistenceError] = useState<string | null>(null);
   const [reminderToggles, setReminderToggles] = useState<
     Record<number, boolean>
   >({});
@@ -181,6 +183,7 @@ export function CalendarioEventoModal({
       setReminderToggles({});
     }
     setShowUpgradeHint(false);
+    setPersistenceError(null);
   }, [open, editingEvent, dateStr, timeStr]);
 
   const toggleReminder = (minutes: number) => {
@@ -194,6 +197,7 @@ export function CalendarioEventoModal({
 
   const onSubmit = async (values: EventFormValues) => {
     setSaving(true);
+    setPersistenceError(null);
     try {
       const payload = buildCalendarEventPayload(values, reminderToggles);
       const url = editingEvent
@@ -212,8 +216,14 @@ export function CalendarioEventoModal({
       onSaved();
       onOpenChange(false);
     } catch (error) {
+      const fallbackMessage = t("calendar.errorSaving");
       if (error instanceof ApiClientError) {
         const code = getCalendarErrorCode(error.body);
+        const message =
+          getCalendarErrorText(error.body, "error") ??
+          getCalendarErrorText(error.body, "message") ??
+          error.message ??
+          fallbackMessage;
         if (code === "FREE_LIMIT_REACHED") {
           toast({
             title: t("calendar.freeLimitTitle"),
@@ -229,15 +239,41 @@ export function CalendarioEventoModal({
         } else {
           toast({
             title: t("calendar.errorTitle"),
-            description: getCalendarErrorText(error.body, "error") ?? t("calendar.errorSaving"),
+            description: message,
             variant: "destructive",
           });
         }
+        setPersistenceError(`${message}. Nessuna modifica e' stata salvata: correggi o riprova.`);
         return;
       }
+      setPersistenceError(`${t("calendar.networkError")}. Nessuna modifica e' stata salvata: riprova.`);
       toast({ title: t("calendar.networkError"), variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingEvent) return;
+    setDeleting(true);
+    setPersistenceError(null);
+    try {
+      await onDeleted(editingEvent.id);
+      onOpenChange(false);
+    } catch (error) {
+      const message = error instanceof ApiClientError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : "Errore eliminazione evento";
+      setPersistenceError(`${message}. Evento non eliminato: puoi riprovare.`);
+      toast({
+        title: t("calendar.errorTitle"),
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -565,15 +601,30 @@ export function CalendarioEventoModal({
             showUpgradeHint={showUpgradeHint}
           />
 
+          {persistenceError && (
+            <p
+              role="alert"
+              className="rounded-lg bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive"
+            >
+              {persistenceError}
+            </p>
+          )}
+
           <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
             {editingEvent && (
               <Button
                 type="button"
                 variant="outline"
                 className="text-destructive border-destructive/30 hover:bg-destructive/10 gap-1"
-                onClick={() => onDeleted(editingEvent.id)}
+                disabled={deleting || saving}
+                onClick={handleDelete}
               >
-                <Trash2 className="h-4 w-4" /> {t("calendar.delete")}
+                {deleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                {t("calendar.delete")}
               </Button>
             )}
             <div className="flex gap-2 ml-auto">
@@ -584,7 +635,7 @@ export function CalendarioEventoModal({
               >
                 {t("calendar.cancel")}
               </Button>
-              <Button type="submit" disabled={saving} className="rounded-full">
+              <Button type="submit" disabled={saving || deleting} className="rounded-full">
                 {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 {editingEvent
                   ? t("calendar.saveChanges")

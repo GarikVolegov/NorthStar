@@ -15,7 +15,7 @@ import {
   SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
-import { patchJson } from "@/lib/apiClient";
+import { ApiClientError, patchJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -126,10 +126,11 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
   const queryClient = useQueryClient();
   const [cv, setCv] = useState<GeneratedCv>(initialCv);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // Reset when drawer re-opens with fresh data
   useEffect(() => {
-    if (open) { setCv(initialCv); setSaved(false); }
+    if (open) { setCv(initialCv); setSaved(false); setSaveError(null); }
   }, [open, initialCv]);
 
   const pi = cv.personalInfo;
@@ -144,7 +145,13 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cvs-mine", userId] });
       setSaved(true);
+      setSaveError(null);
       setTimeout(() => setSaved(false), 3000);
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof ApiClientError ? err.message : "Errore salvataggio CV";
+      setSaved(false);
+      setSaveError(`${message}. Nessuna modifica e' stata salvata, correggi o riprova.`);
     },
   });
 
@@ -361,12 +368,21 @@ export function CvEditorDrawer({ open, onClose, userId, initialCv }: Props) {
 
         {/* Footer fisso */}
         <div className="shrink-0 border-t px-4 py-3 flex items-center justify-between gap-2 bg-background">
-          {saved && (
-            <span className="flex items-center gap-1.5 text-xs text-emerald-700">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Salvato!
-            </span>
-          )}
-          {!saved && <span />}
+          <div className="min-w-0">
+            {saved && (
+              <span className="flex items-center gap-1.5 text-xs text-emerald-700">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Salvato!
+              </span>
+            )}
+            {saveError && (
+              <span
+                className="flex items-center gap-1.5 text-xs font-medium text-destructive"
+                role="alert"
+              >
+                {saveError}
+              </span>
+            )}
+          </div>
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" className="rounded-full text-xs" onClick={onClose}>
               Annulla

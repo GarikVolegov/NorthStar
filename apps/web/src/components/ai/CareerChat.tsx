@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCareerChat, type ChatMessage } from "@/hooks/useAIAgents";
 import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Loader2, MessageSquare, Send, Sparkles, User, X } from "lucide-react";
+import { Bot, Loader2, MessageSquare, RefreshCw, Send, Sparkles, User, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
 interface Props {
@@ -26,11 +26,31 @@ interface DisplayMessage {
   id: string;
 }
 
+interface ChatErrorState {
+  message: string;
+  failedText: string;
+}
+
+function friendlyChatError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("not_configured") ||
+    normalized.includes("not configured") ||
+    normalized.includes("api key") ||
+    normalized.includes("provider")
+  ) {
+    return "AI non configurata: il provider non e pronto. La risposta non e stata salvata nella conversazione.";
+  }
+  return "Il servizio AI e temporaneamente non disponibile. Riprova tra qualche istante.";
+}
+
 export function CareerChat({ profile, isPremium = false, className }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
   const [displayMessages, setDisplayMessages] = useState<DisplayMessage[]>([]);
   const [history, setHistory] = useState<ChatMessage[]>([]);
+  const [chatError, setChatError] = useState<ChatErrorState | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { mutateAsync: sendMessage, isPending } = useCareerChat();
@@ -48,13 +68,24 @@ export function CareerChat({ profile, isPremium = false, className }: Props) {
   }, [isOpen]);
 
   const sendMsg = useCallback(
-    async (text: string) => {
+    async (text: string, options?: { retry?: boolean }) => {
       if (!text.trim() || isPending) return;
 
-      const userMsg: DisplayMessage = { role: "user", content: text, id: crypto.randomUUID() };
-      setDisplayMessages((prev) => [...prev, userMsg]);
+      setChatError(null);
 
-      const newHistory: ChatMessage[] = [...history, { role: "user", content: text }];
+      const isRetry = options?.retry === true;
+      const lastHistoryTurn = history[history.length - 1];
+      const shouldReuseLastUser =
+        isRetry && lastHistoryTurn?.role === "user" && lastHistoryTurn.content === text;
+
+      if (!shouldReuseLastUser) {
+        const userMsg: DisplayMessage = { role: "user", content: text, id: crypto.randomUUID() };
+        setDisplayMessages((prev) => [...prev, userMsg]);
+      }
+
+      const newHistory: ChatMessage[] = shouldReuseLastUser
+        ? history
+        : [...history, { role: "user", content: text }];
       setHistory(newHistory);
       setInput("");
 
@@ -64,24 +95,26 @@ export function CareerChat({ profile, isPremium = false, className }: Props) {
           profile: profile ?? {},
         });
 
-        const assistantContent = res.success && res.reply
-          ? res.reply
-          : "Mi dispiace, si è verificato un errore. Riprova tra poco.";
+        if (!res.success || !res.reply) {
+          setChatError({
+            message: friendlyChatError(new Error(res.error ?? "chat_failed")),
+            failedText: text,
+          });
+          return;
+        }
 
         const assistantMsg: DisplayMessage = {
           role: "assistant",
-          content: assistantContent,
+          content: res.reply,
           id: crypto.randomUUID(),
         };
         setDisplayMessages((prev) => [...prev, assistantMsg]);
-        setHistory((prev) => [...prev, { role: "assistant", content: assistantContent }]);
-      } catch {
-        const errorMsg: DisplayMessage = {
-          role: "assistant",
-          content: "Il servizio AI è temporaneamente non disponibile. Riprova tra qualche istante.",
-          id: crypto.randomUUID(),
-        };
-        setDisplayMessages((prev) => [...prev, errorMsg]);
+        setHistory((prev) => [...prev, { role: "assistant", content: res.reply }]);
+      } catch (error) {
+        setChatError({
+          message: friendlyChatError(error),
+          failedText: text,
+        });
       }
     },
     [history, isPending, profile, sendMessage],
@@ -211,6 +244,35 @@ export function CareerChat({ profile, isPremium = false, className }: Props) {
                         <Loader2 className="w-4 h-4 text-violet-500 animate-spin" />
                       </div>
                     </motion.div>
+                  )}
+
+                  {chatError && (
+                    <div
+                      role="alert"
+                      className="rounded-xl border border-destructive/35 bg-destructive/5 p-3 text-left space-y-3"
+                    >
+                      <p className="text-sm font-medium text-foreground">{chatError.message}</p>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => void sendMsg(chatError.failedText, { retry: true })}
+                          disabled={isPending}
+                        >
+                          <RefreshCw className="w-4 h-4 mr-2" />
+                          Riprova
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setChatError(null)}
+                        >
+                          Cancella errore
+                        </Button>
+                      </div>
+                    </div>
                   )}
 
                   <div ref={bottomRef} />

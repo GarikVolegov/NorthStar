@@ -84,7 +84,7 @@ export default function Lavori() {
   const { isLoggedIn, user } = useAuth();
   const [filterType, setFilterType] = useState<string>("all");
 
-  const { data, isLoading } = useQuery<JobsResponse>({
+  const { data, error, isError, isLoading, refetch } = useQuery<JobsResponse>({
     queryKey: ["jobs", user?.id],
     queryFn: () => getJson<JobsResponse>(`${BASE}api/jobs`),
     enabled: isLoggedIn,
@@ -173,6 +173,19 @@ export default function Lavori() {
             {Array.from({ length: 6 }).map((_, i) => (
               <div key={i} className="h-48 bg-card border border-border rounded-2xl animate-pulse" />
             ))}
+          </div>
+        ) : isError ? (
+          <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-8 text-center" role="alert">
+            <AlertCircle className="h-8 w-8 mx-auto mb-3 text-destructive" />
+            <h2 className="text-lg font-semibold text-foreground mb-2">Offerte non disponibili</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto mb-5">
+              {error instanceof Error
+                ? error.message
+                : "Non siamo riusciti a caricare le offerte. Riprova tra poco."}
+            </p>
+            <Button variant="outline" className="rounded-full" onClick={() => void refetch()}>
+              Riprova
+            </Button>
           </div>
         ) : jobsNotConfigured ? (
           <div className="rounded-2xl border border-warning-muted bg-warning-surface p-8 text-center text-warning">

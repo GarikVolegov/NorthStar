@@ -112,6 +112,7 @@ export function CvSection({ userId }: { userId: number }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [generateError, setGenerateError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [editorOpen, setEditorOpen] = useState(false);
   const [generatedCvData, setGeneratedCvData] = useState<GeneratedCv | null>(
@@ -134,7 +135,7 @@ export function CvSection({ userId }: { userId: number }) {
   }, [selectedTemplate]);
 
   // ── Fetch CVs
-  const { data, isLoading } = useQuery<CvListResponse>({
+  const { data, isLoading, isError, error, refetch } = useQuery<CvListResponse>({
     queryKey: ["cvs-mine", userId],
     queryFn: async () => {
       return getJson<CvListResponse>(`${BASE}api/cv/mine`);
@@ -185,6 +186,7 @@ export function CvSection({ userId }: { userId: number }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cvs-mine", userId] });
       setUploadError(null);
+      setDeleteError(null);
     },
     onError: (err: unknown) =>
       setUploadError(apiErrorMessage(err, "Errore upload")),
@@ -216,6 +218,7 @@ export function CvSection({ userId }: { userId: number }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cvs-mine", userId] });
       setGenerateError(null);
+      setDeleteError(null);
       setShowTemplatePicker(false);
     },
     onError: (err: unknown) =>
@@ -229,7 +232,12 @@ export function CvSection({ userId }: { userId: number }) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cvs-mine", userId] });
+      setDeleteError(null);
     },
+    onError: (err: unknown) =>
+      setDeleteError(
+        `CV non eliminato: ${apiErrorMessage(err, "Errore eliminazione CV")}. Nessuna modifica e' stata applicata, puoi riprovare.`,
+      ),
   });
 
   const isBusy =
@@ -252,6 +260,27 @@ export function CvSection({ userId }: { userId: number }) {
           {isLoading && (
             <div className="flex items-center gap-2 text-muted-foreground text-sm">
               <Loader2 className="w-4 h-4 animate-spin" /> Caricamento...
+            </div>
+          )}
+
+          {isError && (
+            <div
+              role="alert"
+              className="flex flex-col gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
+            >
+              <span className="flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" />
+                CV non caricati: {apiErrorMessage(error, "errore di caricamento")}.
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 self-start rounded-full text-xs"
+                onClick={() => void refetch()}
+              >
+                Riprova caricamento CV
+              </Button>
             </div>
           )}
 
@@ -459,8 +488,28 @@ export function CvSection({ userId }: { userId: number }) {
               <AlertCircle className="w-3.5 h-3.5" /> {generateError}
             </p>
           )}
+          {deleteError && (
+            <div
+              role="alert"
+              className="flex flex-col gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive"
+            >
+              <span className="flex items-center gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5" /> {deleteError}
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 self-start rounded-full text-xs"
+                disabled={isBusy}
+                onClick={() => deleteMutation.mutate()}
+              >
+                Riprova eliminazione CV
+              </Button>
+            </div>
+          )}
 
-          {!isLoading && cvs.length === 0 && !isBusy && (
+          {!isLoading && !isError && cvs.length === 0 && !isBusy && (
             <p className="text-xs text-muted-foreground bg-muted/40 rounded-xl p-3 leading-relaxed">
               Nessun CV presente. Carica il tuo CV (PDF/TXT) oppure generane uno
               dal profilo NorthStar.

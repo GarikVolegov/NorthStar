@@ -32,7 +32,7 @@ router.get("/:id", requireAuth, async (req, res) => {
 /* POST /api/jobs - crea lavoro */
 router.post("/", requireAuth, async (req, res) => {
   try {
-    res.status(201).json(JOBS_NOT_CONFIGURED);
+    res.status(503).json(JOBS_NOT_CONFIGURED);
   } catch (err) {
     req.log?.error?.({ err }, "jobs create error");
     res.status(500).json({ error: "Errore nella creazione del lavoro" });
@@ -42,7 +42,7 @@ router.post("/", requireAuth, async (req, res) => {
 /* PATCH /api/jobs/:id - aggiorna lavoro */
 router.patch("/:id", requireAuth, async (req, res) => {
   try {
-    res.json(JOBS_NOT_CONFIGURED);
+    res.status(503).json(JOBS_NOT_CONFIGURED);
   } catch (err) {
     req.log?.error?.({ err }, "jobs update error");
     res.status(500).json({ error: "Errore nell'aggiornamento del lavoro" });
@@ -52,7 +52,7 @@ router.patch("/:id", requireAuth, async (req, res) => {
 /* DELETE /api/jobs/:id - elimina lavoro */
 router.delete("/:id", requireAuth, async (req, res) => {
   try {
-    res.json(JOBS_NOT_CONFIGURED);
+    res.status(503).json(JOBS_NOT_CONFIGURED);
   } catch (err) {
     req.log?.error?.({ err }, "jobs delete error");
     res.status(500).json({ error: "Errore nell'eliminazione del lavoro" });

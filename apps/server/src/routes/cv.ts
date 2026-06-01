@@ -1,15 +1,32 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { db, userProfileSettingsTable } from "@workspace/db";
 import {
   sendOptionalReadFallback,
-  sendPersistenceWriteError,
+  isPersistenceSchemaError,
 } from "../lib/persistence";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord } from "../lib/type-guards";
 
 const router = Router();
+
+function sendCvPersistenceWriteError(req: Request, res: Response, err: unknown) {
+  if (!isPersistenceSchemaError(err)) return false;
+  req.log?.warn?.(
+    { err, route: "cv.write", userId: req.user?.id, persistenceUnavailable: true },
+    "cv persistence unavailable",
+  );
+  res.status(503).json({
+    status: "error",
+    code: "CV_PERSISTENCE_UNAVAILABLE",
+    error: "Persistenza CV non disponibile. Nessuna modifica e' stata salvata.",
+    action: "retry_after_persistence_restored",
+    persistenceUnavailable: true,
+    setupAction: "run_migrations",
+  });
+  return true;
+}
 
 type CvProfileRow = Pick<
   typeof userProfileSettingsTable.$inferSelect,
@@ -120,7 +137,7 @@ router.post("/mine/upload", requireAuth, async (req, res) => {
     });
   } catch (err) {
     req.log?.error?.({ err }, "cv upload error");
-    if (sendPersistenceWriteError(req, res, err, "cv.upload")) return;
+    if (sendCvPersistenceWriteError(req, res, err)) return;
     res.status(500).json({ error: "Errore upload CV" });
   }
 });
@@ -156,7 +173,7 @@ router.post("/mine/generate", requireAuth, async (req, res) => {
     });
   } catch (err) {
     req.log?.error?.({ err }, "cv generate error");
-    if (sendPersistenceWriteError(req, res, err, "cv.generate")) return;
+    if (sendCvPersistenceWriteError(req, res, err)) return;
     res.status(500).json({ error: "Errore generazione CV" });
   }
 });
@@ -181,7 +198,7 @@ router.patch("/mine/generated", requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     req.log?.error?.({ err }, "cv generated update error");
-    if (sendPersistenceWriteError(req, res, err, "cv.generated.update")) return;
+    if (sendCvPersistenceWriteError(req, res, err)) return;
     res.status(500).json({ error: "Errore salvataggio CV" });
   }
 });
@@ -194,7 +211,7 @@ router.delete("/mine", requireAuth, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     req.log?.error?.({ err }, "cv delete error");
-    if (sendPersistenceWriteError(req, res, err, "cv.delete")) return;
+    if (sendCvPersistenceWriteError(req, res, err)) return;
     res.status(500).json({ error: "Errore eliminazione CV" });
   }
 });

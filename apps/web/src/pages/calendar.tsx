@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import { deleteJson, getJson } from "@/lib/apiClient";
+import { ApiClientError, deleteJson, getJson } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -103,6 +103,10 @@ function getEventColor(event: CalendarEvent): string {
   return CATEGORY_META[event.category]?.bg ?? "bg-gray-100 border-gray-300";
 }
 
+function apiErrorMessage(error: unknown, fallback: string) {
+  return error instanceof ApiClientError ? error.message : fallback;
+}
+
 export default function Calendario() {
   useWendyPageContext({
     page: 'calendario',
@@ -130,7 +134,7 @@ export default function Calendario() {
 
   const { from, to } = getDateRange(view, currentDate);
 
-  const { data, isLoading } = useQuery<{ events: CalendarEvent[] }>({
+  const { data, isLoading, isError, error, refetch } = useQuery<{ events: CalendarEvent[] }>({
     queryKey: ["calendar-events", user?.id, from.toISOString(), to.toISOString()],
     queryFn: async () => {
       if (!user?.id) return { events: [] };
@@ -255,6 +259,31 @@ export default function Calendario() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
+      ) : isError ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-destructive/20 bg-destructive/10 p-4 text-sm text-destructive"
+        >
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="min-w-0 space-y-2">
+              <p className="font-semibold">Calendario non disponibile</p>
+              <p>
+                {apiErrorMessage(error, "Non siamo riusciti a caricare gli eventi.")}
+                {" "}Gli eventi non sono stati sostituiti da uno stato vuoto.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="rounded-full"
+                onClick={() => void refetch()}
+              >
+                Riprova caricamento calendario
+              </Button>
+            </div>
+          </div>
+        </div>
       ) : (
         <>
           {view === "month" && (
@@ -303,7 +332,7 @@ export default function Calendario() {
         defaultDate={selectedDate ?? new Date()}
         editingEvent={editingEvent}
         onSaved={() => queryClient.invalidateQueries({ queryKey: ["calendar-events"] })}
-        onDeleted={(id) => { deleteMutation.mutate(id); setModalOpen(false); }}
+        onDeleted={(id) => deleteMutation.mutateAsync(id).then(() => undefined)}
       />
     </div>
   );

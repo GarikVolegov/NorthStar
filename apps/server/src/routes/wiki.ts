@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod/v4";
 import type { WikiStreamEvent } from "@workspace/ai-server";
@@ -22,6 +22,38 @@ const askSchema = z.object({
     content: z.string(),
   })).optional(),
 });
+
+function writeSse(res: Response, event: Record<string, unknown>) {
+  if (!res.writableEnded) {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  }
+}
+
+function aiStreamError(err: unknown, fallbackCode = "wiki_stream_failed") {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("not_configured") ||
+    normalized.includes("not configured") ||
+    normalized.includes("api key") ||
+    normalized.includes("provider")
+  ) {
+    return {
+      type: "error",
+      code: "provider_not_configured",
+      message: "Il provider AI non e configurato. Controlla le chiavi del servizio e riprova.",
+      retryable: false,
+      action: "configure_provider",
+    };
+  }
+  return {
+    type: "error",
+    code: fallbackCode,
+    message: "Non sono riuscito a generare la risposta Wiki. Riprova tra poco.",
+    retryable: true,
+    action: "retry",
+  };
+}
 
 router.post("/:id/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, planQuotaLimiter, async (req, res) => {
   const userId = req.user!.id;
@@ -85,10 +117,10 @@ router.post("/:id/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, pl
     for await (const event of stream) {
       if (event.type === "token") {
         fullResponse += event.value ?? "";
-        res.write(`data: ${JSON.stringify({ type: "token", value: event.value })}\n\n`);
+        writeSse(res, { type: "token", value: event.value });
       } else if (event.type === "sources") {
         sourceChunks = event.chunks ?? [];
-        res.write(`data: ${JSON.stringify({ type: "sources", chunks: event.chunks })}\n\n`);
+        writeSse(res, { type: "sources", chunks: event.chunks });
       } else if (event.type === "error") {
         recordWikiStreamError({
           requestId,
@@ -99,12 +131,31 @@ router.post("/:id/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, pl
           event,
           sourceChunks,
         });
-        res.write(`data: ${JSON.stringify({ type: "error", message: event.message })}\n\n`);
+        writeSse(res, {
+          ...aiStreamError(new Error(event.message ?? "wiki stream error")),
+          message: event.message,
+        });
         res.end();
         return;
       } else if (event.type === "done") {
         doneEvent = event;
       }
+    }
+
+    if (!fullResponse.trim()) {
+      const event = { type: "error" as const, message: "empty_stream" };
+      recordWikiStreamError({
+        requestId,
+        userId,
+        message: data.message,
+        historyLength: data.history?.length ?? 0,
+        startedAt,
+        event,
+        sourceChunks,
+      });
+      writeSse(res, aiStreamError(new Error("empty stream"), "empty_stream"));
+      res.end();
+      return;
     }
 
     if (fullResponse) {
@@ -118,7 +169,7 @@ router.post("/:id/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, pl
         userRow?.journeyType ?? undefined,
       );
 
-      res.write(`data: ${JSON.stringify({ type: "followUp", questions: suggestedQuestions })}\n\n`);
+      writeSse(res, { type: "followUp", questions: suggestedQuestions });
     }
 
     const doneTelemetry = recordWikiSuccess({
@@ -132,14 +183,14 @@ router.post("/:id/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, pl
       sourceChunks,
     });
 
-    res.write(`data: ${JSON.stringify({
+    writeSse(res, {
       type: "done",
       requestId,
       model: doneTelemetry.model,
       reason: doneTelemetry.reason,
       contextSources: doneTelemetry.contextSources,
       usage: doneTelemetry.usage,
-    })}\n\n`);
+    });
     res.end();
   } catch (err) {
     log.error({ err }, "wiki ask error");
@@ -150,7 +201,7 @@ router.post("/:id/ask", requireAuth, costGuard, wendyLimiter, wendyIpLimiter, pl
       historyLength: data.history?.length ?? 0,
       startedAt,
     });
-    res.write(`data: ${JSON.stringify({ type: "error", message: "Errore durante la generazione della risposta" })}\n\n`);
+    writeSse(res, aiStreamError(err));
     res.end();
   }
 });

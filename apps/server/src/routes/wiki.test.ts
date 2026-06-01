@@ -221,4 +221,27 @@ describe("wiki routes", () => {
       }),
     );
   });
+
+  it("emits a recoverable error when the Wiki provider closes without tokens", async () => {
+    costGuardMock.mockImplementation((_req, _res, next) => next());
+    streamWikiResponseMock.mockReturnValue((async function* () {
+      yield {
+        type: "done",
+        model: "llama-3.3-70b-versatile",
+        reason: "wiki-chat:micro",
+        contextSources: [],
+        usage: { inputTokens: 20, outputTokens: 0, costUsdEst: 0 },
+        rag: { chunksRetrieved: 0, topSimilarity: null, sourcesUsed: [] },
+      };
+    })());
+
+    const response = await request(app())
+      .post("/api/wiki/3/ask")
+      .send({ message: "ciao" })
+      .expect(200);
+
+    expect(response.text).toContain('"type":"error"');
+    expect(response.text).toContain('"code":"empty_stream"');
+    expect(response.text).not.toContain('"type":"done"');
+  });
 });

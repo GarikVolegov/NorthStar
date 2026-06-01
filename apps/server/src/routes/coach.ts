@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { eq, and, desc, isNull } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db, coachMemoryFactsTable, coachSessionsTable } from "@workspace/db";
@@ -38,6 +38,38 @@ const COACH_SYSTEM_PROMPT = `Sei Wendy, coach di crescita personale e orientamen
 Sei empatica, diretta, competente. Rispondi sempre in italiano.
 Usa un tono caldo ma concreto — mai vago o generico.
 Se non sei sicura, dillo esplicitamente piuttosto che inventare.`;
+
+function writeSse(res: Response, event: Record<string, unknown>) {
+  if (!res.writableEnded) {
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  }
+}
+
+function aiStreamError(err: unknown, fallbackCode = "stream_failed") {
+  const message = err instanceof Error ? err.message : String(err ?? "");
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("not_configured") ||
+    normalized.includes("not configured") ||
+    normalized.includes("api key") ||
+    normalized.includes("provider")
+  ) {
+    return {
+      type: "error",
+      code: "provider_not_configured",
+      message: "Il provider AI non e configurato. Controlla le chiavi del servizio e riprova.",
+      retryable: false,
+      action: "configure_provider",
+    };
+  }
+  return {
+    type: "error",
+    code: fallbackCode,
+    message: "Wendy non e riuscita a completare la risposta. Riprova tra poco.",
+    retryable: true,
+    action: "retry",
+  };
+}
 
 // ── LIST sessions ──────────────────────────────────────────────
 type MemoryFactRow = {
@@ -276,7 +308,12 @@ router.post(
       return;
     }
 
-    const log = req.log;
+    const log = req.log ?? {
+      debug: () => undefined,
+      error: () => undefined,
+      info: () => undefined,
+      warn: () => undefined,
+    };
 
     // ── Load memory + recent session summaries ─────────────────
     let memorySection = "";
@@ -343,13 +380,18 @@ router.post(
 
       const tokenBuffer: string[] = [];
       for await (const delta of stream) {
+        if (!delta) continue;
         tokenBuffer.push(delta);
-        res.write(
-          `data: ${JSON.stringify({ type: "token", value: delta })}\n\n`,
-        );
+        writeSse(res, { type: "token", value: delta });
       }
 
       const fullResponse = tokenBuffer.join("");
+      if (!fullResponse.trim()) {
+        writeSse(res, aiStreamError(new Error("empty stream"), "empty_stream"));
+        res.end();
+        return;
+      }
+
       const completionTokens = estimateTokens(fullResponse);
 
       recordLlmUsage({
@@ -460,13 +502,11 @@ router.post(
         })();
       }
 
-      res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+      writeSse(res, { type: "done" });
       res.end();
     } catch (err) {
       log.error({ err }, "coach ask error");
-      res.write(
-        `data: ${JSON.stringify({ type: "error", message: "Errore durante la generazione" })}\n\n`,
-      );
+      writeSse(res, aiStreamError(err));
       res.end();
     }
   },

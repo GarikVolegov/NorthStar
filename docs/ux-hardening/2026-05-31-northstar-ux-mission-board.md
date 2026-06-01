@@ -171,6 +171,18 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - La chat del grafo non resta bloccata su `Avvio`: stream malformati, vuoti o chiusi senza evento terminale diventano messaggi recuperabili.
 - Dashboard indeciso usa la stessa validazione del widget readiness prima di bandizzare gli strumenti, evitando consigli adattivi basati su cache incompleta.
 
+## Tranche 15 Applicata
+
+- Le route placeholder di lavori e candidature non tornano piu successo su create/update/delete: rispondono `503 not_configured`, cosi la UI non puo trattare persistenza assente come modifica riuscita.
+- Lavori distingue provider non configurato, errore API e vera lista vuota, con stato recuperabile e retry.
+- Candidature mantiene aperte form/dialog quando create/edit falliscono, mostra alert inline, e rende visibili errori di status/delete senza invalidazioni ottimistiche.
+- Il generatore lettera di presentazione non accetta una risposta AI vuota come successo: espone errore recuperabile.
+- Skills Gap, Coach e Wiki emettono errori SSE espliciti per stream vuoti, provider non configurati o fallimenti, invece di chiudere con `done` silenzioso.
+- Skills Gap e Career Chat mostrano errori stream/AI con `role="alert"`, retry e pulizia dello stato; Career Chat non salva risposte assistente fallite nella cronologia.
+- Export/eliminazione account, CV e calendario espongono errori strutturati e non dichiarano successo quando la persistenza non e disponibile.
+- Calendario e modale evento non sostituiscono errori di caricamento/salvataggio/eliminazione con griglie vuote o chiusure ottimistiche.
+- La scelta percorso autenticata usa `/api/journey-type/me/journey-type`, controlla `response.ok`, e non naviga ne aggiorna auth se il salvataggio fallisce.
+
 ## Verifica Tranche
 
 - `pnpm --filter @northstar/server test src/routes/test-sessions.test.ts`
@@ -287,6 +299,16 @@ NorthStar e una bussola professionale: aiuta utenti italiani a capire chi sono, 
 - `pnpm --filter @northstar/web exec vitest run --configLoader runner --maxWorkers=1 src/features/idea-validator/IdeaValidatorErrorStates.test.tsx src/features/idea-validator/useIdeaValidatorScoringActions.test.tsx`
 - `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/grafo-conoscenza.test.tsx src/features/knowledge-graph/KnowledgeChatPanel.test.tsx src/features/knowledge-graph/KnowledgeNodeEditor.test.tsx src/features/knowledge-graph/useKnowledgeGraphData.test.tsx`
 - `pnpm --filter @northstar/web run typecheck`
+- `git diff --check`
+
+## Verifica Tranche 15
+
+- `pnpm --filter @northstar/server run typecheck`
+- `pnpm --filter @northstar/web run typecheck`
+- `pnpm --filter @northstar/web test -- src/pages/percorso.test.tsx --maxWorkers=1`
+- `pnpm --filter @northstar/server exec vitest run --configLoader runner src/routes/applications.test.ts src/routes/jobs.test.ts src/routes/skills-gap.test.ts src/routes/coach.test.ts src/routes/wiki.test.ts src/routes/account.test.ts src/routes/cv.test.ts src/routes/calendar.test.ts --pool=forks --maxWorkers=1`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/pages/applications.test.tsx src/pages/lavori.test.tsx src/features/applications/CoverLetterDialog.test.tsx src/pages/skills-gap.test.tsx src/components/ai/CareerChat.test.tsx --pool=forks --maxWorkers=1`
+- `pnpm --filter @northstar/web exec vitest run --configLoader runner src/components/CvSection.test.tsx src/components/cv/CvEditorDrawer.test.tsx src/pages/calendar.test.tsx src/components/calendario/CalendarioEventoModal.test.tsx src/components/profile/ProfileSettings.test.tsx --pool=forks --maxWorkers=1`
 - `git diff --check`
 
 ## Backlog Prossima Tranche

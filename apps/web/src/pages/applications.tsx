@@ -35,6 +35,7 @@ export default function Candidature() {
   const [editApp, setEditApp] = useState<Application | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [view, setView] = useState<"kanban" | "stats">("kanban");
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [coverLetterApp, setCoverLetterApp] = useState<Application | null>(null);
@@ -62,6 +63,7 @@ export default function Candidature() {
         setFormError(applicationsNotConfiguredMessage);
         return;
       }
+      setMutationError(null);
       queryClient.invalidateQueries({ queryKey: ["applications", user?.id] });
       setAddOpen(false);
       setForm(EMPTY_FORM);
@@ -75,9 +77,14 @@ export default function Candidature() {
       return patchJson<Application | ApplicationsResponse>(`${BASE}api/applications/${id}`, updates);
     },
     onSuccess: (response) => {
-      if ("status" in response && response.status === "not_configured") return;
+      if ("status" in response && response.status === "not_configured") {
+        setMutationError(applicationsNotConfiguredMessage);
+        return;
+      }
+      setMutationError(null);
       queryClient.invalidateQueries({ queryKey: ["applications", user?.id] });
     },
+    onError: (error: Error) => setMutationError(error.message),
   });
 
   const deleteMutation = useMutation({
@@ -85,9 +92,14 @@ export default function Candidature() {
       return deleteJson<ApplicationsResponse>(`${BASE}api/applications/${id}`);
     },
     onSuccess: (response) => {
-      if (response.status === "not_configured") return;
+      if (response.status === "not_configured") {
+        setMutationError(applicationsNotConfiguredMessage);
+        return;
+      }
+      setMutationError(null);
       queryClient.invalidateQueries({ queryKey: ["applications", user?.id] });
     },
+    onError: (error: Error) => setMutationError(error.message),
   });
 
   function handleSubmit() {
@@ -107,6 +119,7 @@ export default function Candidature() {
           setFormError(null);
           setAddOpen(false);
         },
+        onError: (error: Error) => setFormError(error.message),
       });
     } else {
       createMutation.mutate(form);
@@ -242,6 +255,17 @@ export default function Candidature() {
 
       {/* ── Content ── */}
       <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-6">
+        {mutationError && !isLoading && !isError && !applicationsNotConfigured && total > 0 && (
+          <div className="mb-4 flex flex-col gap-3 rounded-xl border border-destructive/20 bg-destructive/10 p-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <p className="text-sm text-destructive">{mutationError}</p>
+            </div>
+            <Button variant="outline" className="rounded-full" onClick={() => void refetch()}>
+              Riprova caricamento
+            </Button>
+          </div>
+        )}
         {isLoading ? (
           <div className="flex items-center justify-center py-24">
             <Loader2 className="w-7 h-7 animate-spin text-primary" />
@@ -433,7 +457,7 @@ export default function Candidature() {
             </div>
 
             {formError && (
-              <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20" role="alert">
                 <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
                 <p className="text-xs text-destructive">{formError}</p>
               </div>

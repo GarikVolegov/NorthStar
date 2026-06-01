@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { requireAuth } from "../middleware/auth";
 import { eq, and, gte, asc, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
@@ -11,12 +11,29 @@ import {
   endOfWeek,
 } from "date-fns";
 import { it } from "date-fns/locale";
-import { sendOptionalReadFallback } from "../lib/persistence";
+import { isPersistenceSchemaError, sendOptionalReadFallback } from "../lib/persistence";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord, isOneOf } from "../lib/type-guards";
 
 const router = Router();
 const FREE_CALENDAR_EVENT_LIMIT = 25;
+
+function sendCalendarPersistenceError(req: Request, res: Response, err: unknown) {
+  if (!isPersistenceSchemaError(err)) return false;
+  req.log?.warn?.(
+    { err, route: "calendar.write", userId: req.user?.id, persistenceUnavailable: true },
+    "calendar persistence unavailable",
+  );
+  res.status(503).json({
+    status: "error",
+    code: "CALENDAR_PERSISTENCE_UNAVAILABLE",
+    error: "Persistenza calendario non disponibile. Nessuna modifica e' stata salvata.",
+    action: "retry_after_persistence_restored",
+    persistenceUnavailable: true,
+    setupAction: "run_migrations",
+  });
+  return true;
+}
 
 const EVENT_CATEGORIES = [
   "study",
@@ -148,6 +165,11 @@ function normalizeCalendarEventUpdate(body: CalendarEventInput) {
   return { data };
 }
 
+function parseEventId(value: string | undefined): number | null {
+  const eventId = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(eventId) && eventId > 0 ? eventId : null;
+}
+
 async function countUserCalendarEvents(userId: number): Promise<number> {
   try {
     if (typeof db.select !== "function") return 0;
@@ -229,7 +251,12 @@ router.get("/events", requireAuth, async (req, res) => {
     req.log?.error?.({ err }, "calendar events error");
     res
       .status(500)
-      .json({ error: "Errore nel caricamento degli eventi del calendario" });
+      .json({
+        status: "error",
+        code: "CALENDAR_EVENTS_LOAD_FAILED",
+        error: "Errore nel caricamento degli eventi del calendario",
+        action: "retry_calendar_load",
+      });
   }
 });
 
@@ -237,7 +264,15 @@ router.get("/events", requireAuth, async (req, res) => {
 router.get("/events/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const eventId = parseInt(req.params.id ?? "", 10);
+    const eventId = parseEventId(req.params.id);
+    if (!eventId) {
+      res.status(400).json({
+        code: "CALENDAR_EVENT_INVALID_ID",
+        error: "ID evento non valido",
+        action: "refresh_calendar",
+      });
+      return;
+    }
 
     const [event] = await db
       .select({
@@ -267,14 +302,23 @@ router.get("/events/:id", requireAuth, async (req, res) => {
       );
 
     if (!event) {
-      res.status(404).json({ error: "Evento non trovato" });
+      res.status(404).json({
+        code: "CALENDAR_EVENT_NOT_FOUND",
+        error: "Evento non trovato",
+        action: "refresh_calendar",
+      });
       return;
     }
 
     res.json(event);
   } catch (err) {
     req.log?.error?.({ err }, "calendar event get error");
-    res.status(500).json({ error: "Errore nel caricamento dell'evento" });
+    res.status(500).json({
+      status: "error",
+      code: "CALENDAR_EVENT_LOAD_FAILED",
+      error: "Errore nel caricamento dell'evento",
+      action: "retry_calendar_load",
+    });
   }
 });
 
@@ -286,7 +330,11 @@ router.post("/events", requireAuth, async (req, res) => {
       asPlainRecord(getRequestBody(req)),
     );
     if ("error" in normalized) {
-      res.status(400).json({ error: normalized.error });
+      res.status(400).json({
+        code: "CALENDAR_EVENT_INVALID_INPUT",
+        error: normalized.error,
+        action: "correct_event_form",
+      });
       return;
     }
 
@@ -301,7 +349,13 @@ router.post("/events", requireAuth, async (req, res) => {
     res.status(201).json(event);
   } catch (err) {
     req.log?.error?.({ err }, "calendar event create error");
-    res.status(500).json({ error: "Errore nella creazione dell'evento" });
+    if (sendCalendarPersistenceError(req, res, err)) return;
+    res.status(500).json({
+      status: "error",
+      code: "CALENDAR_EVENT_CREATE_FAILED",
+      error: "Errore nella creazione dell'evento",
+      action: "retry_calendar_save",
+    });
   }
 });
 
@@ -309,12 +363,24 @@ router.post("/events", requireAuth, async (req, res) => {
 router.patch("/events/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const eventId = parseInt(req.params.id ?? "", 10);
+    const eventId = parseEventId(req.params.id);
+    if (!eventId) {
+      res.status(400).json({
+        code: "CALENDAR_EVENT_INVALID_ID",
+        error: "ID evento non valido",
+        action: "refresh_calendar",
+      });
+      return;
+    }
     const normalized = normalizeCalendarEventUpdate(
       asPlainRecord(getRequestBody(req)),
     );
     if ("error" in normalized) {
-      res.status(400).json({ error: normalized.error });
+      res.status(400).json({
+        code: "CALENDAR_EVENT_INVALID_INPUT",
+        error: normalized.error,
+        action: "correct_event_form",
+      });
       return;
     }
 
@@ -330,14 +396,24 @@ router.patch("/events/:id", requireAuth, async (req, res) => {
       .returning();
 
     if (!event) {
-      res.status(404).json({ error: "Evento non trovato" });
+      res.status(404).json({
+        code: "CALENDAR_EVENT_NOT_FOUND",
+        error: "Evento non trovato",
+        action: "refresh_calendar",
+      });
       return;
     }
 
     res.json(event);
   } catch (err) {
     req.log?.error?.({ err }, "calendar event update error");
-    res.status(500).json({ error: "Errore nell'aggiornamento dell'evento" });
+    if (sendCalendarPersistenceError(req, res, err)) return;
+    res.status(500).json({
+      status: "error",
+      code: "CALENDAR_EVENT_UPDATE_FAILED",
+      error: "Errore nell'aggiornamento dell'evento",
+      action: "retry_calendar_save",
+    });
   }
 });
 
@@ -345,21 +421,45 @@ router.patch("/events/:id", requireAuth, async (req, res) => {
 router.delete("/events/:id", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
-    const eventId = parseInt(req.params.id ?? "", 10);
+    const eventId = parseEventId(req.params.id);
+    if (!eventId) {
+      res.status(400).json({
+        code: "CALENDAR_EVENT_INVALID_ID",
+        error: "ID evento non valido",
+        action: "refresh_calendar",
+      });
+      return;
+    }
 
-    await db
+    const deleted = await db
       .delete(calendarEventsTable)
       .where(
         and(
           eq(calendarEventsTable.id, eventId),
           eq(calendarEventsTable.userId, userId),
         ),
-      );
+      )
+      .returning({ id: calendarEventsTable.id });
+
+    if (deleted.length === 0) {
+      res.status(404).json({
+        code: "CALENDAR_EVENT_NOT_FOUND",
+        error: "Evento non trovato",
+        action: "refresh_calendar",
+      });
+      return;
+    }
 
     res.json({ success: true });
   } catch (err) {
     req.log?.error?.({ err }, "calendar event delete error");
-    res.status(500).json({ error: "Errore nell'eliminazione dell'evento" });
+    if (sendCalendarPersistenceError(req, res, err)) return;
+    res.status(500).json({
+      status: "error",
+      code: "CALENDAR_EVENT_DELETE_FAILED",
+      error: "Errore nell'eliminazione dell'evento",
+      action: "retry_calendar_delete",
+    });
   }
 });
 

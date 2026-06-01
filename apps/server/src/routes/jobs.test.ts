@@ -66,12 +66,12 @@ describe("jobs routes", () => {
     });
   });
 
-  it("does not report placeholder job writes as successful persistence", async () => {
+  it("fails placeholder job writes with an unavailable status instead of reporting successful persistence", async () => {
     const create = await request(app())
       .post("/api/jobs")
       .set("Authorization", `Bearer ${token()}`)
       .send({ title: "Designer", company: "NorthStar" })
-      .expect(201);
+      .expect(503);
 
     expect(create.body).toEqual({
       status: "not_configured",
@@ -83,7 +83,7 @@ describe("jobs routes", () => {
       .patch("/api/jobs/1")
       .set("Authorization", `Bearer ${token()}`)
       .send({ title: "Senior Designer" })
-      .expect(200);
+      .expect(503);
 
     expect(update.body).toEqual({
       status: "not_configured",
@@ -94,7 +94,7 @@ describe("jobs routes", () => {
     const deletion = await request(app())
       .delete("/api/jobs/1")
       .set("Authorization", `Bearer ${token()}`)
-      .expect(200);
+      .expect(503);
 
     expect(deletion.body).toEqual({
       status: "not_configured",
