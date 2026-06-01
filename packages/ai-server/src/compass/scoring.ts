@@ -29,7 +29,9 @@ export interface CandidateCluster {
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const CONFIDENCE_THRESHOLD = 0.6;
+// Soglia per dichiarare "è emersa un'ipotesi" (stage hypotheses). Bassa di
+// proposito: hypotheses ≠ impegno; experimenting/committed sono spike-driven.
+const CONFIDENCE_THRESHOLD = 0.5;
 
 /** Decadimento esponenziale: un segnale di `halfLifeDays` fa pesa metà. */
 export function recencyDecay(createdAt: Date, now: Date, halfLifeDays = 30): number {
