@@ -67,21 +67,40 @@ function prevPeriod(period) {
 }
 
 // ── Provider: Adzuna (conteggi reali) ───────────────────────────────────────
+/** Una SOLA chiamata: conteggio totale + salary REALE mediato dai risultati
+ *  (Adzuna espone salary_min/max per annuncio). Niente 2a chiamata = niente
+ *  rate-limit. Retry una volta su 429/5xx transitori. */
 async function fetchAdzuna(roleTitle) {
   const url = new URL("https://api.adzuna.com/v1/api/jobs/it/search/1");
   url.searchParams.set("app_id", ADZUNA_ID);
   url.searchParams.set("app_key", ADZUNA_KEY);
   url.searchParams.set("what", roleTitle);
-  url.searchParams.set("results_per_page", "1");
+  url.searchParams.set("results_per_page", "50");
   url.searchParams.set("content-type", "application/json");
-  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
-  if (!res.ok) throw new Error(`Adzuna ${res.status}`);
+
+  let res;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+    if (res.ok) break;
+    if (res.status === 429 || res.status >= 500) { await sleep(1500); continue; }
+    break;
+  }
+  if (!res || !res.ok) throw new Error(`Adzuna ${res ? res.status : "no-response"}`);
   const data = await res.json();
+
+  const results = Array.isArray(data.results) ? data.results : [];
+  // Tieni solo salari ANNUALI plausibili: scarta orari/part-time/refusi
+  // (es. 45-52 €) che falserebbero la media.
+  const plausible = (n) => Number.isFinite(n) && n >= 12000 && n <= 300000;
+  const mins = results.map((r) => Number(r.salary_min)).filter(plausible);
+  const maxs = results.map((r) => Number(r.salary_max)).filter(plausible);
+  const avg = (arr) => (arr.length ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : null);
+
   return {
     source: "adzuna",
     count: Math.max(0, Math.round(Number(data.count ?? 0))),
-    avgSalaryMin: data.salary_min != null ? Math.round(Number(data.salary_min)) : null,
-    avgSalaryMax: data.salary_max != null ? Math.round(Number(data.salary_max)) : null,
+    avgSalaryMin: avg(mins),
+    avgSalaryMax: avg(maxs),
     topSkills: [],
     growthRate: null,
   };
