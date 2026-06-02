@@ -266,8 +266,7 @@ async function liveFallbackSearch(
           visibility: "public",
           metadata: {
             tags: row.tags ?? [],
-            personalityMatches: row.personalityMatches ?? [],
-            sectorLinks: row.sectorLinks ?? [],
+            keywords: row.sectorLinks ?? [],
           },
           lexicalRaw: textIncludesScore(
             query,
@@ -316,7 +315,7 @@ async function liveFallbackSearch(
           metadata: {
             category: row.category,
             source: row.source,
-            sectorLinks: row.sectorNames ?? [],
+            keywords: row.sectorNames ?? [],
           },
           lexicalRaw: textIncludesScore(
             query,

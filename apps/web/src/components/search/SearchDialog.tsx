@@ -383,7 +383,7 @@ export function SearchDialog({
                       </CommandEmpty>
                     )}
 
-                    {query.length >= 2 && route?.confidence >= 0.6 && (
+                    {query.length >= 2 && (route?.confidence >= 0.6 || indexStatus !== "ready") && (
                       <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5">
                         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">{route.intent}</span>
                         <span className="text-[10px] text-muted-foreground/40">-</span>

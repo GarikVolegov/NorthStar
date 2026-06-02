@@ -254,4 +254,23 @@ describe("SearchDialog", () => {
 
     expect(screen.getByText("indice degraded")).toBeInTheDocument();
   });
+
+  it("shows degraded index state with the default router confidence", () => {
+    renderDialog({
+      query: "focus",
+      searchMode: "hybrid",
+      indexStatus: "degraded",
+      results: [{
+        id: 1,
+        type: "article",
+        title: "Focus profondo",
+        description: "Tecniche pratiche per proteggere l'attenzione.",
+        url: "/growth/focus",
+        icon: "x",
+        color: "blue",
+      }],
+    });
+
+    expect(screen.getByText("indice degraded")).toBeInTheDocument();
+  });
 });

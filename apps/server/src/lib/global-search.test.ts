@@ -107,6 +107,38 @@ describe("globalSearch discovery metadata", () => {
     });
   });
 
+  it("keeps public live fallback articles generic even when article taxonomy matches", async () => {
+    dbMock.execute.mockResolvedValueOnce({ rows: [] });
+    mockSelectRows([
+      {
+        id: 12,
+        title: "Routine di focus",
+        description: "Allenare l'attenzione ogni giorno",
+        slug: "routine-focus",
+        content: "Focus e metodo",
+        tags: ["focus"],
+        personalityMatches: ["Investigativo"],
+        sectorLinks: ["Design"],
+      },
+    ]);
+
+    const response = await globalSearch({
+      query: "focus",
+      userId: null,
+      types: ["article"],
+    });
+
+    expect(response.results[0]).toMatchObject({
+      type: "article",
+      source: "live",
+      sourceLabel: "Biblioteca crescita",
+      personalization: "generic",
+    });
+    expect(response.results[0]?.reasonLabels).toEqual(
+      expect.not.arrayContaining(["Profilo: Investigativo"]),
+    );
+  });
+
   it("keeps private indexed metadata redacted in discovery labels and signals", async () => {
     dbMock.execute.mockResolvedValueOnce({
       rows: [
