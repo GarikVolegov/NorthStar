@@ -13,7 +13,7 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -158,14 +158,16 @@ export default function Lavori() {
   const params = new URLSearchParams(window.location.search);
   const professionId = params.get("professionId");
   const sectorId = params.get("sectorId");
-  const city = params.get("city");
+  const initialCity = params.get("city") ?? "";
+  const [cityInput, setCityInput] = useState(initialCity);
+  const [activeCity, setActiveCity] = useState(initialCity);
   const currentPathWithSearch = `${window.location.pathname}${window.location.search}`;
   const signInHref = `/sign-in?redirect_url=${encodeURIComponent(currentPathWithSearch)}`;
   const jobsQuery = new URLSearchParams();
   if (professionId) jobsQuery.set("professionId", professionId);
   if (sectorId) jobsQuery.set("sectorId", sectorId);
   const companyQuery = new URLSearchParams(jobsQuery);
-  if (city) companyQuery.set("city", city);
+  if (activeCity) companyQuery.set("city", activeCity);
   const jobsQueryString = jobsQuery.toString();
   const companyQueryString = companyQuery.toString();
   const jobsPath = `${BASE}api/jobs${jobsQueryString ? `?${jobsQueryString}` : ""}`;
@@ -179,11 +181,23 @@ export default function Lavori() {
   });
 
   const { data: companyProspects } = useQuery<CompanyProspectsResponse>({
-    queryKey: ["company-prospects", user?.id, professionId, sectorId, city],
+    queryKey: ["company-prospects", user?.id, professionId, sectorId, activeCity],
     queryFn: () => getJson<CompanyProspectsResponse>(companiesPath),
     enabled: isLoggedIn && Boolean(professionId),
     staleTime: 60_000 * 10,
   });
+
+  function applyCity(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = cityInput.trim();
+    setActiveCity(trimmed);
+    // Mantieni la città nell'URL così la ricerca è condivisibile/ricaricabile.
+    const next = new URLSearchParams(window.location.search);
+    if (trimmed) next.set("city", trimmed);
+    else next.delete("city");
+    const qs = next.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${qs ? `?${qs}` : ""}`);
+  }
 
   const jobsNotConfigured = data?.status === "not_configured";
   const rawJobs = data?.jobs ?? [];
@@ -291,6 +305,31 @@ export default function Lavori() {
               <h2 className="text-lg font-bold text-foreground">Aziende nella tua zona</h2>
               <p className="mt-1 text-sm text-muted-foreground">{companyProspects.coverageNote}</p>
             </div>
+            <form onSubmit={applyCity} className="mb-4 flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                value={cityInput}
+                onChange={(e) => setCityInput(e.target.value)}
+                placeholder="Scegli un luogo (es. Milano, Torino, Roma…)"
+                aria-label="Città per cui cercare aziende"
+                className="min-h-11 flex-1 min-w-[12rem] rounded-full border border-border bg-background px-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
+              />
+              <button
+                type="submit"
+                className="min-h-11 whitespace-nowrap rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+              >
+                Cerca aziende qui
+              </button>
+              {activeCity && (
+                <button
+                  type="button"
+                  onClick={() => { setCityInput(""); setActiveCity(""); window.history.replaceState(null, "", window.location.pathname + (jobsQueryString ? `?${jobsQueryString}` : "")); }}
+                  className="min-h-11 whitespace-nowrap rounded-full border border-border px-4 text-sm text-muted-foreground transition hover:text-foreground"
+                >
+                  Azzera
+                </button>
+              )}
+            </form>
             {companyProspects.status === "city_required" ? (
               <p className="rounded-xl border border-dashed bg-background p-4 text-sm text-muted-foreground">
                 Aggiungi una citta al profilo o cerca con un parametro citta per trovare aziende locali.

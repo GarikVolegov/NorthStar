@@ -11,6 +11,7 @@ import {
 } from "@workspace/ai-server";
 import { db, professionsTable, simulatedDaysTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { recomputeCompass } from "../services/compass/recompute";
 
 export interface SimulatedDayRecord {
   id: number;
@@ -205,7 +206,19 @@ export function createSimulatedDaysRouter({ store = dbSimulatedDaysStore }: { st
       return;
     }
 
+    // La giornata-tipo è un segnale ESPERIENZIALE ad alto peso: aggiorna subito la
+    // Bussola così l'utente vede la sua direzione muoversi appena finita la prova
+    // (l'adapter recompute legge i simulated_days completati con debrief.radar).
+    let compassStage: string | null = null;
+    try {
+      const profile = await recomputeCompass(userId);
+      compassStage = profile.stage;
+    } catch (err) {
+      req.log?.error?.({ err }, "try-a-day compass recompute failed");
+    }
+
     res.json({
+      compassStage,
       simulationId: completed.id,
       professionId: completed.professionId,
       roleTitle: completed.roleTitle,
