@@ -1,45 +1,48 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDiscoveryMetadata,
+  type DiscoverableContent,
   type DiscoveryItemType,
+  type DiscoveryReason,
 } from "./content-discovery";
 
 describe("content discovery metadata", () => {
-  it("labels indexed public growth articles with readable source and reasons", () => {
-    const meta = buildDiscoveryMetadata({
+  it("builds public generic metadata with match score, reasons, and default cap", () => {
+    const content: DiscoverableContent = {
+      title: "Focus profondo",
+      description: "Guida pratica alla concentrazione",
       type: "article",
       source: "index",
-      visibility: "public",
-      scoreLexical: 1,
-      scoreSemantic: 0.82,
+      scoreLexical: 0.7,
+      scoreSemantic: 0.84,
       metadata: {
-        tags: ["focus", "produttivita"],
-        personalityMatches: ["Investigativo"],
+        category: "produttivita",
+        tags: ["focus", "energia"],
       },
-    });
+    };
+
+    const meta = buildDiscoveryMetadata(content);
 
     expect(meta).toMatchObject({
+      matchScore: 0.84,
+      personalization: "generic",
       source: "index",
       sourceLabel: "Indice NorthStar",
-      personalization: "profile",
       actionLabel: "Leggi",
     });
-    expect(meta.reasonLabels).toEqual(
-      expect.arrayContaining([
-        "Match nel titolo o contenuto",
-        "Match semantico",
-        "Tema: focus",
-        "Profilo: Investigativo",
-      ]),
-    );
-    expect(meta.matchSignals).toEqual(expect.arrayContaining(["lexical", "semantic", "tag:focus"]));
+    expect(meta.reasons).toHaveLength(3);
+    expect(meta.reasons).toEqual<DiscoveryReason[]>([
+      { code: "lexical", label: "Match nel titolo o contenuto", source: "content" },
+      { code: "semantic", label: "Match semantico", source: "content" },
+      { code: "category:produttivita", label: "Categoria: produttivita", source: "content" },
+    ]);
   });
 
-  it("marks public personality matches as profile personalization and trims metadata values", () => {
+  it("marks personality matches as profile personalization and trims values", () => {
     const meta = buildDiscoveryMetadata({
+      title: "Metodo investigativo",
       type: "idea",
       source: "library",
-      visibility: "public",
       scoreLexical: 0,
       scoreSemantic: null,
       metadata: {
@@ -48,33 +51,122 @@ describe("content discovery metadata", () => {
       },
     });
 
-    expect(meta).toMatchObject({
-      personalization: "profile",
-    });
-    expect(meta.reasonLabels).toEqual(
-      expect.arrayContaining(["Profilo: Investigativo", "Tema: focus"]),
+    expect(meta.personalization).toBe("profile");
+    expect(meta.reasons).toEqual(
+      expect.arrayContaining([
+        { code: "personality:Investigativo", label: "Profilo: Investigativo", source: "profile" },
+        { code: "tag:focus", label: "Tema: focus", source: "content" },
+      ]),
     );
-    expect(meta.matchSignals).toEqual(
-      expect.arrayContaining(["personality:Investigativo", "tag:focus"]),
+    expect(meta.matchedKeywords).toEqual(expect.arrayContaining(["Investigativo", "focus"]));
+  });
+
+  it("marks sector and role profile-derived matches as profile personalization", () => {
+    const meta = buildDiscoveryMetadata({
+      title: "Architettura cloud",
+      type: "role",
+      source: "live",
+      scoreLexical: 0,
+      scoreSemantic: null,
+      metadata: {
+        sectorMatches: ["Cloud"],
+        roleLinks: ["Backend Engineer"],
+      },
+    });
+
+    expect(meta.personalization).toBe("profile");
+    expect(meta.reasons).toEqual(
+      expect.arrayContaining([
+        { code: "sector:Cloud", label: "Settore: Cloud", source: "profile" },
+        { code: "role:Backend Engineer", label: "Ruolo: Backend Engineer", source: "profile" },
+      ]),
     );
   });
 
-  it("labels private live results as personal content", () => {
-    const meta = buildDiscoveryMetadata({
-      type: "objective",
-      source: "live",
-      visibility: "private",
-      scoreLexical: 0.65,
-      scoreSemantic: null,
-      metadata: { category: "carriera" },
-    });
+  it("does not expose raw private metadata values in labels or signals", () => {
+    const meta = buildDiscoveryMetadata(
+      {
+        title: "Obiettivo personale",
+        type: "objective",
+        source: "live",
+        visibility: "private",
+        scoreLexical: 0.65,
+        scoreSemantic: null,
+        metadata: {
+          category: "carriera-segreta",
+          tags: ["riservato"],
+          personalityMatches: ["Investigativo"],
+          sectorLinks: ["Finanza"],
+        },
+      },
+      { isPrivateProfileData: true },
+    );
 
     expect(meta).toMatchObject({
-      sourceLabel: "Contenuti personali",
       personalization: "private",
-      actionLabel: "Apri",
+      sourceLabel: "Contenuti personali",
     });
-    expect(meta.reasonLabels).toEqual(expect.arrayContaining(["Dati del tuo profilo"]));
+    expect(meta.reasons).toEqual(
+      expect.arrayContaining([
+        { code: "private-profile", label: "Dati del tuo profilo", source: "profile" },
+      ]),
+    );
+    const joinedLabels = meta.reasonLabels.join(" ");
+    const joinedSignals = meta.matchSignals.join(" ");
+    expect(joinedLabels).not.toContain("carriera-segreta");
+    expect(joinedLabels).not.toContain("riservato");
+    expect(joinedLabels).not.toContain("Investigativo");
+    expect(joinedLabels).not.toContain("Finanza");
+    expect(joinedSignals).not.toContain("carriera-segreta");
+    expect(joinedSignals).not.toContain("riservato");
+    expect(joinedSignals).not.toContain("Investigativo");
+    expect(joinedSignals).not.toContain("Finanza");
+  });
+
+  it("honors maxReasons overrides", () => {
+    const meta = buildDiscoveryMetadata(
+      {
+        title: "Focus profondo",
+        type: "article",
+        source: "index",
+        scoreLexical: 1,
+        scoreSemantic: 0.9,
+        metadata: {
+          category: "produttivita",
+          tags: ["focus"],
+          personalityMatches: ["Investigativo"],
+        },
+      },
+      { maxReasons: 5 },
+    );
+
+    expect(meta.reasons).toHaveLength(5);
+    expect(meta.reasonLabels).toHaveLength(5);
+    expect(meta.reasons.map((reason) => reason.label)).toEqual(
+      expect.arrayContaining([
+        "Match nel titolo o contenuto",
+        "Match semantico",
+        "Categoria: produttivita",
+        "Profilo: Investigativo",
+        "Tema: focus",
+      ]),
+    );
+  });
+
+  it("keeps Task 2 compatibility labels usable", () => {
+    const meta = buildDiscoveryMetadata({
+      title: "Notizia NorthStar",
+      type: "news",
+      source: "live",
+      scoreLexical: 0,
+      scoreSemantic: null,
+      metadata: {},
+    });
+
+    expect(meta.sourceLabel.length).toBeGreaterThan(0);
+    expect(meta.reasonLabels.length).toBeGreaterThan(0);
+    expect(meta.matchSignals.length).toBeGreaterThan(0);
+    expect(meta.actionLabel).toBe("Leggi");
   });
 
   it("returns stable labels for every supported type", () => {
@@ -94,9 +186,9 @@ describe("content discovery metadata", () => {
 
     for (const type of types) {
       const meta = buildDiscoveryMetadata({
+        title: type,
         type,
         source: "live",
-        visibility: "public",
         scoreLexical: 0,
         scoreSemantic: null,
         metadata: {},

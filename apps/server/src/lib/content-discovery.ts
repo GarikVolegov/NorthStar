@@ -2,21 +2,60 @@ import type { GlobalSearchEntityType } from "./global-search";
 
 export type DiscoveryItemType = GlobalSearchEntityType;
 export type DiscoverySource = "index" | "live" | "library" | "fallback" | "wendy";
-export type DiscoveryPersonalization = "profile" | "journey" | "generic" | "private";
+export type DiscoveryPersonalization = "profile" | "generic" | "private";
+export type DiscoveryReasonSource = "profile" | "content" | "fallback";
 
-export interface DiscoveryMetadataInput {
-  type: DiscoveryItemType;
-  source: DiscoverySource;
+export interface DiscoveryReason {
+  code: string;
+  label: string;
+  source?: DiscoveryReasonSource;
+}
+
+export interface DiscoverableContent<
+  TMetadata extends Record<string, unknown> = Record<string, unknown>,
+> {
+  title: string;
+  summary?: string | null;
+  description?: string | null;
+  url?: string | null;
+  path?: string | null;
+  href?: string | null;
+  link?: string | null;
+  source?: DiscoverySource | string | null;
+  type?: DiscoveryItemType | string | null;
+  category?: string | null;
+  metadata?: TMetadata | null;
+  tags?: string[] | null;
+  keywords?: string[] | null;
+  createdAt?: string | Date | null;
+  publishedAt?: string | Date | null;
+  updatedAt?: string | Date | null;
+  score?: number | null;
+  matchScore?: number | null;
+  scoreLexical?: number | null;
+  lexicalScore?: number | null;
+  scoreSemantic?: number | null;
+  semanticScore?: number | null;
+  readingTime?: number | string | null;
+  visibility?: "public" | "private" | null;
+}
+
+export interface DiscoveryMetadataOptions {
+  isPrivateProfileData?: boolean;
+  maxReasons?: number;
+  source?: DiscoverySource;
   visibility?: "public" | "private";
-  scoreLexical: number;
-  scoreSemantic: number | null;
-  metadata?: Record<string, unknown> | null;
 }
 
 export interface DiscoveryMetadata {
+  matchScore: number;
+  reasons: DiscoveryReason[];
+  personalization: DiscoveryPersonalization;
+  freshnessLabel?: string;
+  readingTime?: number | string;
+  matchedKeywords?: string[];
   source: DiscoverySource;
   sourceLabel: string;
-  personalization: DiscoveryPersonalization;
   reasonLabels: string[];
   matchSignals: string[];
   actionLabel: string;
@@ -51,6 +90,28 @@ const ACTION_LABELS: Record<DiscoveryItemType, string> = {
   profile: "Apri",
 };
 
+const SUPPORTED_SOURCES = new Set<DiscoverySource>([
+  "index",
+  "live",
+  "library",
+  "fallback",
+  "wendy",
+]);
+
+const SUPPORTED_TYPES = new Set<DiscoveryItemType>([
+  "sector",
+  "role",
+  "article",
+  "news",
+  "idea",
+  "objective",
+  "calendar",
+  "certification",
+  "memory",
+  "workspace",
+  "profile",
+]);
+
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((item) => {
@@ -64,64 +125,210 @@ function firstString(value: unknown): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
-export function buildDiscoveryMetadata(input: DiscoveryMetadataInput): DiscoveryMetadata {
-  const metadata = input.metadata ?? {};
-  const tags = stringArray(metadata.tags);
-  const personalityMatches = stringArray(metadata.personalityMatches);
-  const sectorLinks = stringArray(metadata.sectorLinks);
-  const category = firstString(metadata.category);
-  const isPrivate = input.visibility === "private";
+function firstNumber(...values: unknown[]): number | null {
+  for (const value of values) {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+function normalizeSource(value: unknown, fallback: DiscoverySource = "live"): DiscoverySource {
+  return typeof value === "string" && SUPPORTED_SOURCES.has(value as DiscoverySource)
+    ? (value as DiscoverySource)
+    : fallback;
+}
+
+function normalizeType(value: unknown): DiscoveryItemType | null {
+  return typeof value === "string" && SUPPORTED_TYPES.has(value as DiscoveryItemType)
+    ? (value as DiscoveryItemType)
+    : null;
+}
+
+function addReason(reasons: DiscoveryReason[], reason: DiscoveryReason): void {
+  if (!reasons.some((existing) => existing.code === reason.code)) {
+    reasons.push(reason);
+  }
+}
+
+function freshnessLabel(value: string | Date | null | undefined): string | undefined {
+  if (!value) return undefined;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+
+  const days = Math.floor((Date.now() - date.getTime()) / 86_400_000);
+  if (days <= 0) return "Aggiornato oggi";
+  if (days === 1) return "Aggiornato ieri";
+  if (days < 30) return `Aggiornato ${days} giorni fa`;
+  return undefined;
+}
+
+export function buildDiscoveryMetadata(
+  content: DiscoverableContent,
+  options: DiscoveryMetadataOptions = {},
+): DiscoveryMetadata {
+  const metadata = content.metadata ?? {};
+  const type = normalizeType(content.type);
+  const source = normalizeSource(options.source ?? content.source, "live");
+  const isPrivate =
+    options.isPrivateProfileData === true ||
+    options.visibility === "private" ||
+    content.visibility === "private";
+  const maxReasons = Math.max(1, options.maxReasons ?? 3);
+
+  const lexicalScore = firstNumber(content.scoreLexical, content.lexicalScore) ?? 0;
+  const semanticScore = firstNumber(content.scoreSemantic, content.semanticScore) ?? 0;
+  const explicitMatchScore = firstNumber(content.matchScore, content.score);
+  const matchScore = explicitMatchScore ?? Math.max(lexicalScore, semanticScore, 0);
+
+  const category = firstString(content.category) ?? firstString(metadata.category);
+  const tags = [...stringArray(content.tags), ...stringArray(metadata.tags)];
+  const keywords = [...stringArray(content.keywords), ...stringArray(metadata.keywords)];
+  const personalityMatches = [
+    ...stringArray(metadata.personalityMatches),
+    ...stringArray(metadata.personalityMatchesProfile),
+    ...stringArray(metadata.profilePersonalityMatches),
+  ];
+  const sectorMatches = [
+    ...stringArray(metadata.sectorLinks),
+    ...stringArray(metadata.sectorMatches),
+    ...stringArray(metadata.profileSectorMatches),
+  ];
+  const roleMatches = [
+    ...stringArray(metadata.roleLinks),
+    ...stringArray(metadata.roleMatches),
+    ...stringArray(metadata.profileRoleMatches),
+  ];
+  const genericProfileMatches = [
+    ...stringArray(metadata.profileMatches),
+    ...stringArray(metadata.profileMatchLabels),
+  ];
+  const hasProfileMatches =
+    personalityMatches.length > 0 ||
+    sectorMatches.length > 0 ||
+    roleMatches.length > 0 ||
+    genericProfileMatches.length > 0;
+
+  const reasons: DiscoveryReason[] = [];
+  const matchedKeywords: string[] = [];
+
+  if (lexicalScore > 0) {
+    addReason(reasons, {
+      code: "lexical",
+      label: "Match nel titolo o contenuto",
+      source: "content",
+    });
+  }
+  if (semanticScore > 0) {
+    addReason(reasons, {
+      code: "semantic",
+      label: "Match semantico",
+      source: "content",
+    });
+  }
+
+  if (isPrivate) {
+    addReason(reasons, {
+      code: "private-profile",
+      label: "Dati del tuo profilo",
+      source: "profile",
+    });
+  } else {
+    if (category) {
+      addReason(reasons, {
+        code: `category:${category}`,
+        label: `Categoria: ${category}`,
+        source: "content",
+      });
+      matchedKeywords.push(category);
+    }
+    for (const match of personalityMatches) {
+      addReason(reasons, {
+        code: `personality:${match}`,
+        label: `Profilo: ${match}`,
+        source: "profile",
+      });
+      matchedKeywords.push(match);
+    }
+    for (const sector of sectorMatches) {
+      addReason(reasons, {
+        code: `sector:${sector}`,
+        label: `Settore: ${sector}`,
+        source: "profile",
+      });
+      matchedKeywords.push(sector);
+    }
+    for (const role of roleMatches) {
+      addReason(reasons, {
+        code: `role:${role}`,
+        label: `Ruolo: ${role}`,
+        source: "profile",
+      });
+      matchedKeywords.push(role);
+    }
+    for (const profileMatch of genericProfileMatches) {
+      addReason(reasons, {
+        code: `profile:${profileMatch}`,
+        label: `Profilo: ${profileMatch}`,
+        source: "profile",
+      });
+      matchedKeywords.push(profileMatch);
+    }
+    for (const tag of tags) {
+      addReason(reasons, {
+        code: `tag:${tag}`,
+        label: `Tema: ${tag}`,
+        source: "content",
+      });
+      matchedKeywords.push(tag);
+    }
+    for (const keyword of keywords) {
+      addReason(reasons, {
+        code: `keyword:${keyword}`,
+        label: `Keyword: ${keyword}`,
+        source: "content",
+      });
+      matchedKeywords.push(keyword);
+    }
+  }
+
+  if (source === "fallback") {
+    addReason(reasons, {
+      code: "fallback",
+      label: "Contenuto generale",
+      source: "fallback",
+    });
+  }
+
+  if (reasons.length === 0) {
+    addReason(reasons, {
+      code: type ? `type:${type}` : "northstar-content",
+      label: type ? TYPE_SOURCE_LABELS[type] ?? "Contenuto NorthStar" : "Contenuto NorthStar",
+      source: "fallback",
+    });
+  }
+
+  const cappedReasons = reasons.slice(0, maxReasons);
   const sourceLabel = isPrivate
     ? "Contenuti personali"
-    : input.source === "live"
-      ? TYPE_SOURCE_LABELS[input.type] ?? PUBLIC_SOURCE_LABELS.live
-      : PUBLIC_SOURCE_LABELS[input.source];
-
-  const reasonLabels: string[] = [];
-  const matchSignals: string[] = [];
-
-  if (input.scoreLexical > 0) {
-    reasonLabels.push("Match nel titolo o contenuto");
-    matchSignals.push("lexical");
-  }
-  if (input.scoreSemantic != null && input.scoreSemantic > 0) {
-    reasonLabels.push("Match semantico");
-    matchSignals.push("semantic");
-  }
-  if (isPrivate) {
-    reasonLabels.push("Dati del tuo profilo");
-    matchSignals.push("private");
-  }
-  if (category) {
-    reasonLabels.push(`Categoria: ${category}`);
-    matchSignals.push(`category:${category}`);
-  }
-  for (const match of personalityMatches.slice(0, 2)) {
-    reasonLabels.push(`Profilo: ${match}`);
-    matchSignals.push(`personality:${match}`);
-  }
-  for (const tag of tags.slice(0, 2)) {
-    reasonLabels.push(`Tema: ${tag}`);
-    matchSignals.push(`tag:${tag}`);
-  }
-  for (const sector of sectorLinks.slice(0, 2)) {
-    reasonLabels.push(`Settore: ${sector}`);
-    matchSignals.push(`sector:${sector}`);
-  }
-  if (input.source === "fallback") {
-    reasonLabels.push("Contenuto generale");
-    matchSignals.push("fallback");
-  }
-  if (reasonLabels.length === 0) {
-    reasonLabels.push(TYPE_SOURCE_LABELS[input.type] ?? "Contenuto NorthStar");
-  }
+    : source === "live" && type
+      ? TYPE_SOURCE_LABELS[type] ?? PUBLIC_SOURCE_LABELS.live
+      : PUBLIC_SOURCE_LABELS[source];
+  const readingTime =
+    content.readingTime ?? (metadata.readingTime as number | string | null | undefined) ?? undefined;
+  const freshLabel = freshnessLabel(content.publishedAt ?? content.updatedAt ?? content.createdAt);
+  const uniqueKeywords = Array.from(new Set(matchedKeywords));
 
   return {
-    source: input.source,
+    matchScore,
+    reasons: cappedReasons,
+    personalization: isPrivate ? "private" : hasProfileMatches ? "profile" : "generic",
+    ...(freshLabel ? { freshnessLabel: freshLabel } : {}),
+    ...(readingTime != null ? { readingTime } : {}),
+    ...(uniqueKeywords.length > 0 ? { matchedKeywords: uniqueKeywords } : {}),
+    source,
     sourceLabel,
-    personalization: isPrivate ? "private" : personalityMatches.length > 0 ? "profile" : "generic",
-    reasonLabels: Array.from(new Set(reasonLabels)).slice(0, 4),
-    matchSignals: Array.from(new Set(matchSignals)),
-    actionLabel: ACTION_LABELS[input.type],
+    reasonLabels: cappedReasons.map((reason) => reason.label),
+    matchSignals: cappedReasons.map((reason) => reason.code),
+    actionLabel: type ? ACTION_LABELS[type] : "Apri",
   };
 }
