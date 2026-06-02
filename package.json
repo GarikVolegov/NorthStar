@@ -18,7 +18,7 @@
     "build:server": "pnpm --filter @northstar/server run build",
     "start:server": "pnpm --filter @northstar/server run start",
     "// ── TYPE ─────────────────────────────────────────": "---",
-    "typecheck:libs": "tsc --build",
+    "typecheck:libs": "tsc --build --force",
     "typecheck": "pnpm run typecheck:libs && pnpm --filter @northstar/server run typecheck && pnpm --filter @northstar/web run typecheck && pnpm --filter @workspace/scripts run typecheck",
     "// ── LINT ─────────────────────────────────────────": "---",
     "lint": "eslint apps/server/src apps/web/src packages/ai-server/src e2e --max-warnings=0",
