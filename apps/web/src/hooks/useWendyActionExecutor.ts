@@ -26,7 +26,9 @@ type KnownWendyActionType =
   | "update_objective_progress"
   | "create_business_idea"
   | "create_calendar_event"
-  | "create_memory_fact";
+  | "create_memory_fact"
+  | "record_compass_signal"
+  | "log_spike_outcome";
 
 type WendyActionType = KnownWendyActionType | (string & {});
 
@@ -426,6 +428,50 @@ export function useWendyActionExecutor() {
         if (!res.ok) throw new Error("Non sono riuscita a salvare la memoria.");
         invalidateOperationalData();
         toast({ title: "Memoria salvata", description: "Wendy potrà usarla nelle prossime risposte." });
+        return { ...running, status: "executed" };
+      }
+
+      if (action.type === "record_compass_signal") {
+        const res = await apiFetch(`${BASE}api/compass/signal`, {
+          method: "POST",
+          body: JSON.stringify({
+            signalType: String(action.payload.signalType ?? "chat_reaction"),
+            ...(typeof action.payload.refType === "string" ? { refType: action.payload.refType } : {}),
+            ...(action.payload.refId !== undefined ? { refId: action.payload.refId } : {}),
+            ...(typeof action.payload.valence === "number" ? { valence: action.payload.valence } : {}),
+          }),
+        });
+        if (!res.ok) {
+          throw new Error((await readApiError(res)) ?? "Non sono riuscita ad aggiornare la tua Bussola.");
+        }
+        void queryClient.invalidateQueries({ queryKey: ["compass"] });
+        toast({ title: "Bussola aggiornata", description: "Ho registrato il segnale nel tuo profilo direzionale." });
+        return { ...running, status: "executed" };
+      }
+
+      if (action.type === "log_spike_outcome") {
+        const spikeId = readPositiveInteger(action.payload.spikeId);
+        if (spikeId === null) throw new Error("ID spike non valido: non posso registrare l'esito.");
+        const decision = action.payload.decision === "kill" ? "kill" : "continue";
+        const energy = typeof action.payload.energy === "number" ? action.payload.energy : 0;
+        const res = await apiFetch(`${BASE}api/spikes/${spikeId}/resolve`, {
+          method: "POST",
+          body: JSON.stringify({
+            decision,
+            energy,
+            ...(typeof action.payload.learned === "string" ? { learned: action.payload.learned } : {}),
+          }),
+        });
+        if (!res.ok) {
+          throw new Error((await readApiError(res)) ?? "Non sono riuscita a registrare l'esito dello spike.");
+        }
+        void queryClient.invalidateQueries({ queryKey: ["compass"] });
+        toast({
+          title: "Esito registrato",
+          description: decision === "kill"
+            ? "Spike chiuso: un no informato è progresso."
+            : "Segnato: continui su questa strada.",
+        });
         return { ...running, status: "executed" };
       }
 

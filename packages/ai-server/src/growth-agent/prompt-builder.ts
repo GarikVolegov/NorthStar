@@ -213,7 +213,13 @@ export function buildSystemPrompt(opts: BuildSystemPromptOptions): string {
   if (adaptiveTone) sections.push(adaptiveTone);
 
   // ── Modalità Bussola (persona indeciso) ──────────────────────────────────
-  if (userContext.journeyType === "indeciso") {
+  // Attiva sia per l'account marcato `indeciso`, sia quando l'utente sta
+  // navigando il percorso indeciso (pageContext.journeyType) anche se il suo
+  // profilo non è ancora stato salvato come tale.
+  if (
+    userContext.journeyType === "indeciso" ||
+    userContext.pageContext?.journeyType === "indeciso"
+  ) {
     sections.push(buildIndecisoCompassSection());
   }
 

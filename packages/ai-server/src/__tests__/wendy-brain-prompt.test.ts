@@ -68,4 +68,35 @@ describe("Wendy prompt brain separation", () => {
     // Other journeys must NOT receive the compass persona section
     expect(jobSearch).not.toContain("## Modalità Bussola");
   });
+
+  it("activates the Bussola persona from pageContext.journeyType even if the account is not marked indeciso", () => {
+    const base = {
+      personaExamples: [],
+      documentChunks: [],
+      webResults: [],
+      platformChunks: [],
+      cot: null,
+      userMessage: "Sono sulla pagina Bussola",
+      evalResult: {
+        score: 0.9,
+        level: "high" as const,
+        dimensions: { contextCoverage: 0.9, cotConfidence: 0.9, questionClarity: 0.9, memoryCoverage: 0.9 },
+        reasons: [],
+        needsClarification: false,
+      },
+    };
+
+    // Nessun journeyType sull'account, ma l'utente sta navigando il percorso indeciso.
+    const onBussola = buildSystemPrompt({
+      ...base,
+      userContext: { locale: "it", pageContext: { journeyType: "indeciso", route: "/bussola" } },
+    });
+    const elsewhere = buildSystemPrompt({
+      ...base,
+      userContext: { locale: "it", pageContext: { journeyType: "dipendente", route: "/dashboard" } },
+    });
+
+    expect(onBussola).toContain("## Modalità Bussola (utente indeciso)");
+    expect(elsewhere).not.toContain("## Modalità Bussola");
+  });
 });
