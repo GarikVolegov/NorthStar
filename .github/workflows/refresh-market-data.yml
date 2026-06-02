@@ -1,0 +1,52 @@
+name: Refresh market data
+
+# Mantiene FRESCHI i dati reali di mercato senza toccare il server applicativo:
+# - domanda/salary reali per ruolo da Adzuna  → job_posting_snapshots
+# - trend/crescita reali per settore da Eurostat → sectors.trend / growth_rate
+#
+# Gira mensilmente (e on-demand). Richiede questi GitHub Secrets:
+#   DATABASE_URL      (Neon, lo stesso dell'app)
+#   ADZUNA_APP_ID     (developer.adzuna.com)
+#   ADZUNA_APP_KEY
+# Eurostat è pubblico e non richiede chiavi.
+
+on:
+  schedule:
+    - cron: "0 4 1 * *" # il 1° di ogni mese, 04:00 UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: refresh-market-data
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "20.10.x"
+  PNPM_VERSION: "11.0.9"
+
+jobs:
+  refresh:
+    name: Refresh real market data
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+      ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          pnpm-version: ${{ env.PNPM_VERSION }}
+
+      - name: Refresh job market (Adzuna)
+        if: ${{ env.DATABASE_URL != '' && env.ADZUNA_APP_ID != '' && env.ADZUNA_APP_KEY != '' }}
+        run: pnpm db:refresh:market
+
+      - name: Refresh sector trends (Eurostat)
+        if: ${{ env.DATABASE_URL != '' }}
+        run: pnpm db:refresh:eurostat
+
+      - name: Note when DB secret is missing
+        if: ${{ env.DATABASE_URL == '' }}
+        run: echo "::warning::DATABASE_URL non configurato — refresh saltato. Aggiungi i GitHub Secrets per attivare l'aggiornamento automatico."
