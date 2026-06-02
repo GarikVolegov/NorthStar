@@ -18,6 +18,7 @@ import {
   useAllSectors,
   useLatestSession,
   useRevealedRiasec,
+  useSectorsMarketDemand,
 } from "@/features/sectors/sectorExplorer";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
@@ -57,6 +58,7 @@ export default function Settori() {
   const sectorsQuery = useAllSectors();
   const { data: latestSession } = useLatestSession(Boolean(user?.id));
   const { data: revealedRiasec } = useRevealedRiasec(Boolean(user?.id));
+  const { data: marketDemandData } = useSectorsMarketDemand();
   const { workPreference } = useWorkPreference(user?.id);
   const sectors = sectorsQuery.data ?? [];
 
@@ -128,9 +130,13 @@ export default function Settori() {
     });
   }, [sectors, search, activeRiasec, activeRisk]);
 
+  const marketDemand = useMemo(
+    () => new Map((marketDemandData?.demand ?? []).map((d) => [d.sectorId, d.count])),
+    [marketDemandData],
+  );
   const ranked = useMemo(
-    () => rankSectors(filtered, latestSession, workPreference, revealedRiasec ?? undefined),
-    [filtered, latestSession, workPreference, revealedRiasec],
+    () => rankSectors(filtered, latestSession, workPreference, revealedRiasec ?? undefined, marketDemand),
+    [filtered, latestSession, workPreference, revealedRiasec, marketDemand],
   );
   const pyramid = ranked.slice(0, 8);
   const [apexSector, ...rest] = pyramid;

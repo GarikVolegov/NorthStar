@@ -73,6 +73,16 @@ export function useRevealedRiasec(enabled: boolean) {
   });
 }
 
+/** Domanda reale di mercato per settore (annunci attivi). Vuoto finché la pipeline freshness non gira. */
+export function useSectorsMarketDemand() {
+  return useQuery<{ period: string | null; demand: Array<{ sectorId: number; count: number }> }>({
+    queryKey: ["sectors-market-demand"],
+    queryFn: () => getJson(`${BASE}api/sectors/market-demand`),
+    staleTime: 300_000,
+    retry: false,
+  });
+}
+
 export function normalizeText(value: string) {
   return value
     .toLowerCase()
@@ -153,9 +163,11 @@ function buildReason(
   marketScore: number,
   recommendation?: LatestRecommendation,
   usesRevealed = false,
+  hasRealDemand = false,
 ) {
   if (recommendation?.matchReason) return recommendation.matchReason;
   if (usesRevealed && fitScore >= 70) return "Emerso da come ti muovi davvero nella Bussola, non solo dal test.";
+  if (hasRealDemand && marketScore >= 78) return "Domanda di mercato reale alta: tanti annunci attivi in questo settore.";
   if (fitScore >= 75) return "Forte coerenza con il tuo profilo e i tuoi interessi.";
   if (marketScore >= 75) return "Segnali di mercato solidi e buona sostenibilita del percorso.";
   if (sector.workMode?.length) return "Buona area da esplorare per modalita e competenze richieste.";
@@ -170,10 +182,14 @@ export function rankSectors(
   // cui ti muovi davvero pesa più di ciò che dichiari nel test. Opzionale →
   // retro-compatibile: senza, il ranking resta identico a prima.
   revealedRiasec?: Record<string, number>,
+  // Domanda REALE di mercato per settore (annunci attivi, da job_posting_snapshots).
+  // Quando presente, "quali settori sono migliori sfruttando i dati".
+  marketDemand?: Map<number, number>,
 ) {
   const recommendations = new Map(
     (latestSession?.recommendations ?? []).map((rec) => [rec.sectorId, rec]),
   );
+  const maxDemand = marketDemand && marketDemand.size > 0 ? Math.max(...marketDemand.values()) : 0;
 
   return sectors
     .map((sector) => {
@@ -188,7 +204,15 @@ export function rankSectors(
         ? (declaredFit > 0 ? Math.round(declaredFit * 0.45 + revealedFit * 0.55) : revealedFit)
         : declaredFit;
       const workModeScore = computeWorkModeScore(sector, workPreference);
-      const marketScore = computeMarketScore(sector);
+      // Mercato: parte da segnali statici (trend/salary/rischio); se ci sono DATI
+      // REALI di domanda, li fonde dominante (sqrt per non far dominare un solo picco).
+      const staticMarket = computeMarketScore(sector);
+      const demand = marketDemand?.get(sector.id);
+      const hasRealDemand = demand != null && maxDemand > 0;
+      const realDemandScore = hasRealDemand ? Math.round(45 + 55 * Math.sqrt(demand / maxDemand)) : null;
+      const marketScore = realDemandScore != null
+        ? Math.round(staticMarket * 0.4 + realDemandScore * 0.6)
+        : staticMarket;
       const rankScore = Math.round(fitScore * 0.6 + workModeScore * 0.2 + marketScore * 0.2);
 
       return {
@@ -197,7 +221,7 @@ export function rankSectors(
         fitScore,
         workModeScore,
         marketScore,
-        reason: buildReason(sector, fitScore, marketScore, recommendation, usesRevealed),
+        reason: buildReason(sector, fitScore, marketScore, recommendation, usesRevealed, hasRealDemand),
       };
     })
     .sort((a, b) => {

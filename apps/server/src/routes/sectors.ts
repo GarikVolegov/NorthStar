@@ -138,6 +138,31 @@ router.get("/:id/market", async (req, res) => {
   }
 });
 
+/* ─── GET /api/sectors/market-demand  —  domanda reale aggregata per settore ───
+ * Per la piramide /settori: ordina i settori anche sui DATI reali, non solo sul
+ * profilo. Somma gli annunci dell'ultimo periodo per settore. Vuoto finche' la
+ * pipeline freshness non gira. */
+router.get("/market-demand", async (req, res) => {
+  try {
+    const { rows } = await pool.query<{ sector_id: number; demand: string; period: string }>(`
+      WITH latest AS (
+        SELECT max(period) AS p FROM job_posting_snapshots
+      )
+      SELECT sector_id, sum(count)::int AS demand, max(period) AS period
+      FROM job_posting_snapshots, latest
+      WHERE period = latest.p AND sector_id IS NOT NULL
+      GROUP BY sector_id
+    `);
+    res.json({
+      period: rows[0]?.period ?? null,
+      demand: rows.map((r) => ({ sectorId: Number(r.sector_id), count: Number(r.demand) })),
+    });
+  } catch (err) {
+    req.log?.error?.({ err }, "sectors market-demand error");
+    res.status(500).json({ error: "Errore nel caricamento della domanda per settore" });
+  }
+});
+
 /* ─── GET /api/sectors/:id/roles  —  professioni del settore ─── */
 router.get("/:id/roles", async (req, res) => {
   try {
