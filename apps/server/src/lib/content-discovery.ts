@@ -53,7 +53,11 @@ const ACTION_LABELS: Record<DiscoveryItemType, string> = {
 
 function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+  return value.flatMap((item) => {
+    if (typeof item !== "string") return [];
+    const trimmed = item.trim();
+    return trimmed.length > 0 ? [trimmed] : [];
+  });
 }
 
 function firstString(value: unknown): string | null {
@@ -115,7 +119,7 @@ export function buildDiscoveryMetadata(input: DiscoveryMetadataInput): Discovery
   return {
     source: input.source,
     sourceLabel,
-    personalization: isPrivate ? "private" : "generic",
+    personalization: isPrivate ? "private" : personalityMatches.length > 0 ? "profile" : "generic",
     reasonLabels: Array.from(new Set(reasonLabels)).slice(0, 4),
     matchSignals: Array.from(new Set(matchSignals)),
     actionLabel: ACTION_LABELS[input.type],

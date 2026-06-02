@@ -21,7 +21,7 @@ describe("content discovery metadata", () => {
     expect(meta).toMatchObject({
       source: "index",
       sourceLabel: "Indice NorthStar",
-      personalization: "generic",
+      personalization: "profile",
       actionLabel: "Leggi",
     });
     expect(meta.reasonLabels).toEqual(
@@ -33,6 +33,30 @@ describe("content discovery metadata", () => {
       ]),
     );
     expect(meta.matchSignals).toEqual(expect.arrayContaining(["lexical", "semantic", "tag:focus"]));
+  });
+
+  it("marks public personality matches as profile personalization and trims metadata values", () => {
+    const meta = buildDiscoveryMetadata({
+      type: "idea",
+      source: "library",
+      visibility: "public",
+      scoreLexical: 0,
+      scoreSemantic: null,
+      metadata: {
+        tags: [" focus "],
+        personalityMatches: [" Investigativo "],
+      },
+    });
+
+    expect(meta).toMatchObject({
+      personalization: "profile",
+    });
+    expect(meta.reasonLabels).toEqual(
+      expect.arrayContaining(["Profilo: Investigativo", "Tema: focus"]),
+    );
+    expect(meta.matchSignals).toEqual(
+      expect.arrayContaining(["personality:Investigativo", "tag:focus"]),
+    );
   });
 
   it("labels private live results as personal content", () => {
