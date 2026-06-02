@@ -3,9 +3,9 @@ import { Input } from "@/components/ui/input";
 import { getJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ArrowRight, BookOpen, Clock, Filter, Search, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "wouter";
 
@@ -105,7 +105,16 @@ export default function CrescitaCategoria() {
   const { t } = useTranslation();
   const { cat } = useParams<{ cat: string }>();
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [diffFilter, setDiffFilter] = useState("all");
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+
+    return () => window.clearTimeout(handle);
+  }, [search]);
 
   const { data: catData = [] } = useQuery<Category[]>({
     queryKey: ["crescita-categorie"],
@@ -116,16 +125,15 @@ export default function CrescitaCategoria() {
   const currentCat = catData.find((c) => c.id === cat);
 
   const { data, isLoading } = useQuery<{ articles: Article[]; total: number }>({
-    queryKey: ["crescita", cat, search, diffFilter],
+    queryKey: ["crescita", cat, debouncedSearch, diffFilter],
     queryFn: () => {
       const params = new URLSearchParams({
         category: cat ?? "",
         limit: "50",
       });
-      const trimmedSearch = search.trim();
 
-      if (trimmedSearch) {
-        params.set("search", trimmedSearch);
+      if (debouncedSearch) {
+        params.set("search", debouncedSearch);
       }
 
       if (diffFilter !== "all") {
@@ -137,6 +145,7 @@ export default function CrescitaCategoria() {
       );
     },
     staleTime: 1000 * 60 * 5,
+    placeholderData: keepPreviousData,
     enabled: !!cat,
   });
 

@@ -41,6 +41,7 @@ function renderCategory() {
 
 describe("CrescitaCategoria server-backed filtering", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     getJsonMock.mockReset();
     getJsonMock.mockImplementation((url: string) => {
       if (url.includes("api/crescita/categorie")) {
@@ -56,6 +57,28 @@ describe("CrescitaCategoria server-backed filtering", () => {
       }
 
       if (url.includes("api/crescita?")) {
+        if (url.includes("search=leadership")) {
+          return Promise.resolve({
+            articles: [
+              {
+                id: 11,
+                title: "Leadership focalizzata",
+                slug: "leadership-focalizzata",
+                category: "focus",
+                description: "Decisioni chiare e priorita condivise.",
+                tags: ["leadership"],
+                difficulty: "base",
+                readTimeMinutes: 6,
+                viewCount: 7,
+                sourceLabel: "Biblioteca crescita",
+                personalization: "generic",
+                reasonLabels: ["Tema: leadership"],
+              },
+            ],
+            total: 1,
+          });
+        }
+
         return Promise.resolve({
           articles: [
             {
@@ -81,14 +104,19 @@ describe("CrescitaCategoria server-backed filtering", () => {
     });
   });
 
-  it("requests server-side search and keeps discovery metadata visible", async () => {
+  it("debounces trimmed server-side search and renders the searched result metadata", async () => {
     renderCategory();
 
     expect(await screen.findByText("Allenare il focus")).toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText(/Cerca articoli/i), {
-      target: { value: "leadership" },
+      target: { value: " leadership " },
     });
+
+    expect(screen.getByPlaceholderText(/Cerca articoli/i)).toHaveValue(" leadership ");
+    expect(
+      getJsonMock.mock.calls.some(([url]) => String(url).includes("search=leadership")),
+    ).toBe(false);
 
     await waitFor(() => {
       expect(
@@ -96,8 +124,10 @@ describe("CrescitaCategoria server-backed filtering", () => {
       ).toBe(true);
     });
 
+    expect(await screen.findByText("Leadership focalizzata")).toBeInTheDocument();
+    expect(screen.queryByText("Allenare il focus")).not.toBeInTheDocument();
     expect(await screen.findByText("Biblioteca crescita")).toBeInTheDocument();
-    expect(screen.getByText("Tema: focus")).toBeInTheDocument();
+    expect(screen.getByText("Tema: leadership")).toBeInTheDocument();
   });
 
   it("requests server-side difficulty filtering", async () => {
