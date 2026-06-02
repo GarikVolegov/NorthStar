@@ -2,10 +2,12 @@
  * useCompass — hook dati per "La Bussola" dell'utente indeciso.
  * Legge GET /api/compass e offre helper per registrare segnali e diagnosticare.
  */
-import { apiFetch } from "@/lib/api-fetch";
-import { useCallback, useEffect, useState } from "react";
+import { getJson, postJson } from "@/lib/apiClient";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 const BASE = import.meta.env.BASE_URL || "/";
+const COMPASS_QUERY_KEY = ["compass"] as const;
 
 export type CompassStage = "zero_ideas" | "hypotheses" | "experimenting" | "committed";
 export type CompassBlockType =
@@ -41,27 +43,17 @@ export interface SceneCard {
 }
 
 export function useCompass() {
-  const [profile, setProfile] = useState<CompassProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: COMPASS_QUERY_KEY,
+    queryFn: () => getJson<CompassProfile>(`${BASE}api/compass`),
+  });
 
-  const reload = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await apiFetch(`${BASE}api/compass`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      setProfile((await res.json()) as CompassProfile);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Errore");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  // le mutation ritornano il profilo aggiornato → aggiorna la cache react-query
+  const applyProfile = useCallback(
+    (next: CompassProfile) => queryClient.setQueryData(COMPASS_QUERY_KEY, next),
+    [queryClient],
+  );
 
   const recordSignal = useCallback(async (signal: {
     signalType: "scene_swipe" | "tournament_choice" | "block_answer" | "spike_outcome" | "chat_reaction";
@@ -72,30 +64,39 @@ export function useCompass() {
     dims?: Record<string, number>;
     weight?: number;
   }) => {
-    const res = await apiFetch(`${BASE}api/compass/signal`, {
-      method: "POST",
-      body: JSON.stringify(signal),
-    });
-    if (res.ok) setProfile((await res.json()) as CompassProfile);
-    return res.ok;
-  }, []);
+    try {
+      applyProfile(await postJson<CompassProfile>(`${BASE}api/compass/signal`, signal));
+      return true;
+    } catch {
+      return false;
+    }
+  }, [applyProfile]);
 
   const diagnose = useCallback(async (blockType: CompassBlockType) => {
-    const res = await apiFetch(`${BASE}api/compass/diagnose`, {
-      method: "POST",
-      body: JSON.stringify({ blockType }),
-    });
-    if (res.ok) setProfile((await res.json()) as CompassProfile);
-    return res.ok;
-  }, []);
+    try {
+      applyProfile(await postJson<CompassProfile>(`${BASE}api/compass/diagnose`, { blockType }));
+      return true;
+    } catch {
+      return false;
+    }
+  }, [applyProfile]);
 
-  return { profile, loading, error, reload, recordSignal, diagnose };
+  return {
+    profile: data ?? null,
+    loading: isLoading,
+    error: error ? (error instanceof Error ? error.message : "Errore") : null,
+    reload: refetch,
+    recordSignal,
+    diagnose,
+  };
 }
 
 export async function fetchScenes(limit = 12): Promise<SceneCard[]> {
-  const res = await apiFetch(`${BASE}api/compass/scenes?limit=${limit}`);
-  if (!res.ok) return [];
-  return (await res.json()) as SceneCard[];
+  try {
+    return await getJson<SceneCard[]>(`${BASE}api/compass/scenes?limit=${limit}`);
+  } catch {
+    return [];
+  }
 }
 
 /* ── Il Torneo: scelta a coppie a preferenze rivelate ── */
@@ -118,9 +119,11 @@ export interface TournamentChoiceResult extends Omit<TournamentState, "pool"> {
 }
 
 export async function fetchTournament(): Promise<TournamentState | null> {
-  const res = await apiFetch(`${BASE}api/compass/tournament`);
-  if (!res.ok) return null;
-  return (await res.json()) as TournamentState;
+  try {
+    return await getJson<TournamentState>(`${BASE}api/compass/tournament`);
+  } catch {
+    return null;
+  }
 }
 
 export async function chooseTournament(
@@ -128,12 +131,11 @@ export async function chooseTournament(
   loserId: string,
   reactionMs?: number,
 ): Promise<TournamentChoiceResult | null> {
-  const res = await apiFetch(`${BASE}api/compass/tournament/choice`, {
-    method: "POST",
-    body: JSON.stringify({ winnerId, loserId, reactionMs }),
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as TournamentChoiceResult;
+  try {
+    return await postJson<TournamentChoiceResult>(`${BASE}api/compass/tournament/choice`, { winnerId, loserId, reactionMs });
+  } catch {
+    return null;
+  }
 }
 
 /* ── Career Spike: commit reversibile ── */
@@ -161,18 +163,20 @@ export interface SpikeSuggestion {
 }
 
 export async function fetchSpikes(): Promise<CareerSpike[]> {
-  const res = await apiFetch(`${BASE}api/spikes`);
-  if (!res.ok) return [];
-  return (await res.json()) as CareerSpike[];
+  try {
+    return await getJson<CareerSpike[]>(`${BASE}api/spikes`);
+  } catch {
+    return [];
+  }
 }
 
 export async function proposeSpikeFor(hypothesisLabel: string, refId?: string): Promise<SpikeSuggestion[]> {
-  const res = await apiFetch(`${BASE}api/spikes/propose`, {
-    method: "POST",
-    body: JSON.stringify({ hypothesisLabel, refId }),
-  });
-  if (!res.ok) return [];
-  return ((await res.json()) as { suggestions: SpikeSuggestion[] }).suggestions;
+  try {
+    const data = await postJson<{ suggestions: SpikeSuggestion[] }>(`${BASE}api/spikes/propose`, { hypothesisLabel, refId });
+    return data.suggestions;
+  } catch {
+    return [];
+  }
 }
 
 export async function createSpike(body: {
@@ -183,9 +187,11 @@ export async function createSpike(body: {
   killCriterion: string;
   reviewDate?: string;
 }): Promise<CareerSpike | null> {
-  const res = await apiFetch(`${BASE}api/spikes`, { method: "POST", body: JSON.stringify(body) });
-  if (!res.ok) return null;
-  return (await res.json()) as CareerSpike;
+  try {
+    return await postJson<CareerSpike>(`${BASE}api/spikes`, body);
+  } catch {
+    return null;
+  }
 }
 
 export async function resolveSpike(
@@ -194,12 +200,11 @@ export async function resolveSpike(
   energy: number,
   learned?: string,
 ): Promise<{ spike: CareerSpike; profile: CompassProfile } | null> {
-  const res = await apiFetch(`${BASE}api/spikes/${id}/resolve`, {
-    method: "POST",
-    body: JSON.stringify({ decision, energy, learned }),
-  });
-  if (!res.ok) return null;
-  return (await res.json()) as { spike: CareerSpike; profile: CompassProfile };
+  try {
+    return await postJson<{ spike: CareerSpike; profile: CompassProfile }>(`${BASE}api/spikes/${id}/resolve`, { decision, energy, learned });
+  } catch {
+    return null;
+  }
 }
 
 /* ── Il ponte verso il lavoro vero: piano d'azione fondato sulla domanda reale ── */
@@ -226,7 +231,9 @@ export interface CompassActionPlan {
 }
 
 export async function fetchActionPlan(): Promise<CompassActionPlan | null> {
-  const res = await apiFetch(`${BASE}api/compass/action-plan`);
-  if (!res.ok) return null;
-  return (await res.json()) as CompassActionPlan;
+  try {
+    return await getJson<CompassActionPlan>(`${BASE}api/compass/action-plan`);
+  } catch {
+    return null;
+  }
 }
