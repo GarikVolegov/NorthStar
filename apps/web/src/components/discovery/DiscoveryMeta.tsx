@@ -10,9 +10,9 @@ const PERSONALIZATION_LABELS = {
 } satisfies Record<DiscoveryPersonalization, string>;
 
 export interface DiscoveryMetaProps {
-  sourceLabel?: string;
-  personalization?: DiscoveryPersonalization;
-  reasonLabels?: string[];
+  sourceLabel?: string | undefined;
+  personalization?: DiscoveryPersonalization | undefined;
+  reasonLabels?: string[] | undefined;
   className?: string;
 }
 
