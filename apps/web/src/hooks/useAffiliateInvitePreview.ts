@@ -1,5 +1,5 @@
 import { apiFetch } from "@/lib/api-fetch";
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -17,63 +17,40 @@ const EMPTY_PREVIEW: AffiliateInvitePreview = {
   referralLink: null,
 };
 
+interface AffiliatePreviewData {
+  referralCode: string | null;
+  referralLink: string | null;
+}
+
 export function useAffiliateInvitePreview(open: boolean, enabled: boolean): AffiliateInvitePreview {
-  const [preview, setPreview] = useState<AffiliateInvitePreview>(EMPTY_PREVIEW);
+  // apiFetch (non apiClient) perché serve distinguere lo status 403 = "unavailable"
+  const { data, isError } = useQuery<AffiliatePreviewData>({
+    queryKey: ["affiliate-invite-preview"],
+    enabled: open && enabled,
+    queryFn: async () => {
+      const response = await apiFetch(`${BASE}api/affiliate/dashboard`);
+      if (response.status === 403) return { referralCode: null, referralLink: null };
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json() as {
+        referralCode?: string | null;
+        code?: string | null;
+        referralLink?: string | null;
+        link?: string | null;
+      };
+      return {
+        referralCode: payload.referralCode ?? payload.code ?? null,
+        referralLink: payload.referralLink ?? payload.link ?? null,
+      };
+    },
+  });
 
-  useEffect(() => {
-    if (!open || !enabled) {
-      if (!enabled) setPreview(EMPTY_PREVIEW);
-      return;
-    }
-
-    let cancelled = false;
-    setPreview((current) => ({
-      status: current.status === "ready" ? "ready" : "loading",
-      referralCode: current.referralCode,
-      referralLink: current.referralLink,
-    }));
-
-    apiFetch(`${BASE}api/affiliate/dashboard`)
-      .then(async (response) => {
-        if (response.status === 403) return { unavailable: true };
-        if (!response.ok) return { error: true };
-        const data = await response.json() as {
-          referralCode?: string | null;
-          code?: string | null;
-          referralLink?: string | null;
-          link?: string | null;
-        };
-        return {
-          referralCode: data.referralCode ?? data.code ?? null,
-          referralLink: data.referralLink ?? data.link ?? null,
-        };
-      })
-      .then((data) => {
-        if (cancelled) return;
-        if ("unavailable" in data) {
-          setPreview({ status: "unavailable", referralCode: null, referralLink: null });
-          return;
-        }
-        if ("error" in data) {
-          setPreview({ status: "error", referralCode: null, referralLink: null });
-          return;
-        }
-        setPreview(
-          data.referralLink
-            ? { status: "ready", referralCode: data.referralCode, referralLink: data.referralLink }
-            : { status: "unavailable", referralCode: null, referralLink: null },
-        );
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setPreview({ status: "error", referralCode: null, referralLink: null });
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [enabled, open]);
-
-  return preview;
+  if (!enabled) return EMPTY_PREVIEW;
+  if (isError) return { status: "error", referralCode: null, referralLink: null };
+  if (!data) {
+    // nessun dato in cache: loading se il pannello è aperto, altrimenti idle
+    return open ? { status: "loading", referralCode: null, referralLink: null } : EMPTY_PREVIEW;
+  }
+  return data.referralLink
+    ? { status: "ready", referralCode: data.referralCode, referralLink: data.referralLink }
+    : { status: "unavailable", referralCode: null, referralLink: null };
 }
