@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { and, eq, count } from "drizzle-orm";
-import { db, pool, sectorsTable, professionsTable, testSessionsTable } from "@workspace/db";
+import { and, desc, eq, count } from "drizzle-orm";
+import { db, pool, sectorsTable, professionsTable, testSessionsTable, jobPostingSnapshotsTable } from "@workspace/db";
 
 const router = Router();
 
@@ -75,6 +75,66 @@ router.get("/:id/stats", async (req, res) => {
   } catch (err) {
     req.log?.error?.({ err }, "sector stats error");
     res.status(500).json({ error: "Errore nel caricamento delle statistiche" });
+  }
+});
+
+/* ─── GET /api/sectors/:id/market  —  domanda REALE di mercato del settore ───
+ * Aggrega i job_posting_snapshots dell'ultimo periodo per il settore. Onesto:
+ * se non ci sono ancora snapshot (pipeline freshness non eseguita) ritorna
+ * hasData:false invece di numeri inventati. Si accende da solo quando i dati
+ * reali vengono popolati. */
+router.get("/:id/market", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (Number.isNaN(id)) { res.status(400).json({ error: "ID non valido" }); return; }
+
+    const rows = await db
+      .select({
+        count: jobPostingSnapshotsTable.count,
+        period: jobPostingSnapshotsTable.period,
+        growthRate: jobPostingSnapshotsTable.growthRate,
+        avgSalaryMin: jobPostingSnapshotsTable.avgSalaryMin,
+        avgSalaryMax: jobPostingSnapshotsTable.avgSalaryMax,
+        topSkills: jobPostingSnapshotsTable.topSkills,
+        source: jobPostingSnapshotsTable.source,
+      })
+      .from(jobPostingSnapshotsTable)
+      .where(eq(jobPostingSnapshotsTable.sectorId, id))
+      .orderBy(desc(jobPostingSnapshotsTable.period))
+      .limit(50);
+
+    if (rows.length === 0) {
+      res.json({ hasData: false });
+      return;
+    }
+
+    // Aggrega solo l'ultimo periodo disponibile (il più recente).
+    const latestPeriod = rows[0]!.period;
+    const latest = rows.filter((r) => r.period === latestPeriod);
+
+    const totalCount = latest.reduce((sum, r) => sum + (r.count ?? 0), 0);
+    const growthVals = latest.map((r) => r.growthRate).filter((g): g is number => g != null);
+    const avgGrowth = growthVals.length ? growthVals.reduce((a, b) => a + b, 0) / growthVals.length : null;
+    const salMins = latest.map((r) => r.avgSalaryMin).filter((n): n is number => n != null);
+    const salMaxs = latest.map((r) => r.avgSalaryMax).filter((n): n is number => n != null);
+    const skillFreq = new Map<string, number>();
+    for (const r of latest) for (const s of r.topSkills ?? []) skillFreq.set(s, (skillFreq.get(s) ?? 0) + 1);
+    const topSkills = [...skillFreq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([s]) => s);
+    const sources = [...new Set(latest.map((r) => r.source).filter(Boolean))];
+
+    res.json({
+      hasData: true,
+      period: latestPeriod,
+      count: totalCount,
+      growthRate: avgGrowth,
+      avgSalaryMin: salMins.length ? Math.min(...salMins) : null,
+      avgSalaryMax: salMaxs.length ? Math.max(...salMaxs) : null,
+      topSkills,
+      sources,
+    });
+  } catch (err) {
+    req.log?.error?.({ err }, "sector market error");
+    res.status(500).json({ error: "Errore nel caricamento della domanda di mercato" });
   }
 });
 

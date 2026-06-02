@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Sector from "./sector";
@@ -36,6 +37,9 @@ vi.mock("@workspace/api-client-react", () => ({
   useGetSector: () => ({ data: sectorState.sector, isLoading: false, error: null }),
   useGetSectorRoles: () => ({ data: sectorState.roles, isLoading: false }),
   useGetSectorStats: () => ({ data: null, isLoading: false }),
+}));
+vi.mock("@/lib/apiClient", () => ({
+  getJson: vi.fn(() => Promise.resolve({ hasData: false })),
 }));
 
 vi.mock("@/components/WorkModeSelector", () => ({
@@ -125,6 +129,13 @@ vi.mock("wouter", () => ({
 
 const scrollIntoViewMock = vi.fn();
 
+function renderSector() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<Sector />, {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+}
+
 describe("Sector role decision flow", () => {
   beforeEach(() => {
     scrollIntoViewMock.mockClear();
@@ -136,7 +147,7 @@ describe("Sector role decision flow", () => {
   });
 
   it("promotes role choice before the deep browsing tabs", async () => {
-    render(<Sector />);
+    renderSector();
 
     expect(await screen.findByText("Scegli il ruolo target")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /scegli questo ruolo product designer/i }))
@@ -148,7 +159,7 @@ describe("Sector role decision flow", () => {
   it("scrolls to the role choice section when opened with the ruoli hash", async () => {
     window.history.replaceState({}, "", "/settore/2#ruoli");
 
-    render(<Sector />);
+    renderSector();
 
     expect(await screen.findByText("Scegli il ruolo target")).toBeInTheDocument();
     expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });

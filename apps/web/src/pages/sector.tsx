@@ -31,6 +31,8 @@ import {
   useGetSectorRoles,
   useGetSectorStats,
 } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
+import { getJson } from "@/lib/apiClient";
 import {
   ArrowLeft,
   ArrowRight,
@@ -47,6 +49,19 @@ import {
 import React, { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "wouter";
+
+const BASE = import.meta.env.BASE_URL || "/";
+
+interface SectorMarket {
+  hasData: boolean;
+  period?: string;
+  count?: number;
+  growthRate?: number | null;
+  avgSalaryMin?: number | null;
+  avgSalaryMax?: number | null;
+  topSkills?: string[];
+  sources?: string[];
+}
 
 // Main page ───────────────────────────────────────────────────────────────
 export default function Sector() {
@@ -89,6 +104,13 @@ export default function Sector() {
 
   const { data: roles, isLoading: isLoadingRoles } = useGetSectorRoles(id, {
     query: { enabled: !!id, queryKey: ["sectorRoles", id] },
+  });
+
+  const { data: market } = useQuery<SectorMarket>({
+    queryKey: ["sectorMarket", id],
+    queryFn: () => getJson<SectorMarket>(`${BASE}api/sectors/${id}/market`),
+    enabled: !!id,
+    staleTime: 60_000 * 10,
   });
 
   useWendyPageContext({
@@ -492,6 +514,50 @@ export default function Sector() {
 
         {/* Data / chart */}
         <TabsContent value="data" className="animate-in fade-in duration-500">
+          {/* Domanda REALE di mercato (onesto: niente numeri inventati) */}
+          <div className="mb-8 rounded-3xl border bg-card p-6 md:p-8 shadow-sm">
+            <h3 className="mb-1 flex items-center gap-2 text-xl font-serif font-bold">
+              <TrendingUp className="h-5 w-5 text-primary" /> Domanda reale di mercato
+            </h3>
+            {market?.hasData ? (
+              <>
+                <p className="mb-5 text-sm text-muted-foreground">
+                  Dati aggregati dagli annunci di lavoro ({market.period}).
+                </p>
+                <div className="flex flex-wrap items-center gap-3 text-sm">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 font-medium">
+                    {market.count?.toLocaleString("it-IT")} annunci
+                  </span>
+                  {market.growthRate != null && (
+                    <span className={cn(
+                      "inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5",
+                      market.growthRate >= 0 ? "text-emerald-600" : "text-amber-600",
+                    )}>
+                      {market.growthRate >= 0 ? "+" : ""}{Math.round(market.growthRate)}% trend
+                    </span>
+                  )}
+                  {(market.avgSalaryMin || market.avgSalaryMax) && (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5">
+                      💶 {market.avgSalaryMin?.toLocaleString("it-IT")}–{market.avgSalaryMax?.toLocaleString("it-IT")} €
+                    </span>
+                  )}
+                </div>
+                {market.topSkills && market.topSkills.length > 0 && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {market.topSkills.map((s) => (
+                      <span key={s} className="rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground">{s}</span>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Stiamo aggiornando la domanda reale di questo settore dalle fonti di mercato.
+                Appena disponibile la vedi qui — senza numeri inventati.
+              </p>
+            )}
+          </div>
+
           {isLoadingStats ? (
             <Skeleton className="h-[400px] w-full rounded-3xl" />
           ) : stats ? (
@@ -504,6 +570,9 @@ export default function Sector() {
                   {/* GrowthChart is memo'd: won't re-render unless chartData reference changes */}
                   <GrowthChart data={chartData} />
                 </div>
+                <p className="mt-3 text-xs text-muted-foreground/70">
+                  Proiezione indicativa basata sul tasso di crescita del settore — non sono dati di mercato live. La domanda reale è nel riquadro qui sopra.
+                </p>
               </div>
               <div className="md:col-span-2 space-y-6">
                 <div className="bg-card border rounded-3xl p-6 shadow-sm">
