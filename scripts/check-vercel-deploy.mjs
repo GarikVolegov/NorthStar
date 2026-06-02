@@ -72,6 +72,15 @@ assert(
     ),
   "vercel.json must rewrite SPA routes to /index.html",
 );
+const cspValue = Array.isArray(vercel?.headers)
+  ? vercel.headers
+      .flatMap((entry) => entry.headers ?? [])
+      .find((header) => header.key === "Content-Security-Policy")?.value
+  : undefined;
+assert(
+  typeof cspValue === "string" && /worker-src[^;]*blob:/.test(cspValue),
+  "vercel.json CSP must allow blob: workers for browser auth/runtime code",
+);
 
 assert(
   wrapper.includes("../apps/server/api/index.js"),
