@@ -167,7 +167,7 @@ function parseFilterRecord(value: Record<string, unknown> | string | undefined):
   if (!value) return {};
   if (typeof value === "string") {
     try {
-      const parsed = JSON.parse(value);
+      const parsed: unknown = JSON.parse(value);
       return parsed && typeof parsed === "object" && !Array.isArray(parsed)
         ? parsed as Record<string, unknown>
         : {};

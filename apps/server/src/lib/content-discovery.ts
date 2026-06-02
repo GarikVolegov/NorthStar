@@ -2,6 +2,8 @@ import type { GlobalSearchEntityType } from "./global-search";
 
 export type DiscoveryItemType = GlobalSearchEntityType;
 export type DiscoverySource = "index" | "live" | "library" | "fallback" | "wendy";
+type UnknownDiscoverySource = string & {};
+type UnknownDiscoveryItemType = string & {};
 export type DiscoveryPersonalization = "profile" | "journey" | "generic" | "private";
 export type DiscoveryReasonSource = "profile" | "content" | "fallback";
 
@@ -21,8 +23,8 @@ export interface DiscoverableContent<
   path?: string | null;
   href?: string | null;
   link?: string | null;
-  source?: DiscoverySource | string | null;
-  type?: DiscoveryItemType | string | null;
+  source?: DiscoverySource | UnknownDiscoverySource | null;
+  type?: DiscoveryItemType | UnknownDiscoveryItemType | null;
   category?: string | null;
   metadata?: TMetadata | null;
   tags?: string[] | null;

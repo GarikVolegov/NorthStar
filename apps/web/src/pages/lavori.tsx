@@ -42,10 +42,10 @@ interface JobsResponse {
   basedOnSector: string | null;
   totalCount: number;
   status?: "ok" | "empty" | "not_configured";
-  reason?: "jobs_provider_not_connected" | string;
-  action?: "connect_jobs_provider" | string;
+  reason?: "jobs_provider_not_connected" | (string & {});
+  action?: "connect_jobs_provider" | (string & {});
   personalized?: boolean;
-  source?: "job_posting_snapshots" | string;
+  source?: "job_posting_snapshots" | (string & {});
   period?: string | null;
   filter?: {
     professionId: number | null;

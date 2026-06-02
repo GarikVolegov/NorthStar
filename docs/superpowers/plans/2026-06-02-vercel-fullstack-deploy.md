@@ -173,7 +173,7 @@ Expected valid shapes:
 ```json
 {
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm run quality:required && pnpm --filter @northstar/server exec node build.mjs && pnpm --filter @northstar/web run build",
+  "buildCommand": "pnpm run typecheck && pnpm --filter @northstar/server exec node build.mjs && pnpm --filter @northstar/web run build",
   "outputDirectory": "apps/web/dist/public",
   "framework": "vite",
   "rewrites": [
@@ -249,7 +249,7 @@ NorthStar deploys to Vercel as one full-stack project from the repository root.
 - Root Directory: repository root
 - Framework Preset: Vite
 - Install Command: `pnpm install --frozen-lockfile`
-- Build Command: `pnpm run quality:required && pnpm --filter @northstar/server exec node build.mjs && pnpm --filter @northstar/web run build`
+- Build Command: `pnpm run typecheck && pnpm --filter @northstar/server exec node build.mjs && pnpm --filter @northstar/web run build`
 - Output Directory: `apps/web/dist/public`
 
 API traffic is handled by `api/[...path].js`, which loads the bundled Express app generated at `apps/server/api/index.js`.

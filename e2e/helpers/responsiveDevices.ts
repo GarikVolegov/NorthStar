@@ -1,4 +1,4 @@
-import { devices } from "@playwright/test";
+import type { devices } from "@playwright/test";
 
 export type PlaywrightDevice = typeof devices["Pixel 5"];
 

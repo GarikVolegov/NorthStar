@@ -68,11 +68,11 @@ vi.mock("wouter", () => ({
 vi.mock("framer-motion", () => ({
   motion: {
     div: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => {
-      const { initial, animate, transition, ...rest } = props;
+      const { initial: _initial, animate: _animate, transition: _transition, ...rest } = props;
       return <div {...rest}>{children}</div>;
     },
     button: ({ children, ...props }: React.PropsWithChildren<Record<string, unknown>>) => {
-      const { initial, animate, transition, ...rest } = props;
+      const { initial: _initial, animate: _animate, transition: _transition, ...rest } = props;
       return <button {...rest}>{children}</button>;
     },
   },

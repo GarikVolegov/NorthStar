@@ -1,4 +1,4 @@
-import { newsArticlesTable } from "@workspace/db";
+import type { newsArticlesTable } from "@workspace/db";
 import { mapNewsCategoryForUi } from "../lib/news-category";
 
 export type NewsArticleRow = typeof newsArticlesTable.$inferSelect;
@@ -122,7 +122,7 @@ export function escapeSvgText(value: unknown): string {
 }
 
 export function readHexColor(value: unknown, fallback: string): string {
-  const raw = Array.isArray(value) ? value[0] : value;
+  const raw: unknown = Array.isArray(value) ? (value as readonly unknown[])[0] : value;
   return typeof raw === "string" && /^[0-9a-f]{6}$/i.test(raw) ? raw : fallback;
 }
 

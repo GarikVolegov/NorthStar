@@ -108,7 +108,7 @@ The intended root build is:
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm run quality:required
+pnpm run typecheck
 pnpm --filter @northstar/server exec node build.mjs
 pnpm --filter @northstar/web run build
 ```

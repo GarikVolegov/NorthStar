@@ -87,7 +87,7 @@ function newsStatus(newsCount: number): NewsFeedStatus {
 }
 
 function readNewsLocale(value: unknown): NewsLocale {
-  const raw = Array.isArray(value) ? value[0] : value;
+  const raw: unknown = Array.isArray(value) ? (value as readonly unknown[])[0] : value;
   const normalized = typeof raw === "string" ? raw.slice(0, 2).toLowerCase() : "it";
   return ["it", "en", "es", "fr", "de"].includes(normalized) ? normalized as NewsLocale : "it";
 }
@@ -137,7 +137,7 @@ async function runAutoNewsRefresh(reason: NewsRefreshReason, log?: { warn?: (pay
         lastNewsRefreshResult = refreshResult;
         return refreshResult;
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         const message = err instanceof Error ? err.message : String(err);
         log?.warn?.({ err, reason }, "news auto-refresh failed");
         const refreshResult = {
