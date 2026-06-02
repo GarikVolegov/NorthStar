@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const dbMock = vi.hoisted(() => ({
   select: vi.fn(),
+  update: vi.fn(),
 }));
 
 const authState = vi.hoisted(() => ({
@@ -69,6 +70,14 @@ function mockSelectRows(rows: unknown[]) {
   dbMock.select.mockReturnValueOnce(chain);
 }
 
+function mockUpdateOk() {
+  const chain = {
+    set: vi.fn(() => chain),
+    where: vi.fn(async () => []),
+  };
+  dbMock.update.mockReturnValueOnce(chain);
+}
+
 function stringifyQueryCondition(condition: unknown) {
   const seen = new WeakSet<object>();
   return JSON.stringify(condition, (_key, value) => {
@@ -92,6 +101,7 @@ describe("growth routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     dbMock.select.mockReset();
+    dbMock.update.mockReset();
     authState.user = null;
   });
 
@@ -168,6 +178,7 @@ describe("growth routes", () => {
     expect(response.body.articles[0]).toMatchObject({
       id: 2,
       personalityMatches: ["Artistico"],
+      personalization: "profile",
     });
   });
 
@@ -205,7 +216,7 @@ describe("growth routes", () => {
       id: 1,
       source: "library",
       sourceLabel: "Biblioteca crescita",
-      personalization: "profile",
+      personalization: "generic",
       actionLabel: "Leggi",
       reasonLabels: expect.arrayContaining(["Tema: focus", "Profilo: I"]),
       matchSignals: expect.any(Array),
@@ -362,5 +373,37 @@ describe("growth routes", () => {
       related: expect.any(Array),
     });
     expect(response.body.content).toMatch(/Settimana|giorni|azione/i);
+  });
+
+  it("keeps library article details and related articles generic outside profile context", async () => {
+    mockSelectRows(articles);
+    mockUpdateOk();
+    mockSelectRows([
+      {
+        ...articles[0],
+        id: 2,
+        slug: "routine-focus-related",
+        personalityMatches: ["Artistico"],
+      },
+    ]);
+
+    const response = await request(app())
+      .get("/api/crescita/routine-focus")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      slug: "routine-focus",
+      source: "library",
+      personalization: "generic",
+      reasonLabels: expect.arrayContaining(["Profilo: I"]),
+      related: [
+        expect.objectContaining({
+          slug: "routine-focus-related",
+          source: "library",
+          personalization: "generic",
+          reasonLabels: expect.arrayContaining(["Profilo: Artistico"]),
+        }),
+      ],
+    });
   });
 });

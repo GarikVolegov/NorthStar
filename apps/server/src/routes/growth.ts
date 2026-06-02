@@ -166,7 +166,7 @@ function mapArticle(
 
   const discoveryMetadata = {
     ...discovery,
-    personalization: options.personalization ?? discovery.personalization,
+    personalization: options.personalization ?? "generic",
   };
 
   return {
