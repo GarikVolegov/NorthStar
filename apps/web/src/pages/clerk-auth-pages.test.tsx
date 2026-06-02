@@ -48,13 +48,13 @@ describe("Clerk auth pages", () => {
     );
   });
 
-  it("sends signed-in users through the home onboarding gate after sign-in", () => {
+  it("sends signed-in users to the dashboard after sign-in", () => {
     render(<SignInPage />);
 
     expect(signInMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        fallbackRedirectUrl: "/",
-        forceRedirectUrl: "/",
+        fallbackRedirectUrl: "/dashboard",
+        forceRedirectUrl: "/dashboard",
       }),
     );
   });
@@ -72,13 +72,13 @@ describe("Clerk auth pages", () => {
     }));
   });
 
-  it("sends new users through the home onboarding gate after sign-up", () => {
+  it("sends new users to the dashboard after sign-up", () => {
     render(<SignUpPage />);
 
     expect(signUpMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        fallbackRedirectUrl: "/",
-        forceRedirectUrl: "/",
+        fallbackRedirectUrl: "/dashboard",
+        forceRedirectUrl: "/dashboard",
       }),
     );
   });

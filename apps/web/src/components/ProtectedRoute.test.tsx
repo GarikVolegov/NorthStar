@@ -71,14 +71,14 @@ describe("PublicOnlyRoute", () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it("redirects incomplete signed-in users to the onboarding gate instead of dashboard", () => {
+  it("redirects signed-in users from public auth pages to the dashboard", () => {
     clerkState.isSignedIn = true;
     authState.isLoggedIn = true;
     authState.user = { onboardingCompleted: false };
 
     render(<PublicOnlyRoute component={PublicPage} />);
 
-    expect(redirectMock).toHaveBeenCalledWith("/");
+    expect(redirectMock).toHaveBeenCalledWith("/dashboard");
   });
 });
 
@@ -95,14 +95,14 @@ describe("ProtectedRoute", () => {
     clerkState.isSignedIn = false;
   });
 
-  it("redirects incomplete logged-in users away from protected routes to the onboarding gate", () => {
+  it("allows incomplete logged-in users to reach protected routes", () => {
     clerkState.isSignedIn = true;
     authState.isLoggedIn = true;
     authState.user = { onboardingCompleted: false };
 
     render(<ProtectedRoute component={ProtectedPage} />);
 
-    expect(redirectMock).toHaveBeenCalledWith("/");
-    expect(screen.queryByText("Protected page")).not.toBeInTheDocument();
+    expect(redirectMock).not.toHaveBeenCalled();
+    expect(screen.getByText("Protected page")).toBeInTheDocument();
   });
 });
