@@ -56,6 +56,7 @@
     "quality:full": "pnpm run quality:required && pnpm run build && pnpm run quality:runtime",
     "qa": "pnpm run quality:required",
     "check": "pnpm run lint:ci && pnpm run typecheck",
+    "deploy:vercel:check": "node scripts/check-vercel-deploy.mjs",
     "// ── CLI/MCP ─────────────────────────────────────": "---",
     "northstar": ".brain/40_Agent_Context/tools/printed-clis/northstar/bin/northstar-pp-cli.exe",
     "northstar:mcp": ".brain/40_Agent_Context/tools/printed-clis/northstar/bin/northstar-pp-mcp.exe",
