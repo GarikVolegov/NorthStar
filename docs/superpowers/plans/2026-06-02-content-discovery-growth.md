@@ -81,7 +81,7 @@ describe("content discovery metadata", () => {
     expect(meta).toMatchObject({
       source: "index",
       sourceLabel: "Indice NorthStar",
-      personalization: "generic",
+      personalization: "profile",
       actionLabel: "Leggi",
     });
     expect(meta.reasonLabels).toEqual(
