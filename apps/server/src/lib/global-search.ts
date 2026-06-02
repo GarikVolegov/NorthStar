@@ -15,6 +15,12 @@ import {
   workspacesTable,
 } from "@workspace/db";
 import { generateEmbedding } from "@workspace/ai-server/embeddings/generate";
+import {
+  buildDiscoveryMetadata,
+  type DiscoveryPersonalization,
+  type DiscoveryReason,
+  type DiscoverySource,
+} from "./content-discovery";
 
 export type GlobalSearchEntityType =
   | "sector"
@@ -43,6 +49,17 @@ export interface GlobalSearchResult {
   score_total: number;
   visibility?: "public" | "private";
   metadata?: Record<string, unknown>;
+  source: DiscoverySource;
+  sourceLabel: string;
+  personalization: DiscoveryPersonalization;
+  reasonLabels: string[];
+  matchSignals: string[];
+  actionLabel: string;
+  matchScore?: number;
+  reasons?: DiscoveryReason[];
+  freshnessLabel?: string;
+  readingTime?: number | string;
+  matchedKeywords?: string[];
 }
 
 export interface GlobalSearchResponse {
@@ -98,16 +115,47 @@ function normalizeLexical(score: number) {
 }
 
 function result(
-  input: Omit<GlobalSearchResult, "score_lexical" | "score_semantic" | "score_total"> & {
+  input: Omit<
+    GlobalSearchResult,
+    | "score_lexical"
+    | "score_semantic"
+    | "score_total"
+    | "source"
+    | "sourceLabel"
+    | "personalization"
+    | "reasonLabels"
+    | "matchSignals"
+    | "actionLabel"
+    | "matchScore"
+    | "reasons"
+    | "freshnessLabel"
+    | "readingTime"
+    | "matchedKeywords"
+  > & {
     lexicalRaw: number;
   },
 ): GlobalSearchResult {
   const score_lexical = normalizeLexical(input.lexicalRaw);
+  const discovery = buildDiscoveryMetadata(
+    {
+      title: input.title,
+      description: input.description,
+      url: input.url,
+      type: input.type,
+      visibility: input.visibility,
+      metadata: input.metadata ?? {},
+      scoreLexical: score_lexical,
+      scoreSemantic: null,
+      scoreTotal: score_lexical,
+    },
+    { source: "live", visibility: input.visibility },
+  );
   return {
     ...input,
     score_lexical,
     score_semantic: null,
     score_total: score_lexical,
+    ...discovery,
   };
 }
 
@@ -215,6 +263,11 @@ async function liveFallbackSearch(
           icon: TYPE_META.article.icon,
           color: TYPE_META.article.color,
           visibility: "public",
+          metadata: {
+            tags: row.tags ?? [],
+            personalityMatches: row.personalityMatches ?? [],
+            sectorLinks: row.sectorLinks ?? [],
+          },
           lexicalRaw: textIncludesScore(
             query,
             row.title,
@@ -259,6 +312,11 @@ async function liveFallbackSearch(
           icon: TYPE_META.news.icon,
           color: TYPE_META.news.color,
           visibility: "public",
+          metadata: {
+            category: row.category,
+            source: row.source,
+            sectorLinks: row.sectorNames ?? [],
+          },
           lexicalRaw: textIncludesScore(
             query,
             row.title,
@@ -543,6 +601,27 @@ export async function globalSearch(input: {
       return {
         results: rows.rows.map((row) => {
           const meta = TYPE_META[row.entity_type] ?? TYPE_META.article;
+          const score_lexical = row.score_lexical ?? 0;
+          const score_semantic = row.score_semantic;
+          const score_total = row.score_total ?? 0;
+          const metadata = row.metadata ?? {};
+          const discovery = buildDiscoveryMetadata(
+            {
+              title: row.title,
+              description: row.content,
+              url: row.url,
+              type: row.entity_type,
+              visibility: row.visibility,
+              metadata,
+              scoreLexical: score_lexical,
+              scoreSemantic: score_semantic,
+              scoreTotal: score_total,
+              score_lexical,
+              score_semantic,
+              score_total,
+            },
+            { source: "index", visibility: row.visibility },
+          );
           return {
             type: row.entity_type,
             id: Number(row.entity_id) || row.id,
@@ -552,11 +631,12 @@ export async function globalSearch(input: {
             url: row.url,
             icon: meta.icon,
             color: meta.color,
-            score_lexical: row.score_lexical ?? 0,
-            score_semantic: row.score_semantic,
-            score_total: row.score_total ?? 0,
+            score_lexical,
+            score_semantic,
+            score_total,
             visibility: row.visibility,
-            metadata: row.metadata ?? {},
+            metadata,
+            ...discovery,
           };
         }),
         has_semantic: !!embedding && rows.rows.some((row) => row.score_semantic != null),
