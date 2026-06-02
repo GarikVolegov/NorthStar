@@ -63,6 +63,15 @@ assert(
     ),
   "vercel.json must rewrite /api/:path* to /api/[...path]",
 );
+assert(
+  Array.isArray(vercel?.rewrites) &&
+    vercel.rewrites.some(
+      (rewrite) =>
+        rewrite.source === "/:path*" &&
+        rewrite.destination === "/index.html",
+    ),
+  "vercel.json must rewrite SPA routes to /index.html",
+);
 
 assert(
   wrapper.includes("../apps/server/api/index.js"),
