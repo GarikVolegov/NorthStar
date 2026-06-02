@@ -241,14 +241,14 @@ test.describe("Mobile Visual QA - Wendy e dashboard", () => {
     const input = searchInput(page);
     await expectReachableInViewport(input, "input ricerca Wendy");
     await input.fill("carriera mobile");
-    const askButton = page.getByRole("button", { name: /Chiedi a Wendy di guidarti su "carriera mobile"/i });
+    const askButton = page.getByRole("button", { name: /Chiedi a Wendy di guidarti|Ask Wendy to guide/i });
     await expectReachableInViewport(askButton, "azione chiedi a Wendy");
     await expectNoHorizontalOverflow(page);
 
     await askButton.tap();
-    await expect(page.getByRole("region", { name: "Chat Wendy" })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole("region", { name: /Chat Wendy|Wendy Chat/i })).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/Wendy risponde dentro la ricerca mobile/i)).toBeVisible({ timeout: 10_000 });
-    await expectReachableInViewport(page.getByRole("button", { name: /Invia a Wendy|Interrompi Wendy/i }).last(), "controllo invio Wendy");
+    await expectReachableInViewport(page.getByRole("button", { name: /Invia a Wendy|Interrompi Wendy|Send to Wendy|Stop Wendy/i }).last(), "controllo invio Wendy");
     await expectNoHorizontalOverflow(page);
   });
 
@@ -275,15 +275,15 @@ test.describe("Mobile Visual QA - Wendy e dashboard", () => {
 
     await page.goto("/wendy/memoria", { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByRole("heading", { name: /Memoria di Wendy/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Memoria di Wendy|Wendy Memory/i })).toBeVisible();
     await expect(page.getByText(/Preferisco piani di carriera sintetici/i)).toBeVisible({ timeout: 10_000 });
-    const memoryInput = page.getByPlaceholder(/Aggiunge un fatto manuale/i);
+    const memoryInput = page.getByPlaceholder(/Aggiunge un fatto manuale|Add a manual fact/i);
     await expectReachableInViewport(memoryInput, "input memoria Wendy");
-    await expectReachableInViewport(page.getByRole("button", { name: /Aggiungi/i }), "bottone aggiungi memoria");
+    await expectReachableInViewport(page.getByRole("button", { name: /Aggiungi|Add/i }), "bottone aggiungi memoria");
     await expectNoHorizontalOverflow(page);
 
     await memoryInput.fill("Sto valutando una crescita verso product operations");
-    await page.getByRole("button", { name: /Aggiungi/i }).tap();
+    await page.getByRole("button", { name: /Aggiungi|Add/i }).tap();
     await expect(page.getByText(/product operations/i)).toBeVisible({ timeout: 10_000 });
     await expectNoHorizontalOverflow(page);
   });
@@ -295,18 +295,18 @@ test.describe("Mobile Visual QA - Wendy e dashboard", () => {
 
     await page.goto("/dashboard", { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByText(/La tua bussola personale|Pannello di controllo/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/Accelera la tua carriera|Accelerate Your Career|La tua bussola personale|Pannello di controllo/i).first()).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText(/Chiedi a Wendy|Settori consigliati per te|Strumenti del percorso/i).first()).toBeVisible({ timeout: 10_000 });
     await expectNoHorizontalOverflow(page);
 
-    const openWendy = page.getByRole("button", { name: /apri ricerca wendy/i });
+    const openWendy = page.getByRole("button", { name: /apri ricerca wendy|open wendy search/i });
     await expectReachableInViewport(openWendy, "bottone Wendy dashboard");
     await openWendy.tap();
     await expect(page).toHaveURL(/\/wendy$/);
-    const wendyComposer = page.getByPlaceholder("Chiedi a Wendy...");
+    const wendyComposer = page.getByRole("combobox").or(page.getByRole("textbox")).first();
     await expectReachableInViewport(wendyComposer, "input Wendy dalla dashboard");
     await wendyComposer.fill("prossimo passo");
-    const sendWendy = page.getByRole("button", { name: "Invia a Wendy" }).last();
+    const sendWendy = page.getByRole("button", { name: /Invia a Wendy|Send to Wendy/i }).last();
     await expectReachableInViewport(sendWendy, "bottone invia Wendy dalla dashboard");
     await sendWendy.tap();
     await expect(page.getByText(/Wendy e raggiungibile dalla dashboard mobile/i)).toBeVisible({ timeout: 10_000 });

@@ -58,11 +58,29 @@ async function registerE2eUserToken(
   return token;
 }
 
+async function completeE2eOnboarding(
+  request: APIRequestContext,
+  token: string,
+): Promise<void> {
+  const res = await request.patch(`${TEST_API_URL}/api/users/onboarding`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  expect(
+    res.status(),
+    "Il completamento onboarding E2E deve rispondere 2xx",
+  ).toBeGreaterThanOrEqual(200);
+  expect(
+    res.status(),
+    "Il completamento onboarding E2E deve rispondere 2xx",
+  ).toBeLessThan(300);
+}
+
 export async function registerE2eUser(
   request: APIRequestContext,
   prefix = "e2e-user",
 ): Promise<Record<string, string>> {
   const token = await registerE2eUserToken(request, prefix);
+  await completeE2eOnboarding(request, token);
   return { Authorization: `Bearer ${token}` };
 }
 
@@ -90,6 +108,7 @@ export async function loginViaApi(
 
   if (res.status() !== 200 && usesDefaultSeed) {
     const token = await registerE2eUserToken(page.request, "login-e2e");
+    await completeE2eOnboarding(page.request, token);
     await page.addInitScript((t: string) => {
       localStorage.setItem("northstar_token", t);
       sessionStorage.setItem("northstar_token", t);
@@ -108,6 +127,8 @@ export async function loginViaApi(
     token,
     "Il token JWT deve essere presente nella risposta di /api/auth/login",
   ).toBeTruthy();
+
+  await completeE2eOnboarding(page.request, token);
 
   // addInitScript: eseguito prima di ogni navigate nel contesto della pagina
   // Simula il comportamento di AuthContext. ns_token resta solo come compat legacy.
@@ -158,6 +179,7 @@ export async function loginAsTestUser(
     token,
     "Il token JWT deve essere presente nella risposta di /api/auth/login",
   ).toBeTruthy();
+  await completeE2eOnboarding(request, token);
   return { Authorization: `Bearer ${token}` };
 }
 
