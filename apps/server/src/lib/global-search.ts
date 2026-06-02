@@ -136,19 +136,20 @@ function result(
   },
 ): GlobalSearchResult {
   const score_lexical = normalizeLexical(input.lexicalRaw);
+  const visibility = input.visibility;
   const discovery = buildDiscoveryMetadata(
     {
       title: input.title,
       description: input.description,
       url: input.url,
       type: input.type,
-      visibility: input.visibility,
+      ...(visibility ? { visibility } : {}),
       metadata: input.metadata ?? {},
       scoreLexical: score_lexical,
       scoreSemantic: null,
       scoreTotal: score_lexical,
     },
-    { source: "live", visibility: input.visibility },
+    { source: "live", ...(visibility ? { visibility } : {}) },
   );
   return {
     ...input,
