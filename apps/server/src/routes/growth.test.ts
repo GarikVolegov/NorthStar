@@ -69,6 +69,25 @@ function mockSelectRows(rows: unknown[]) {
   dbMock.select.mockReturnValueOnce(chain);
 }
 
+function stringifyQueryCondition(condition: unknown) {
+  const seen = new WeakSet<object>();
+  return JSON.stringify(condition, (_key, value) => {
+    if (typeof value !== "object" || value === null) return value;
+    if (seen.has(value)) return "[Circular]";
+    seen.add(value);
+    return value;
+  });
+}
+
+function countConditionJoins(condition: unknown) {
+  const chunks = (condition as { queryChunks?: unknown[] } | undefined)?.queryChunks;
+  const nested = (chunks?.[1] as { queryChunks?: unknown[] } | undefined)?.queryChunks ?? [];
+  return nested.filter((chunk) => {
+    const value = (chunk as { value?: unknown }).value;
+    return Array.isArray(value) && value.includes(" and ");
+  }).length;
+}
+
 describe("growth routes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -173,6 +192,58 @@ describe("growth routes", () => {
       status: "error",
       error: "growth_unavailable",
     });
+  });
+
+  it("includes discovery metadata on growth list articles", async () => {
+    mockSelectRows(articles);
+
+    const response = await request(app())
+      .get("/api/crescita?limit=6")
+      .expect(200);
+
+    expect(response.body.articles[0]).toMatchObject({
+      id: 1,
+      source: "library",
+      sourceLabel: "Biblioteca crescita",
+      personalization: "profile",
+      actionLabel: "Leggi",
+      reasonLabels: expect.arrayContaining(["Tema: focus", "Profilo: I"]),
+      matchSignals: expect.any(Array),
+    });
+  });
+
+  it("accepts difficulty and tag filters without falling back when the library matches", async () => {
+    const chain = {
+      from: vi.fn(() => chain),
+      where: vi.fn(() => chain),
+      orderBy: vi.fn(() => chain),
+      limit: vi.fn(async () => articles),
+    };
+    dbMock.select.mockReturnValueOnce(chain);
+
+    const response = await request(app())
+      .get("/api/crescita?category=produttivita&difficulty=base&tag=focus&limit=6")
+      .expect(200);
+
+    expect(response.body).toMatchObject({
+      total: 1,
+      status: "ok",
+      source: "library",
+      articles: [
+        expect.objectContaining({
+          source: "library",
+          difficulty: "base",
+          tags: ["focus"],
+        }),
+      ],
+    });
+    expect(dbMock.select).toHaveBeenCalledTimes(1);
+    const whereCalls = chain.where.mock.calls as unknown as [[unknown]];
+    const condition = whereCalls[0]?.[0];
+    const conditionText = stringifyQueryCondition(condition);
+    expect(conditionText).toContain("tags");
+    expect(conditionText).toContain("%focus%");
+    expect(countConditionJoins(condition)).toBe(3);
   });
 
   it("returns useful Italian fallback articles when the published growth library is empty", async () => {

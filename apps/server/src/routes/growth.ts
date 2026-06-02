@@ -5,6 +5,10 @@ import { db, growthArticlesTable, testSessionsTable } from "@workspace/db";
 import { optionalAuth } from "../middleware/auth";
 import { requireAuth } from "../middleware/require-auth";
 import { clampContentLimit, readContentSearchQuery } from "../lib/content-search";
+import {
+  buildDiscoveryMetadata,
+  type DiscoveryPersonalization,
+} from "../lib/content-discovery";
 
 const router = Router();
 
@@ -122,7 +126,49 @@ function isSql(condition: SQL | undefined): condition is SQL {
   return condition !== undefined;
 }
 
-function mapArticle(article: typeof growthArticlesTable.$inferSelect | GrowthArticleView) {
+function mapArticle(
+  article: typeof growthArticlesTable.$inferSelect | GrowthArticleView,
+  options: { personalization?: Extract<DiscoveryPersonalization, GrowthPersonalization> } = {},
+) {
+  const source: GrowthSource = "source" in article && article.source ? article.source : "library";
+  const tags = article.tags ?? [];
+  const personalityMatches = article.personalityMatches ?? [];
+  const sectorLinks = article.sectorLinks ?? [];
+  const scoreSemantic = "embedding" in article && article.embedding ? 0.75 : null;
+  const discovery = buildDiscoveryMetadata(
+    {
+      title: article.title,
+      description: article.description,
+      source,
+      type: "article",
+      category: article.category,
+      tags,
+      metadata: {
+        category: article.category,
+        tags,
+        personalityMatches,
+        sectorLinks,
+        readingTime: article.readTimeMinutes,
+      },
+      createdAt: article.createdAt,
+      updatedAt: article.updatedAt,
+      scoreLexical: 1,
+      scoreSemantic,
+      readingTime: article.readTimeMinutes,
+      visibility: "public",
+    },
+    {
+      source,
+      visibility: "public",
+      maxReasons: 8,
+    },
+  );
+
+  const discoveryMetadata = {
+    ...discovery,
+    personalization: options.personalization ?? discovery.personalization,
+  };
+
   return {
     id: article.id,
     title: article.title,
@@ -139,7 +185,7 @@ function mapArticle(article: typeof growthArticlesTable.$inferSelect | GrowthArt
     viewCount: article.viewCount,
     createdAt: article.createdAt,
     updatedAt: article.updatedAt,
-    source: "source" in article ? article.source : "library",
+    ...discoveryMetadata,
   };
 }
 
@@ -158,10 +204,19 @@ function fallbackCategories() {
   }));
 }
 
-function filterFallbackArticles(input: { category?: string; search?: string; limit: number }) {
+function filterFallbackArticles(input: {
+  category?: string;
+  search?: string;
+  difficulty?: string;
+  tag?: string;
+  limit: number;
+}) {
   const search = input.search?.trim().toLowerCase();
+  const tag = input.tag?.trim().toLowerCase();
   return FALLBACK_GROWTH_ARTICLES.filter((article) => {
     if (input.category && article.category !== input.category) return false;
+    if (input.difficulty && article.difficulty !== input.difficulty) return false;
+    if (tag && !article.tags.some((articleTag) => articleTag.toLowerCase().includes(tag))) return false;
     if (!search) return true;
     const searchable = [
       article.title,
@@ -310,10 +365,15 @@ router.get("/per-te", optionalAuth, async (req, res) => {
         })
       : candidateArticles;
 
+    const articlePersonalization: GrowthPersonalization =
+      hasProfile && source === "library" ? "profile" : "generic";
+
     res.json({
-      articles: sortedArticles.slice(0, 6).map(mapArticle),
+      articles: sortedArticles.slice(0, 6).map((article) =>
+        mapArticle(article, { personalization: articlePersonalization }),
+      ),
       hasProfile,
-      personalization: (hasProfile && source === "library" ? "profile" : "generic") satisfies GrowthPersonalization,
+      personalization: articlePersonalization,
       types,
       italianTypes: toItalianTypes(types),
       status: source === "library" ? "ok" : "fallback",
@@ -338,10 +398,16 @@ router.get("/", async (req, res) => {
     const limit = clampContentLimit(req.query.limit as string | undefined, 20, 100);
     const category =
       typeof req.query.category === "string" ? req.query.category : "";
+    const rawDifficulty =
+      typeof req.query.difficulty === "string" ? req.query.difficulty.trim() : "";
+    const difficulty = rawDifficulty && rawDifficulty !== "all" ? rawDifficulty : "";
+    const tag = typeof req.query.tag === "string" ? req.query.tag.trim() : "";
     const search = readContentSearchQuery(req.query as Record<string, string | string[] | undefined>);
     const where = [
       eq(growthArticlesTable.status, "published"),
       category ? eq(growthArticlesTable.category, category) : undefined,
+      difficulty ? eq(growthArticlesTable.difficulty, difficulty) : undefined,
+      tag ? sql`${growthArticlesTable.tags}::text ILIKE ${`%${tag}%`}` : undefined,
       search
         ? or(
             ilike(growthArticlesTable.title, `%${search}%`),
@@ -362,7 +428,7 @@ router.get("/", async (req, res) => {
       .limit(limit);
 
     if (articles.length === 0) {
-      if ((category || search) && await hasPublishedGrowthArticles()) {
+      if ((category || search || difficulty || tag) && await hasPublishedGrowthArticles()) {
         res.json({
           articles: [],
           total: 0,
@@ -372,9 +438,9 @@ router.get("/", async (req, res) => {
         return;
       }
 
-      const fallbackArticles = filterFallbackArticles({ category, search, limit });
+      const fallbackArticles = filterFallbackArticles({ category, search, difficulty, tag, limit });
       res.json({
-        articles: fallbackArticles.map(mapArticle),
+        articles: fallbackArticles.map((article) => mapArticle(article, { personalization: "generic" })),
         total: fallbackArticles.length,
         status: fallbackArticles.length > 0 ? "fallback" : "empty",
         source: "fallback" satisfies GrowthSource,
@@ -383,7 +449,7 @@ router.get("/", async (req, res) => {
     }
 
     res.json({
-      articles: articles.map(mapArticle),
+      articles: articles.map((article) => mapArticle(article)),
       total: articles.length,
       status: "ok",
       source: "library" satisfies GrowthSource,
@@ -424,11 +490,12 @@ router.get("/:slug", async (req, res) => {
     if (!article) {
       const fallback = fallbackArticleBySlug(req.params.slug);
       if (fallback) {
+        const related = FALLBACK_GROWTH_ARTICLES.filter((item) => item.id !== fallback.id)
+          .slice(0, 3)
+          .map((article) => mapArticle(article, { personalization: "generic" }));
         res.json({
-          ...mapArticle(fallback),
-          related: FALLBACK_GROWTH_ARTICLES.filter((item) => item.id !== fallback.id)
-            .slice(0, 3)
-            .map(mapArticle),
+          ...mapArticle(fallback, { personalization: "generic" }),
+          related,
           source: "fallback" satisfies GrowthSource,
         });
         return;
@@ -456,7 +523,7 @@ router.get("/:slug", async (req, res) => {
       related: related
         .filter((item) => item.id !== article.id)
         .slice(0, 3)
-        .map(mapArticle),
+        .map((article) => mapArticle(article)),
     });
   } catch (err) {
     req.log?.error?.({ err }, "growth article error");
