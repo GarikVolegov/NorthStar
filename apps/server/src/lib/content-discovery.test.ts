@@ -61,6 +61,27 @@ describe("content discovery metadata", () => {
     expect(meta.matchedKeywords).toEqual(expect.arrayContaining(["Investigativo", "focus"]));
   });
 
+  it("keeps tag reasons visible for indexed profile-matched results under the default cap", () => {
+    const meta = buildDiscoveryMetadata({
+      title: "Focus profondo",
+      type: "article",
+      source: "index",
+      scoreLexical: 1,
+      scoreSemantic: 0.82,
+      metadata: {
+        tags: ["focus"],
+        personalityMatches: ["Investigativo"],
+      },
+    });
+
+    expect(meta.personalization).toBe("profile");
+    expect(meta.reasonLabels).toEqual(
+      expect.arrayContaining(["Match nel titolo o contenuto", "Match semantico", "Tema: focus"]),
+    );
+    expect(meta.matchSignals).toEqual(expect.arrayContaining(["lexical", "semantic", "tag:focus"]));
+    expect(meta.reasonLabels).not.toContain("Profilo: Investigativo");
+  });
+
   it("marks sector and role profile-derived matches as profile personalization", () => {
     const meta = buildDiscoveryMetadata({
       title: "Architettura cloud",
@@ -209,6 +230,19 @@ describe("content discovery metadata", () => {
         scoreSemantic: null,
       }).matchScore,
     ).toBe(0.42);
+  });
+
+  it("supports global-search snake_case lexical and semantic score aliases", () => {
+    const meta = buildDiscoveryMetadata({
+      title: "Snake score result",
+      type: "article",
+      source: "index",
+      score_lexical: 0.3,
+      score_semantic: 0.8,
+    });
+
+    expect(meta.matchScore).toBe(0.8);
+    expect(meta.matchSignals).toEqual(expect.arrayContaining(["lexical", "semantic"]));
   });
 
   it("includes source and type reasons for public content when maxReasons allows", () => {

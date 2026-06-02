@@ -2,7 +2,7 @@ import type { GlobalSearchEntityType } from "./global-search";
 
 export type DiscoveryItemType = GlobalSearchEntityType;
 export type DiscoverySource = "index" | "live" | "library" | "fallback" | "wendy";
-export type DiscoveryPersonalization = "profile" | "generic" | "private";
+export type DiscoveryPersonalization = "profile" | "journey" | "generic" | "private";
 export type DiscoveryReasonSource = "profile" | "content" | "fallback";
 
 export interface DiscoveryReason {
@@ -35,8 +35,10 @@ export interface DiscoverableContent<
   scoreTotal?: number | null;
   score_total?: number | null;
   scoreLexical?: number | null;
+  score_lexical?: number | null;
   lexicalScore?: number | null;
   scoreSemantic?: number | null;
+  score_semantic?: number | null;
   semanticScore?: number | null;
   readingTime?: number | string | null;
   visibility?: "public" | "private" | null;
@@ -181,8 +183,12 @@ export function buildDiscoveryMetadata(
     content.visibility === "private";
   const maxReasons = Math.max(1, options.maxReasons ?? 3);
 
-  const lexicalScore = clampScore(firstNumber(content.scoreLexical, content.lexicalScore) ?? 0);
-  const semanticScore = clampScore(firstNumber(content.scoreSemantic, content.semanticScore) ?? 0);
+  const lexicalScore = clampScore(
+    firstNumber(content.scoreLexical, content.score_lexical, content.lexicalScore) ?? 0,
+  );
+  const semanticScore = clampScore(
+    firstNumber(content.scoreSemantic, content.score_semantic, content.semanticScore) ?? 0,
+  );
   const explicitMatchScore = firstNumber(
     content.matchScore,
     content.score,
@@ -255,6 +261,22 @@ export function buildDiscoveryMetadata(
       });
       matchedKeywords.push(category);
     }
+    for (const tag of tags) {
+      addReason(reasons, {
+        code: `tag:${tag}`,
+        label: `Tema: ${tag}`,
+        source: "content",
+      });
+      matchedKeywords.push(tag);
+    }
+    for (const keyword of keywords) {
+      addReason(reasons, {
+        code: `keyword:${keyword}`,
+        label: `Keyword: ${keyword}`,
+        source: "content",
+      });
+      matchedKeywords.push(keyword);
+    }
     for (const match of personalityMatches) {
       addReason(reasons, {
         code: `personality:${match}`,
@@ -286,22 +308,6 @@ export function buildDiscoveryMetadata(
         source: "profile",
       });
       matchedKeywords.push(profileMatch);
-    }
-    for (const tag of tags) {
-      addReason(reasons, {
-        code: `tag:${tag}`,
-        label: `Tema: ${tag}`,
-        source: "content",
-      });
-      matchedKeywords.push(tag);
-    }
-    for (const keyword of keywords) {
-      addReason(reasons, {
-        code: `keyword:${keyword}`,
-        label: `Keyword: ${keyword}`,
-        source: "content",
-      });
-      matchedKeywords.push(keyword);
     }
     addReason(reasons, {
       code: `source:${source}`,
