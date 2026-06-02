@@ -9,7 +9,7 @@ import {
 } from "@/components/WorkModeSelector";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendy } from "@/contexts/WendyProvider";
-import { CareerStepList, GrowthChart } from "@/features/sector/SectorCharts";
+import { CareerStepList } from "@/features/sector/SectorCharts";
 import { SectorPremiumTools } from "@/features/sector/SectorPremiumTools";
 import {
   SectorCompareCta,
@@ -18,7 +18,7 @@ import {
   WorkModeAlignmentBadge,
 } from "@/features/sector/SectorSummarySections";
 import { SectorErrorState, SectorLoadingState } from "@/features/sector/SectorStates";
-import type { ChartEntry, SectorExtended } from "@/features/sector/sectorTypes";
+import type { SectorExtended } from "@/features/sector/sectorTypes";
 import { CompareDrawer } from "@/features/sector-vitals/CompareDrawer";
 import { VitalSignsRow } from "@/features/sector-vitals/VitalSignsRow";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
@@ -156,28 +156,6 @@ export default function Sector() {
       block: "start",
     });
   }, [sector?.id]);
-
-  // Memoised: recomputed only when stats change or t() reference changes (lang switch).
-  const chartData = useMemo<ChartEntry[]>(() => {
-    if (!stats?.growthProjection) return [];
-    return [
-      {
-        name: t("sector.shortTerm"),
-        value: parseInt(stats.growthProjection.shortTerm ?? "0"),
-        color: "hsl(var(--chart-1))",
-      },
-      {
-        name: t("sector.midTerm"),
-        value: parseInt(stats.growthProjection.midTerm ?? "0"),
-        color: "hsl(var(--chart-2))",
-      },
-      {
-        name: t("sector.longTerm"),
-        value: parseInt(stats.growthProjection.longTerm ?? "0"),
-        color: "hsl(var(--chart-3))",
-      },
-    ];
-  }, [stats, t]);
 
   // Memoised: getCareerStepGroup is pure but called twice in the original code.
   // Now computed once and shared by both path views.
@@ -559,59 +537,45 @@ export default function Sector() {
           </div>
 
           {isLoadingStats ? (
-            <Skeleton className="h-[400px] w-full rounded-3xl" />
+            <Skeleton className="h-[200px] w-full rounded-3xl" />
           ) : stats ? (
-            <div className="grid md:grid-cols-5 gap-8">
-              <div className="md:col-span-3 bg-card border rounded-3xl p-6 md:p-8 shadow-sm">
-                <h3 className="text-xl font-serif font-bold mb-8">
-                  {t("sector.growthProjection")}
-                </h3>
-                <div className="h-[300px] w-full">
-                  {/* GrowthChart is memo'd: won't re-render unless chartData reference changes */}
-                  <GrowthChart data={chartData} />
-                </div>
-                <p className="mt-3 text-xs text-muted-foreground/70">
-                  Proiezione indicativa basata sul tasso di crescita del settore — non sono dati di mercato live. La domanda reale è nel riquadro qui sopra.
-                </p>
-              </div>
-              <div className="md:col-span-2 space-y-6">
-                <div className="bg-card border rounded-3xl p-6 shadow-sm">
-                  <h4 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">
-                    {t("sector.platformStats")}
-                  </h4>
-                  <div className="space-y-6">
-                    <div>
-                      <div className="text-3xl font-serif font-bold text-foreground mb-1">
-                        {stats.timesPicked}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {t("sector.platformStatsUsers")}
-                      </div>
+            <div className="grid gap-8 md:grid-cols-2">
+              <div className="bg-card border rounded-3xl p-6 shadow-sm">
+                <h4 className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-4">
+                  {t("sector.platformStats")}
+                </h4>
+                <div className="space-y-6">
+                  <div>
+                    <div className="text-3xl font-serif font-bold text-foreground mb-1">
+                      {stats.timesPicked}
                     </div>
-                    <Separator />
-                    <div>
-                      <div className="text-3xl font-serif font-bold text-foreground mb-1">
-                        {stats.avgMatchScore}%
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {t("sector.platformStatsMatch")}
-                      </div>
+                    <div className="text-sm text-muted-foreground">
+                      {t("sector.platformStatsUsers")}
+                    </div>
+                  </div>
+                  <Separator />
+                  <div>
+                    <div className="text-3xl font-serif font-bold text-foreground mb-1">
+                      {stats.avgMatchScore}%
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {t("sector.platformStatsMatch")}
                     </div>
                   </div>
                 </div>
-                <div className="bg-primary text-primary-foreground rounded-3xl p-6 shadow-md">
-                  <h4 className="font-serif font-bold text-lg mb-2">
-                    {t("sector.readyTitle")}
-                  </h4>
-                  <p className="text-primary-foreground/80 text-sm mb-6">
-                    {t("sector.readyDesc")}
-                  </p>
-                  <Button variant="secondary" className="w-full" asChild>
-                    <button onClick={() => window.history.back()}>
-                      {t("sector.backAndConfirm")}
-                    </button>
-                  </Button>
-                </div>
+              </div>
+              <div className="bg-primary text-primary-foreground rounded-3xl p-6 shadow-md flex flex-col justify-center">
+                <h4 className="font-serif font-bold text-lg mb-2">
+                  {t("sector.readyTitle")}
+                </h4>
+                <p className="text-primary-foreground/80 text-sm mb-6">
+                  {t("sector.readyDesc")}
+                </p>
+                <Button variant="secondary" className="w-full" asChild>
+                  <button onClick={() => window.history.back()}>
+                    {t("sector.backAndConfirm")}
+                  </button>
+                </Button>
               </div>
             </div>
           ) : (

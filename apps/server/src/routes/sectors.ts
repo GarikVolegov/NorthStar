@@ -66,11 +66,10 @@ router.get("/:id/stats", async (req, res) => {
       rolesCount:     Number(rolesCount?.cnt ?? 0),
       timesPicked,
       avgMatchScore,
-      growthProjection: {
-        shortTerm: String(Math.round(gr * 1.0)),
-        midTerm:   String(Math.round(gr * 2.5)),
-        longTerm:  String(Math.round(gr * 5.0)),
-      },
+      // Proiezione di crescita RIMOSSA: era gr×{1,2.5,5}, costanti inventate.
+      // La crescita reale arriva dai job_posting_snapshots (growth_rate vs periodo
+      // precedente) ed è esposta da /api/sectors/:id/market, non fabbricata qui.
+      growthProjection: null,
     });
   } catch (err) {
     req.log?.error?.({ err }, "sector stats error");
