@@ -6,10 +6,12 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { DiscoveryMeta } from "@/components/discovery/DiscoveryMeta";
 import { useWendy } from "@/contexts/WendyProvider";
 import type { RouterOutput, SearchResult } from "@/hooks/useGlobalSearch";
 import { useWendyChat } from "@/hooks/useWendyChat";
 import { eventBus } from "@/lib/event-bus";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { ORDER, SUGGESTIONS_DEFAULTS, TYPE_CONFIG } from "./searchDialogConfig";
 import { useSearchDialogMobile } from "./useSearchDialogMobile";
@@ -24,6 +26,8 @@ import {
 import { useCallback, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
+
+type SuggestionItem = { title: string; description: string; url: string };
 
 interface SearchDialogProps {
   query: string;
@@ -40,6 +44,38 @@ interface SearchDialogProps {
   setIsOpen: (open: boolean) => void;
   close: () => void;
   trackClick: (result: SearchResult) => void;
+}
+
+const TYPE_HEADING_SOURCES: Record<keyof typeof TYPE_CONFIG, string> = {
+  sector: "Settori",
+  role: "Ruoli",
+  article: "Articoli",
+  news: "Notizie",
+  idea: "Idee",
+  objective: "Obiettivi",
+  calendar: "Calendario",
+  certification: "Certificazioni",
+  memory: "Memoria Wendy",
+  workspace: "Workspace",
+  profile: "Profilo",
+};
+
+function useDynamicSuggestionCopy(locale: string, item: SuggestionItem, keyBase: string): SuggestionItem {
+  return {
+    ...item,
+    title: useDynamicTranslation({
+      locale,
+      source: item.title,
+      key: `search.suggestions.${keyBase}.title`,
+      context: "Search dialog default suggestion title",
+    }),
+    description: useDynamicTranslation({
+      locale,
+      source: item.description,
+      key: `search.suggestions.${keyBase}.description`,
+      context: "Search dialog default suggestion description",
+    }),
+  };
 }
 
 
@@ -60,7 +96,7 @@ export function SearchDialog({
   close,
   trackClick,
 }: SearchDialogProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [, setLocation] = useLocation();
   const wendy = useWendy();
   const closeWendy = wendy.close;
@@ -151,9 +187,176 @@ export function SearchDialog({
   const showSearchError = !isLoading && isError && hasSearchQuery;
   const showSearchEmpty = !isLoading && !isError && results.length === 0 && hasSearchQuery;
   const hasSuggestions = suggestions.length > 0;
-  const activeSuggestions = hasSuggestions ? suggestions : SUGGESTIONS_DEFAULTS;
   const pageHints = getPageHints();
   const quickActions = pageHints.quickActions.slice(0, 3);
+  const activeLanguage =
+    i18n?.resolvedLanguage?.slice(0, 2) || i18n?.language?.slice(0, 2) || "it";
+  const mobileDragLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Trascina verso il basso per chiudere",
+    key: "search.mobile.dragClose",
+    context: "Search dialog mobile drag handle accessible label",
+  });
+  const globalSearchTitle = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Ricerca globale",
+    key: "search.global.title",
+    context: "Search dialog global search panel title",
+  });
+  const globalSearchDescription = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Cerca pagine, ruoli, articoli e contenuti NorthStar.",
+    key: "search.global.description",
+    context: "Search dialog global search panel description",
+  });
+  const globalResultsDescription = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Risultati nell'app NorthStar.",
+    key: "search.global.resultsDescription",
+    context: "Search dialog side results panel description",
+  });
+  const searchPlaceholder = useDynamicTranslation({
+    locale: activeLanguage,
+    source: t("search.placeholder"),
+    key: "search.placeholder",
+    context: "Search dialog input placeholder",
+  });
+  const searchingLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: t("common.searching"),
+    key: "common.searching",
+    context: "Search dialog loading state",
+  });
+  const searchInProgressLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Ricerca in corso...",
+    key: "search.inProgress",
+    context: "Search dialog compact loading state",
+  });
+  const searchErrorTitle = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "La ricerca globale non e disponibile adesso.",
+    key: "search.error.title",
+    context: "Search dialog global search unavailable title",
+  });
+  const searchErrorHint = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Puoi riprovare tra poco o chiedere a Wendy.",
+    key: "search.error.hint",
+    context: "Search dialog unavailable hint",
+  });
+  const searchErrorSideHint = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Puoi riprovare tra poco o chiedere a Wendy qui accanto.",
+    key: "search.error.sideHint",
+    context: "Search dialog side panel unavailable hint",
+  });
+  const searchEmptyTitle = useDynamicTranslation({
+    locale: activeLanguage,
+    source: `Nessun risultato globale per "${query}"`,
+    key: "search.empty.title",
+    context: "Search dialog empty state title; keep the quoted user query unchanged",
+  });
+  const searchEmptyHint = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Prova termini piu generali oppure chiedi a Wendy di guidarti.",
+    key: "search.empty.hint",
+    context: "Search dialog empty state hint",
+  });
+  const searchEmptySideHint = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Wendy puo aiutarti a riformulare o ragionare sul prossimo passo.",
+    key: "search.empty.sideHint",
+    context: "Search dialog side empty state hint",
+  });
+  const askWendyCurrentLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: `Chiedi a Wendy di guidarti su "${query}"`,
+    key: "search.askWendyCurrent",
+    context: "Search dialog CTA to ask Wendy about the current query; keep the quoted query unchanged",
+  });
+  const [exploreSectorsSuggestion, takeTestSuggestion, marketTrendsSuggestion, askWendySuggestion] =
+    SUGGESTIONS_DEFAULTS as [
+      SuggestionItem,
+      SuggestionItem,
+      SuggestionItem,
+      SuggestionItem,
+    ];
+  const defaultSuggestions = [
+    useDynamicSuggestionCopy(activeLanguage, exploreSectorsSuggestion, "exploreSectors"),
+    useDynamicSuggestionCopy(activeLanguage, takeTestSuggestion, "takeTest"),
+    useDynamicSuggestionCopy(activeLanguage, marketTrendsSuggestion, "marketTrends"),
+    useDynamicSuggestionCopy(activeLanguage, askWendySuggestion, "askWendy"),
+  ];
+  const activeSuggestions = hasSuggestions ? suggestions : defaultSuggestions;
+  const typeHeadings: Record<keyof typeof TYPE_CONFIG, string> = {
+    sector: useDynamicTranslation({
+      locale: activeLanguage,
+      source: t(TYPE_CONFIG.sector.labelKey, { defaultValue: TYPE_HEADING_SOURCES.sector }),
+      key: "search.type.sector",
+      context: "Search result group heading",
+    }),
+    role: useDynamicTranslation({
+      locale: activeLanguage,
+      source: t(TYPE_CONFIG.role.labelKey, { defaultValue: TYPE_HEADING_SOURCES.role }),
+      key: "search.type.role",
+      context: "Search result group heading",
+    }),
+    article: useDynamicTranslation({
+      locale: activeLanguage,
+      source: t(TYPE_CONFIG.article.labelKey, { defaultValue: TYPE_HEADING_SOURCES.article }),
+      key: "search.type.article",
+      context: "Search result group heading",
+    }),
+    news: useDynamicTranslation({
+      locale: activeLanguage,
+      source: t(TYPE_CONFIG.news.labelKey, { defaultValue: TYPE_HEADING_SOURCES.news }),
+      key: "search.type.news",
+      context: "Search result group heading",
+    }),
+    idea: useDynamicTranslation({
+      locale: activeLanguage,
+      source: TYPE_HEADING_SOURCES.idea,
+      key: "search.type.idea",
+      context: "Search result group heading",
+    }),
+    objective: useDynamicTranslation({
+      locale: activeLanguage,
+      source: TYPE_HEADING_SOURCES.objective,
+      key: "search.type.objective",
+      context: "Search result group heading",
+    }),
+    calendar: useDynamicTranslation({
+      locale: activeLanguage,
+      source: TYPE_HEADING_SOURCES.calendar,
+      key: "search.type.calendar",
+      context: "Search result group heading",
+    }),
+    certification: useDynamicTranslation({
+      locale: activeLanguage,
+      source: TYPE_HEADING_SOURCES.certification,
+      key: "search.type.certification",
+      context: "Search result group heading",
+    }),
+    memory: useDynamicTranslation({
+      locale: activeLanguage,
+      source: TYPE_HEADING_SOURCES.memory,
+      key: "search.type.memory",
+      context: "Search result group heading",
+    }),
+    workspace: useDynamicTranslation({
+      locale: activeLanguage,
+      source: TYPE_HEADING_SOURCES.workspace,
+      key: "search.type.workspace",
+      context: "Search result group heading",
+    }),
+    profile: useDynamicTranslation({
+      locale: activeLanguage,
+      source: TYPE_HEADING_SOURCES.profile,
+      key: "search.type.profile",
+      context: "Search result group heading",
+    }),
+  };
 
   // AI panel visible when streaming or has response
   const hasConversation = chat.messages.length > 0 || chat.thinking.active || !!chat.streamError;
@@ -208,7 +411,7 @@ export function SearchDialog({
                 onPointerDown={(e) => dragControls.start(e)}
                 className="flex justify-center pt-2.5 pb-1 shrink-0 touch-none cursor-grab active:cursor-grabbing"
                 role="separator"
-                aria-label="Trascina verso il basso per chiudere"
+                aria-label={mobileDragLabel}
               >
                 <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
               </div>
@@ -248,8 +451,8 @@ export function SearchDialog({
                   <div className="border-b border-white/10">
                     <div className="flex items-center justify-between gap-3 px-3 py-2">
                       <div>
-                        <p className="text-xs font-semibold uppercase text-muted-foreground">Ricerca globale</p>
-                        <p className="text-[11px] text-muted-foreground/70">Cerca pagine, ruoli, articoli e contenuti NorthStar.</p>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">{globalSearchTitle}</p>
+                        <p className="text-[11px] text-muted-foreground/70">{globalSearchDescription}</p>
                       </div>
                       <span className="rounded-full border border-white/10 px-2 py-1 text-[10px] text-muted-foreground">
                         {searchMode}
@@ -257,7 +460,7 @@ export function SearchDialog({
                     </div>
                     <CommandInput
                       ref={inputRef}
-                      placeholder={t("search.placeholder")}
+                      placeholder={searchPlaceholder}
                       value={query}
                       onValueChange={setQuery}
                     />
@@ -270,16 +473,16 @@ export function SearchDialog({
 
                     {/* Colonna sinistra: risultati DB */}
                     {showSideResults && (
-                    <section className="w-2/5 border-r border-white/10 overflow-y-auto" aria-label="Ricerca globale">
+                    <section className="w-2/5 border-r border-white/10 overflow-y-auto" aria-label={globalSearchTitle}>
                       <div className="border-b border-white/10 px-4 py-3">
-                        <p className="text-xs font-semibold uppercase text-muted-foreground">Ricerca globale</p>
-                        <p className="text-[11px] text-muted-foreground/70">Risultati nell'app NorthStar.</p>
+                        <p className="text-xs font-semibold uppercase text-muted-foreground">{globalSearchTitle}</p>
+                        <p className="text-[11px] text-muted-foreground/70">{globalResultsDescription}</p>
                       </div>
                       <CommandList className="max-h-none">
                         {isLoading && (
                           <div className="flex items-center gap-2 px-4 py-4 text-sm text-muted-foreground">
                             <Sparkles className="h-4 w-4 animate-pulse text-primary" />
-                            Ricerca in corso...
+                            {searchInProgressLabel}
                           </div>
                         )}
                         {showResults && ORDER.filter((type) => grouped[type]?.length).map((type) => {
@@ -287,7 +490,7 @@ export function SearchDialog({
                           const Icon   = config.icon;
                           const typeResults = grouped[type] ?? [];
                           return (
-                            <CommandGroup key={type} heading={t(config.labelKey)}>
+                            <CommandGroup key={type} heading={typeHeadings[type]}>
                               {typeResults.slice(0, 3).map((item) => (
                                 <CommandItem
                                   key={`${type}-${item.id}`}
@@ -301,6 +504,12 @@ export function SearchDialog({
                                   <div className="flex flex-col min-w-0 flex-1">
                                     <span className="text-xs font-medium truncate">{item.title}</span>
                                     <span className="text-[11px] text-muted-foreground truncate">{item.description}</span>
+                                    <DiscoveryMeta
+                                      sourceLabel={item.sourceLabel}
+                                      personalization={item.personalization}
+                                      reasonLabels={item.reasonLabels}
+                                      className="mt-1"
+                                    />
                                   </div>
                                 </CommandItem>
                               ))}
@@ -309,14 +518,14 @@ export function SearchDialog({
                         })}
                         {showSearchError && (
                           <div className="px-4 py-5 text-sm text-muted-foreground">
-                            <p className="font-medium text-foreground">La ricerca globale non e disponibile adesso.</p>
-                            <p className="mt-1 text-xs">Puoi riprovare tra poco o chiedere a Wendy qui accanto.</p>
+                            <p className="font-medium text-foreground">{searchErrorTitle}</p>
+                            <p className="mt-1 text-xs">{searchErrorSideHint}</p>
                           </div>
                         )}
                         {showSearchEmpty && (
                           <div className="px-4 py-5 text-sm text-muted-foreground">
-                            <p className="font-medium text-foreground">Nessun risultato globale per "{query}"</p>
-                            <p className="mt-1 text-xs">Wendy puo aiutarti a riformulare o ragionare sul prossimo passo.</p>
+                            <p className="font-medium text-foreground">{searchEmptyTitle}</p>
+                            <p className="mt-1 text-xs">{searchEmptySideHint}</p>
                           </div>
                         )}
                       </CommandList>
@@ -341,24 +550,24 @@ export function SearchDialog({
                     {isLoading && (
                       <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground">
                         <Sparkles className="h-4 w-4 animate-pulse text-primary" />
-                        {t("common.searching")}
+                        {searchingLabel}
                       </div>
                     )}
 
                     {showSearchError && (
                       <CommandEmpty>
-                        <p className="font-medium text-foreground">La ricerca globale non e disponibile adesso.</p>
+                        <p className="font-medium text-foreground">{searchErrorTitle}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Puoi riprovare tra poco o chiedere a Wendy.
+                          {searchErrorHint}
                         </p>
                       </CommandEmpty>
                     )}
 
                     {showSearchEmpty && (
                       <CommandEmpty>
-                        <p>Nessun risultato globale per "{query}"</p>
+                        <p>{searchEmptyTitle}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          Prova termini piu generali oppure chiedi a Wendy di guidarti.
+                          {searchEmptyHint}
                         </p>
                       </CommandEmpty>
                     )}
@@ -396,7 +605,7 @@ export function SearchDialog({
                           className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-primary/25 bg-primary/10 px-3 text-left text-sm font-semibold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                         >
                           <Search className="h-4 w-4" />
-                          <span className="min-w-0 truncate">Chiedi a Wendy di guidarti su "{query}"</span>
+                          <span className="min-w-0 truncate">{askWendyCurrentLabel}</span>
                         </button>
                       </div>
                     )}
@@ -439,7 +648,7 @@ export function SearchDialog({
                         const Icon   = config.icon;
                         const typeResults = grouped[type] ?? [];
                         return (
-                          <CommandGroup key={type} heading={t(config.labelKey)}>
+                          <CommandGroup key={type} heading={typeHeadings[type]}>
                             {typeResults.map((item) => (
                               <CommandItem key={`${type}-${item.id}`} value={`${item.title} ${item.description}`} onSelect={() => handleResultSelect(item)} className="cursor-pointer">
                                 <div className={`flex h-7 w-7 items-center justify-center rounded-full ${config.className}`}>
@@ -448,6 +657,12 @@ export function SearchDialog({
                                 <div className="flex flex-col min-w-0 flex-1">
                                   <span className="text-sm font-medium truncate">{item.title}</span>
                                   <span className="text-xs text-muted-foreground truncate">{item.description}</span>
+                                  <DiscoveryMeta
+                                    sourceLabel={item.sourceLabel}
+                                    personalization={item.personalization}
+                                    reasonLabels={item.reasonLabels}
+                                    className="mt-1"
+                                  />
                                 </div>
                               </CommandItem>
                             ))}
