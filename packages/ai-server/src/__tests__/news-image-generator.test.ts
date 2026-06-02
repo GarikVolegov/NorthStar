@@ -29,8 +29,10 @@ function item(overrides: Partial<RawItem>): RawItem {
 describe("news image generator", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllGlobals();
     delete process.env.NEWS_IMAGE_GENERATION;
     delete process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+    delete process.env.UNSPLASH_ACCESS_KEY; // i test DALL-E girano con Unsplash spento
   });
 
   it("does nothing unless image generation is explicitly enabled", async () => {
@@ -74,5 +76,28 @@ describe("news image generator", () => {
 
     expect(result[0]!.imageUrl).toBeUndefined();
     expect(result[1]!.imageUrl).toMatch(/^data:image\/png;base64,/);
+  });
+
+  it("prefers REAL Unsplash photos when configured, without AI generation", async () => {
+    process.env.UNSPLASH_ACCESS_KEY = "test-key";
+    const fetchMock = vi.fn(async (input: unknown) => {
+      if (String(input).includes("api.unsplash.com/search")) {
+        return new Response(JSON.stringify({
+          results: [{
+            urls: { regular: "https://images.unsplash.com/photo-real" },
+            links: { download_location: "https://api.unsplash.com/photos/x/download" },
+          }],
+        }), { status: 200 });
+      }
+      return new Response("", { status: 200 }); // download trigger
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await generateNewsImage([
+      item({ title: "AI in Italia", url: "https://example.com/ai", sectorNames: ["Artificial Intelligence"] }),
+    ]);
+
+    expect(result[0]!.imageUrl).toBe("https://images.unsplash.com/photo-real");
+    expect(generateImageBuffer).not.toHaveBeenCalled();
   });
 });
