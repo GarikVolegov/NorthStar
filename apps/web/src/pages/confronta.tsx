@@ -338,7 +338,7 @@ export default function Confronta() {
                     { s: right, color: "text-violet-600" },
                   ].map(({ s, color }, i) => (
                     <div key={i} className="text-center p-3 rounded-xl bg-muted/40">
-                      <p className={cn("text-2xl font-bold font-serif", color)}>+{s.growthRate}%</p>
+                      <p className={cn("text-2xl font-bold font-serif", color)}>{s.growthRate >= 0 ? "+" : ""}{s.growthRate}%</p>
                       <p className="text-xs text-muted-foreground truncate mt-0.5">{s.name.split(" ")[0]}</p>
                     </div>
                   ))}

@@ -30,8 +30,11 @@ export function SectorKeyMetrics({
         <div className="flex items-center text-muted-foreground text-sm font-medium mb-2 uppercase tracking-wider">
           <TrendingUp className="w-4 h-4 mr-1.5" /> {t("sector.growth")}
         </div>
-        <div className="text-xl md:text-2xl font-semibold text-emerald-600">
-          {t("sector.annualGrowth", { rate: sector.growthRate })}
+        <div className={cn(
+          "text-xl md:text-2xl font-semibold",
+          sector.growthRate >= 0 ? "text-emerald-600" : "text-amber-600",
+        )}>
+          {sector.growthRate >= 0 ? "+" : ""}{sector.growthRate}%
         </div>
       </div>
       <div className="bg-card border rounded-2xl p-5 flex flex-col justify-center">

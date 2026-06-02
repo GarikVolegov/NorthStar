@@ -132,7 +132,7 @@ export function RecommendationsSection({
                           <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
                             <TrendingUp className="w-3.5 h-3.5" /> {t("common.growth")}
                           </div>
-                          <div className="font-semibold text-sm text-emerald-400">+{hero.sector?.growthRate ?? 0}%</div>
+                          <div className="font-semibold text-sm text-emerald-400">{(hero.sector?.growthRate ?? 0) >= 0 ? "+" : ""}{hero.sector?.growthRate ?? 0}%</div>
                         </div>
                         <div className="bg-muted/50 rounded-xl p-3">
                           <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
@@ -230,7 +230,7 @@ export function RecommendationsSection({
                                   EUR{(rec.sector?.avgSalaryMin ?? 0) / 1000}k-EUR{(rec.sector?.avgSalaryMax ?? 0) / 1000}k
                                 </span>
                                 <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                                  <TrendingUp className="w-3 h-3" /> +{rec.sector?.growthRate ?? 0}%
+                                  <TrendingUp className="w-3 h-3" /> {(rec.sector?.growthRate ?? 0) >= 0 ? "+" : ""}{rec.sector?.growthRate ?? 0}%
                                 </span>
                               </div>
                             </CardContent>

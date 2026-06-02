@@ -104,7 +104,10 @@ async function main() {
     if (!g) { console.log(`  - ${sectorName}: nessun dato NACE ${nace} → salto`); skipped++; continue; }
 
     const trend = trendFromGrowth(g.totalPct);
-    const growthRate = Math.round(g.cagr * 1000) / 1000; // frazione annua, es. 0.020
+    // Crescita REALE in PUNTI PERCENTUALI (variazione occupati nel periodo), 1 dec.
+    // Convenzione DB/display: i componenti mostrano `${growthRate}%`, quindi il
+    // valore è già in %, non una frazione (prima 0.18 veniva mostrato come "0,18%").
+    const growthRate = Math.round(g.totalPct * 10) / 10;
 
     const { rows: before } = await client.query(
       `SELECT trend, growth_rate FROM sectors WHERE name = $1 LIMIT 1`, [sectorName]);

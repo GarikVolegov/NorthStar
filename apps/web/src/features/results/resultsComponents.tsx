@@ -260,7 +260,7 @@ export function QuickCompare({ recs }: { recs: Rec[] }) {
                 {cols.map((rec, i) => (
                   <Cell
                     key={rec.sectorId}
-                    val={`+${rec.sector?.growthRate ?? 0}%`}
+                    val={`${(rec.sector?.growthRate ?? 0) >= 0 ? "+" : ""}${rec.sector?.growthRate ?? 0}%`}
                     isWinner={winnerIdx(growthVals) === i}
                   />
                 ))}
