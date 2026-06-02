@@ -30,23 +30,20 @@ import { registerPublicRoutes } from "./route-registry-public";
 import { registerAuthenticatedRoutes } from "./route-registry-authenticated";
 import { registerAdminRoutes } from "./route-registry-admin";
 import { logSecurityEvent } from "./lib/security-events";
+import { buildCorsAllowlist, isCorsOriginAllowed } from "./lib/cors-origin";
 
 const app = express();
 app.set("trust proxy", 1);
 
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim())
-  : [];
-const defaultLocalOrigins = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://localhost:4173",
-  "http://127.0.0.1:4173",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
-const corsAllowlist = new Set([...allowedOrigins, ...defaultLocalOrigins]);
-const isDev = process.env.NODE_ENV !== "production";
+const corsAllowlist = buildCorsAllowlist();
+
+function getRequestOrigin(req: express.Request): string | undefined {
+  const host = req.get("host");
+  if (!host) return undefined;
+
+  const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  return `${forwardedProto || req.protocol}://${host}`;
+}
 
 app.use(
   helmet({
@@ -78,13 +75,13 @@ app.use(
     },
   }),
 );
-app.use(
-  cors({
+app.use((req, res, next) => {
+  const requestOrigin = getRequestOrigin(req);
+  return cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      if (isDev) return callback(null, true);
-      if (corsAllowlist.has(origin)) return callback(null, true);
+      if (isCorsOriginAllowed(origin, process.env, corsAllowlist, requestOrigin)) {
+        return callback(null, true);
+      }
       logSecurityEvent("cors_blocked", {
         origin,
         detail: `allowed=${[...corsAllowlist].join(",")}`,
@@ -92,8 +89,8 @@ app.use(
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-  }),
-);
+  })(req, res, next);
+});
 app.use("/api/subscription/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "10mb" }));
 app.use(requestLoggerMiddleware);
