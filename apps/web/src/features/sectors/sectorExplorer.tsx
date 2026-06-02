@@ -59,6 +59,20 @@ export function useLatestSession(enabled: boolean) {
   });
 }
 
+/** RIASEC rivelato dal comportamento (Bussola). Vuoto/nullo per chi non l'ha usata. */
+export function useRevealedRiasec(enabled: boolean) {
+  return useQuery<Record<string, number> | null>({
+    queryKey: ["compass-revealed-riasec"],
+    enabled,
+    queryFn: () =>
+      getJson<{ revealedRiasec?: Record<string, number> }>(`${BASE}api/compass`)
+        .then((p) => (p.revealedRiasec && Object.keys(p.revealedRiasec).length > 0 ? p.revealedRiasec : null))
+        .catch(() => null),
+    staleTime: 120_000,
+    retry: false,
+  });
+}
+
 export function normalizeText(value: string) {
   return value
     .toLowerCase()
@@ -138,8 +152,10 @@ function buildReason(
   fitScore: number,
   marketScore: number,
   recommendation?: LatestRecommendation,
+  usesRevealed = false,
 ) {
   if (recommendation?.matchReason) return recommendation.matchReason;
+  if (usesRevealed && fitScore >= 70) return "Emerso da come ti muovi davvero nella Bussola, non solo dal test.";
   if (fitScore >= 75) return "Forte coerenza con il tuo profilo e i tuoi interessi.";
   if (marketScore >= 75) return "Segnali di mercato solidi e buona sostenibilita del percorso.";
   if (sector.workMode?.length) return "Buona area da esplorare per modalita e competenze richieste.";
@@ -150,6 +166,10 @@ export function rankSectors(
   sectors: Sector[],
   latestSession: LatestSession | null | undefined,
   workPreference: WorkPreference | "unknown",
+  // RIASEC RIVELATO dal comportamento (Bussola). Tesi dell'indeciso: ciò verso
+  // cui ti muovi davvero pesa più di ciò che dichiari nel test. Opzionale →
+  // retro-compatibile: senza, il ranking resta identico a prima.
+  revealedRiasec?: Record<string, number>,
 ) {
   const recommendations = new Map(
     (latestSession?.recommendations ?? []).map((rec) => [rec.sectorId, rec]),
@@ -158,8 +178,15 @@ export function rankSectors(
   return sectors
     .map((sector) => {
       const recommendation = recommendations.get(sector.id);
-      const fitScore =
+      const declaredFit =
         recommendation?.matchScore ?? computeRiasecFit(sector, latestSession?.riasecScores);
+      const revealedFit = revealedRiasec ? computeRiasecFit(sector, revealedRiasec) : 0;
+      const usesRevealed = revealedFit > 0;
+      // Fonde dichiarato + rivelato (rivelato pesato di più). Se non c'è il test,
+      // usa solo il rivelato; se non c'è la Bussola, usa solo il dichiarato.
+      const fitScore = usesRevealed
+        ? (declaredFit > 0 ? Math.round(declaredFit * 0.45 + revealedFit * 0.55) : revealedFit)
+        : declaredFit;
       const workModeScore = computeWorkModeScore(sector, workPreference);
       const marketScore = computeMarketScore(sector);
       const rankScore = Math.round(fitScore * 0.6 + workModeScore * 0.2 + marketScore * 0.2);
@@ -170,7 +197,7 @@ export function rankSectors(
         fitScore,
         workModeScore,
         marketScore,
-        reason: buildReason(sector, fitScore, marketScore, recommendation),
+        reason: buildReason(sector, fitScore, marketScore, recommendation, usesRevealed),
       };
     })
     .sort((a, b) => {
