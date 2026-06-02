@@ -5,10 +5,13 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
+import { getJson } from "@/lib/apiClient";
 import { RIASEC_LABELS, SectorIcon } from "@/lib/sector-icon";
 import { cn } from "@/lib/utils";
 import { useGetRoleDetail } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import {
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   Briefcase,
@@ -16,8 +19,11 @@ import {
   Clock,
   Coins,
   DollarSign,
+  Flame,
   Gauge,
   GraduationCap,
+  Lightbulb,
+  Rocket,
   ShieldCheck,
   TrendingUp,
   Zap,
@@ -25,6 +31,26 @@ import {
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useParams } from "wouter";
+
+const BASE = import.meta.env.BASE_URL || "/";
+
+interface RoleInsights {
+  professionId: number;
+  roleTitle: string;
+  sector: { id: number; name: string } | null;
+  energizers: string[];
+  frictions: string[];
+  opportunities: string[];
+  curiosity: string;
+  demand: {
+    count: number;
+    period: string;
+    growthRate: number | null;
+    avgSalaryMin: number | null;
+    avgSalaryMax: number | null;
+    topSkills: string[];
+  } | null;
+}
 
 export default function Ruolo() {
   const { t } = useTranslation();
@@ -35,6 +61,13 @@ export default function Ruolo() {
 
   const { data: role, isLoading, error } = useGetRoleDetail(id, {
     query: { enabled: !!id, queryKey: ["roleDetail", id] },
+  });
+
+  const { data: insights } = useQuery<RoleInsights>({
+    queryKey: ["role-insights", id],
+    queryFn: () => getJson<RoleInsights>(`${BASE}api/roles/${id}/insights`),
+    enabled: !!id,
+    staleTime: 60_000 * 10,
   });
 
   useWendyPageContext({
@@ -208,6 +241,74 @@ export default function Ruolo() {
           </div>
         )}
       </div>
+
+      {insights && (insights.energizers.length > 0 || insights.frictions.length > 0 || insights.opportunities.length > 0) && (
+        <section className="mb-12 rounded-2xl border bg-card p-6">
+          <div className="mb-5 flex items-start gap-3">
+            <Lightbulb className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
+            <div>
+              <h2 className="text-xl font-serif font-bold">Il ritratto onesto</h2>
+              <p className="text-sm text-muted-foreground">{insights.curiosity}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            {insights.energizers.length > 0 && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-emerald-700 dark:text-emerald-400">
+                  <Flame className="h-4 w-4" /> Cosa ti accende
+                </div>
+                <ul className="space-y-1.5">
+                  {insights.energizers.map((e) => (
+                    <li key={e} className="text-sm text-foreground">• {e}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {insights.frictions.length > 0 && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20">
+                <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="h-4 w-4" /> Cosa pesa (sul serio)
+                </div>
+                <ul className="space-y-1.5">
+                  {insights.frictions.map((f) => (
+                    <li key={f} className="text-sm text-foreground">• {f}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {insights.opportunities.length > 0 && (
+            <div className="mt-4 rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary">
+                <Rocket className="h-4 w-4" /> Dove sta andando
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {insights.opportunities.map((o) => (
+                  <span key={o} className="rounded-full bg-background px-3 py-1 text-sm text-muted-foreground">{o}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {insights.demand && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t pt-4 text-sm">
+              <span className="inline-flex items-center gap-1.5 font-medium">
+                <TrendingUp className="h-4 w-4 text-primary" /> Domanda reale
+              </span>
+              <span className="text-muted-foreground">
+                {insights.demand.count.toLocaleString("it-IT")} annunci ({insights.demand.period})
+              </span>
+              {insights.demand.growthRate != null && (
+                <span className={insights.demand.growthRate >= 0 ? "text-emerald-600" : "text-amber-600"}>
+                  {insights.demand.growthRate >= 0 ? "+" : ""}{Math.round(insights.demand.growthRate)}%
+                </span>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <TryADaySection
         role={role}

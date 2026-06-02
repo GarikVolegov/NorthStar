@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Ruolo from "./ruolo";
@@ -42,6 +43,12 @@ vi.mock("wouter", () => ({
 vi.mock("@/components/role/TryADaySection", () => ({
   TryADaySection: () => <section>Try-a-Day mock</section>,
 }));
+vi.mock("@/lib/apiClient", () => ({
+  getJson: vi.fn(() => Promise.resolve({
+    professionId: 55, roleTitle: "Product Designer", sector: null,
+    energizers: [], frictions: [], opportunities: [], curiosity: "", demand: null,
+  })),
+}));
 vi.mock("@/lib/sector-icon", () => ({
   RIASEC_LABELS: {
     A: { label: "Artistico", desc: "Creativo" },
@@ -50,6 +57,13 @@ vi.mock("@/lib/sector-icon", () => ({
   SectorIcon: () => <span data-testid="sector-icon" />,
 }));
 
+function renderRuolo() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<Ruolo />, {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+}
+
 describe("Ruolo decision flow", () => {
   beforeEach(() => {
     roleState.role.id = 55;
@@ -57,7 +71,7 @@ describe("Ruolo decision flow", () => {
   });
 
   it("links the target role to role-specific jobs with sector fallback", () => {
-    render(<Ruolo />);
+    renderRuolo();
 
     expect(screen.getByText("Settore scelto")).toBeInTheDocument();
     expect(screen.getByText("Ruolo target")).toBeInTheDocument();
@@ -74,7 +88,7 @@ describe("Ruolo decision flow", () => {
   it("links to role-specific jobs without sector when sector info is absent", () => {
     roleState.role.sectorInfo = null;
 
-    render(<Ruolo />);
+    renderRuolo();
 
     const jobsLinks = screen.getAllByRole("link", { name: /trova aziende e lavori per questo ruolo/i });
     expect(jobsLinks[0]).toHaveAttribute("href", "/lavori?professionId=55");
