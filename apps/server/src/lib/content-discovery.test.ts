@@ -153,6 +153,88 @@ describe("content discovery metadata", () => {
     );
   });
 
+  it("clamps explicit and derived match scores to the 0..1 range", () => {
+    expect(
+      buildDiscoveryMetadata({
+        title: "High score",
+        type: "article",
+        source: "index",
+        matchScore: 1.7,
+        scoreLexical: 0,
+        scoreSemantic: null,
+      }).matchScore,
+    ).toBe(1);
+
+    expect(
+      buildDiscoveryMetadata({
+        title: "Low score",
+        type: "article",
+        source: "index",
+        score: -0.2,
+        scoreLexical: 0,
+        scoreSemantic: null,
+      }).matchScore,
+    ).toBe(0);
+
+    expect(
+      buildDiscoveryMetadata({
+        title: "Derived high score",
+        type: "article",
+        source: "index",
+        scoreLexical: -0.4,
+        scoreSemantic: 2.4,
+      }).matchScore,
+    ).toBe(1);
+  });
+
+  it("supports global-search total score aliases", () => {
+    expect(
+      buildDiscoveryMetadata({
+        title: "Total score",
+        type: "news",
+        source: "live",
+        scoreTotal: 1.4,
+        scoreLexical: 0,
+        scoreSemantic: null,
+      }).matchScore,
+    ).toBe(1);
+
+    expect(
+      buildDiscoveryMetadata({
+        title: "Snake total score",
+        type: "news",
+        source: "live",
+        score_total: 0.42,
+        scoreLexical: 0,
+        scoreSemantic: null,
+      }).matchScore,
+    ).toBe(0.42);
+  });
+
+  it("includes source and type reasons for public content when maxReasons allows", () => {
+    const meta = buildDiscoveryMetadata(
+      {
+        title: "Focus profondo",
+        type: "article",
+        source: "index",
+        scoreLexical: 1,
+        scoreSemantic: 0.9,
+        metadata: {
+          category: "produttivita",
+          tags: ["focus"],
+        },
+      },
+      { maxReasons: 6 },
+    );
+
+    expect(meta.reasons).toEqual(
+      expect.arrayContaining([
+        { code: "source:index", label: "Fonte: Indice NorthStar", source: "content" },
+        { code: "type:article", label: "Tipo: Biblioteca crescita", source: "content" },
+      ]),
+    );
+  });
+
   it("keeps Task 2 compatibility labels usable", () => {
     const meta = buildDiscoveryMetadata({
       title: "Notizia NorthStar",

@@ -32,6 +32,8 @@ export interface DiscoverableContent<
   updatedAt?: string | Date | null;
   score?: number | null;
   matchScore?: number | null;
+  scoreTotal?: number | null;
+  score_total?: number | null;
   scoreLexical?: number | null;
   lexicalScore?: number | null;
   scoreSemantic?: number | null;
@@ -132,6 +134,10 @@ function firstNumber(...values: unknown[]): number | null {
   return null;
 }
 
+function clampScore(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
 function normalizeSource(value: unknown, fallback: DiscoverySource = "live"): DiscoverySource {
   return typeof value === "string" && SUPPORTED_SOURCES.has(value as DiscoverySource)
     ? (value as DiscoverySource)
@@ -175,10 +181,18 @@ export function buildDiscoveryMetadata(
     content.visibility === "private";
   const maxReasons = Math.max(1, options.maxReasons ?? 3);
 
-  const lexicalScore = firstNumber(content.scoreLexical, content.lexicalScore) ?? 0;
-  const semanticScore = firstNumber(content.scoreSemantic, content.semanticScore) ?? 0;
-  const explicitMatchScore = firstNumber(content.matchScore, content.score);
-  const matchScore = explicitMatchScore ?? Math.max(lexicalScore, semanticScore, 0);
+  const lexicalScore = clampScore(firstNumber(content.scoreLexical, content.lexicalScore) ?? 0);
+  const semanticScore = clampScore(firstNumber(content.scoreSemantic, content.semanticScore) ?? 0);
+  const explicitMatchScore = firstNumber(
+    content.matchScore,
+    content.score,
+    content.scoreTotal,
+    content.score_total,
+  );
+  const matchScore =
+    explicitMatchScore != null
+      ? clampScore(explicitMatchScore)
+      : Math.max(lexicalScore, semanticScore, 0);
 
   const category = firstString(content.category) ?? firstString(metadata.category);
   const tags = [...stringArray(content.tags), ...stringArray(metadata.tags)];
@@ -288,6 +302,18 @@ export function buildDiscoveryMetadata(
         source: "content",
       });
       matchedKeywords.push(keyword);
+    }
+    addReason(reasons, {
+      code: `source:${source}`,
+      label: `Fonte: ${PUBLIC_SOURCE_LABELS[source]}`,
+      source: "content",
+    });
+    if (type) {
+      addReason(reasons, {
+        code: `type:${type}`,
+        label: `Tipo: ${TYPE_SOURCE_LABELS[type] ?? "Contenuto NorthStar"}`,
+        source: "content",
+      });
     }
   }
 
