@@ -153,6 +153,44 @@ router.post("/signal", requireAuth, async (req, res) => {
   }
 });
 
+/* ─── POST /api/compass/signal/undo — annulla l'ultimo segnale di un tipo ─── */
+router.post("/signal/undo", requireAuth, async (req, res) => {
+  try {
+    const userId = req.user!.id;
+    const signalType = (req.body as { signalType?: unknown })?.signalType as CompassSignalType;
+    if (!COMPASS_SIGNAL_TYPES.includes(signalType)) {
+      res.status(400).json({ error: "signalType non valido" });
+      return;
+    }
+
+    // Trova l'ultimo segnale di quel tipo per QUESTO utente e lo rimuove.
+    const [last] = await db
+      .select({ id: compassSignalsTable.id })
+      .from(compassSignalsTable)
+      .where(and(
+        eq(compassSignalsTable.userId, userId),
+        eq(compassSignalsTable.signalType, signalType),
+      ))
+      .orderBy(desc(compassSignalsTable.createdAt), desc(compassSignalsTable.id))
+      .limit(1);
+
+    if (last) {
+      await db
+        .delete(compassSignalsTable)
+        .where(and(
+          eq(compassSignalsTable.id, last.id),
+          eq(compassSignalsTable.userId, userId), // doppia garanzia di ownership
+        ));
+    }
+
+    const profile = await recomputeCompass(userId);
+    res.json(profile);
+  } catch (err) {
+    req.log?.error?.({ err }, "compass signal undo error");
+    res.status(500).json({ error: "Errore nell'annullamento del segnale" });
+  }
+});
+
 /* ─── POST /api/compass/diagnose — imposta il tipo di blocco ─── */
 router.post("/diagnose", requireAuth, async (req, res) => {
   try {

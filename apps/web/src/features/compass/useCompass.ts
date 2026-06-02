@@ -63,12 +63,26 @@ export function useCompass() {
     reactionMs?: number;
     dims?: Record<string, number>;
     weight?: number;
-  }) => {
+  }): Promise<CompassProfile | null> => {
     try {
-      applyProfile(await postJson<CompassProfile>(`${BASE}api/compass/signal`, signal));
-      return true;
+      const next = await postJson<CompassProfile>(`${BASE}api/compass/signal`, signal);
+      applyProfile(next);
+      return next;
     } catch {
-      return false;
+      return null;
+    }
+  }, [applyProfile]);
+
+  /** Annulla l'ultimo segnale di un tipo (es. l'ultima reazione dello Specchio). */
+  const undoLastSignal = useCallback(async (
+    signalType: "scene_swipe" | "tournament_choice" | "block_answer" | "spike_outcome" | "chat_reaction",
+  ): Promise<CompassProfile | null> => {
+    try {
+      const next = await postJson<CompassProfile>(`${BASE}api/compass/signal/undo`, { signalType });
+      applyProfile(next);
+      return next;
+    } catch {
+      return null;
     }
   }, [applyProfile]);
 
@@ -87,6 +101,7 @@ export function useCompass() {
     error: error ? (error instanceof Error ? error.message : "Errore") : null,
     reload: refetch,
     recordSignal,
+    undoLastSignal,
     diagnose,
   };
 }

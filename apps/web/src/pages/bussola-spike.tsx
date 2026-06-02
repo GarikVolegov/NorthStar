@@ -25,9 +25,10 @@ function reviewInDays(reviewDate: string): number {
 }
 
 export default function SpikePage() {
-  const { profile, reload } = useCompass();
+  const { profile, reload, loading } = useCompass();
   const [, setLocation] = useLocation();
   const [spikes, setSpikes] = useState<CareerSpike[]>([]);
+  const [spikesLoaded, setSpikesLoaded] = useState(false);
 
   // creazione
   const [hyp, setHyp] = useState<CompassHypothesis | null>(null);
@@ -41,7 +42,7 @@ export default function SpikePage() {
   const [energy, setEnergy] = useState(0.5);
   const [learned, setLearned] = useState("");
 
-  useEffect(() => { void fetchSpikes().then(setSpikes); }, []);
+  useEffect(() => { void fetchSpikes().then((s) => { setSpikes(s); setSpikesLoaded(true); }); }, []);
 
   const openHyps = (profile?.hypotheses ?? []).filter((h) => h.verdict !== "discarded");
   const active = spikes.filter((s) => s.status === "active");
@@ -86,6 +87,19 @@ export default function SpikePage() {
       await reload();
     }
     setBusy(false);
+  }
+
+  if (loading && !spikesLoaded) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 p-6">
+        <div className="h-8 w-48 animate-pulse rounded bg-muted" />
+        <div className="h-24 w-full animate-pulse rounded-xl bg-muted" />
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="h-20 animate-pulse rounded-xl bg-muted" />
+          <div className="h-20 animate-pulse rounded-xl bg-muted" />
+        </div>
+      </div>
+    );
   }
 
   return (

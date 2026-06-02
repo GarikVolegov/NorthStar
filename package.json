@@ -31,6 +31,7 @@
     "db:migrate": "pnpm --filter @workspace/db exec tsx migrate.ts",
     "db:migrate:dry-run": "pnpm --filter @workspace/db run migrate:dry-run",
     "db:push": "pnpm --filter @workspace/db run push",
+    "db:seed:scenes": "node packages/db/seed-scene-cards.mjs",
     "// ── SECRETS ─────────────────────────────────────": "---",
     "secrets": "bash scripts/generate-secrets.sh",
     "secrets:env": "bash scripts/generate-secrets.sh --env",
