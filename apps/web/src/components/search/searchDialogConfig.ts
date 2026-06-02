@@ -31,7 +31,7 @@ export const SUGGESTIONS_DEFAULTS = [
   { title: "Fai il test", description: "Scopri la tua personalita professionale", url: "/test" },
   { title: "Trend di mercato", description: "Le ultime tendenze del lavoro", url: "/news" },
   { title: "Chiedi a Wendy", description: "Parla con l'assistente AI di NorthStar", url: "#wendy" },
-];
+] as const;
 
 export const ORDER: Array<keyof typeof TYPE_CONFIG> = [
   "idea",
