@@ -1,3 +1,4 @@
+import { DiscoveryMeta, type DiscoveryPersonalization } from "@/components/discovery/DiscoveryMeta";
 import { useAuth } from "@/contexts/AuthContext";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { getJson } from "@/lib/apiClient";
@@ -28,6 +29,9 @@ interface Article {
   tags: string[];
   difficulty: string;
   readTimeMinutes: number;
+  sourceLabel?: string;
+  personalization?: DiscoveryPersonalization;
+  reasonLabels?: string[];
 }
 
 interface PerTeData {
@@ -110,6 +114,12 @@ function ArticleCard({ article, recommended }: { article: Article; recommended?:
         <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 flex-1">
           {article.description}
         </p>
+        <DiscoveryMeta
+          sourceLabel={article.sourceLabel}
+          personalization={article.personalization}
+          reasonLabels={article.reasonLabels}
+          className="mt-3"
+        />
         {article.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-3">
             {article.tags.slice(0, 3).map(t => (

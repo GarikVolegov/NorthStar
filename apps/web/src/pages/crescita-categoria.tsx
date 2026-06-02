@@ -1,3 +1,4 @@
+import { DiscoveryMeta, type DiscoveryPersonalization } from "@/components/discovery/DiscoveryMeta";
 import { Input } from "@/components/ui/input";
 import { getJson } from "@/lib/apiClient";
 import { usePageMeta } from "@/lib/seo";
@@ -20,6 +21,9 @@ interface Article {
   difficulty: string;
   readTimeMinutes: number;
   viewCount: number;
+  sourceLabel?: string;
+  personalization?: DiscoveryPersonalization;
+  reasonLabels?: string[];
 }
 
 interface Category {
@@ -71,6 +75,12 @@ function ArticleCard({ article }: { article: Article }) {
         <p className="text-sm text-muted-foreground leading-relaxed flex-1 line-clamp-3">
           {article.description}
         </p>
+        <DiscoveryMeta
+          sourceLabel={article.sourceLabel}
+          personalization={article.personalization}
+          reasonLabels={article.reasonLabels}
+          className="mt-3"
+        />
         {article.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-3 pt-3 border-t">
             {article.tags.slice(0, 4).map((t) => (
@@ -106,8 +116,26 @@ export default function CrescitaCategoria() {
   const currentCat = catData.find((c) => c.id === cat);
 
   const { data, isLoading } = useQuery<{ articles: Article[]; total: number }>({
-    queryKey: ["crescita", cat],
-    queryFn: () => getJson<{ articles: Article[]; total: number }>(`${BASE}api/crescita?category=${cat}&limit=50`),
+    queryKey: ["crescita", cat, search, diffFilter],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        category: cat ?? "",
+        limit: "50",
+      });
+      const trimmedSearch = search.trim();
+
+      if (trimmedSearch) {
+        params.set("search", trimmedSearch);
+      }
+
+      if (diffFilter !== "all") {
+        params.set("difficulty", diffFilter);
+      }
+
+      return getJson<{ articles: Article[]; total: number }>(
+        `${BASE}api/crescita?${params.toString()}`,
+      );
+    },
     staleTime: 1000 * 60 * 5,
     enabled: !!cat,
   });
@@ -122,19 +150,7 @@ export default function CrescitaCategoria() {
 
   const allArticles = data?.articles ?? [];
 
-  const filtered = allArticles.filter((a) => {
-    if (diffFilter !== "all" && a.difficulty !== diffFilter) return false;
-    if (search.trim()) {
-      const s = search.toLowerCase();
-      if (
-        !a.title.toLowerCase().includes(s) &&
-        !a.description.toLowerCase().includes(s) &&
-        !a.tags.some((t) => t.toLowerCase().includes(s))
-      )
-        return false;
-    }
-    return true;
-  });
+  const filtered = allArticles;
 
   const allTags = Array.from(new Set(allArticles.flatMap((a) => a.tags))).slice(
     0,

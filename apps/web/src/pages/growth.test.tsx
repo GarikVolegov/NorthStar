@@ -120,6 +120,43 @@ describe("Crescita page reliability states", () => {
     expect(screen.getByText(/Esplora tutte le aree/i)).toBeInTheDocument();
   });
 
+  it("shows profile-matched growth card discovery metadata", async () => {
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("api/crescita/categorie")) return Promise.resolve([]);
+      if (url.includes("api/crescita/per-te")) {
+        return Promise.resolve({
+          articles: [
+            {
+              id: 3,
+              title: "Routine di focus investigativo",
+              slug: "routine-focus-investigativo",
+              category: "produttivita",
+              description: "Una guida pratica per restare sul problema giusto.",
+              tags: ["focus"],
+              difficulty: "base",
+              readTimeMinutes: 5,
+              sourceLabel: "Biblioteca crescita",
+              personalization: "profile",
+              reasonLabels: ["Profilo: Investigativo", "Tema: focus"],
+            },
+          ],
+          hasProfile: true,
+          personalization: "profile",
+          types: ["I"],
+        });
+      }
+      if (url.includes("api/crescita?limit=6")) return Promise.resolve({ articles: [] });
+      return Promise.reject(new Error(`Unhandled URL ${url}`));
+    });
+
+    renderGrowth();
+
+    expect(await screen.findByText("Routine di focus investigativo")).toBeInTheDocument();
+    expect(screen.getByText("Biblioteca crescita")).toBeInTheDocument();
+    expect(screen.getByText("Personalizzato")).toBeInTheDocument();
+    expect(screen.getByText("Profilo: Investigativo")).toBeInTheDocument();
+  });
+
   it("shows fallback growth articles as a general path, not personalized advice", async () => {
     getJsonMock.mockImplementation((url: string) => {
       if (url.includes("api/crescita/categorie")) return Promise.resolve([]);
