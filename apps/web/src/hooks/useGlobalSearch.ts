@@ -28,6 +28,12 @@ export interface SearchResult {
   score_total?: number;
   visibility?: "public" | "private";
   metadata?: Record<string, unknown>;
+  source?: "index" | "live" | "library" | "fallback" | "wendy";
+  sourceLabel?: string;
+  personalization?: "profile" | "journey" | "generic" | "private";
+  reasonLabels?: string[];
+  matchSignals?: string[];
+  actionLabel?: string;
 }
 
 export interface SearchSuggestion {
