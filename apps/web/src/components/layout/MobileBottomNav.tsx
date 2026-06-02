@@ -26,7 +26,6 @@ type MobileNavItem = { href: string; icon?: LucideIcon | undefined; labelKey: st
 const NAV_SOURCES = {
   home: "Home",
   northStar: "NorthStar",
-  bussola: "Bussola",
   test: "Test",
   areas: "Aree",
   choice: "Settore+ruolo",
@@ -81,7 +80,6 @@ const PHASE_ITEMS: Record<NavPhase, MobileNavItem[]> = {
   ],
   indeciso: [
     navItem("/dashboard", "northStar", undefined, true),
-    navItem("/bussola", "bussola", Compass),
     navItem("/settori", "choice", Layers),
     GROWTH_NAV_ITEM,
     navItem("/social", "social", MessageCircle),
