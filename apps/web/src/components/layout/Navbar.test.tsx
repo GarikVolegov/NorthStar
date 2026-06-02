@@ -1,7 +1,15 @@
 import { render, screen } from "@testing-library/react";
 import * as React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_NEWS_TICKER_ITEMS } from "./navbarConfig";
+
+const getJsonMock = vi.hoisted(() => vi.fn());
+const useDynamicTranslationMock = vi.hoisted(() => vi.fn());
+const getDynamicTranslationMock = vi.hoisted(() => vi.fn());
+const i18nState = vi.hoisted(() => ({
+  language: "it",
+  resolvedLanguage: "it",
+}));
 
 vi.mock("@/components/brand/AppLogo", () => ({
   AppLogo: ({ decorative, className }: { decorative?: boolean; className?: string }) => (
@@ -69,11 +77,16 @@ vi.mock("@/lib/api-fetch", () => ({
 }));
 
 vi.mock("@/lib/apiClient", () => ({
-  getJson: vi.fn().mockResolvedValue({ news: [] }),
+  getJson: getJsonMock,
 }));
 
 vi.mock("@/lib/motion", () => ({
   useReducedMotion: () => false,
+}));
+
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: useDynamicTranslationMock,
+  getDynamicTranslation: getDynamicTranslationMock,
 }));
 
 vi.mock("@clerk/react", () => ({
@@ -87,7 +100,7 @@ vi.mock("next-themes", () => ({
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
     t: (key: string) => key,
-    i18n: { resolvedLanguage: "it", language: "it", changeLanguage: vi.fn() },
+    i18n: { ...i18nState, changeLanguage: vi.fn() },
   }),
 }));
 
@@ -129,6 +142,17 @@ vi.mock("framer-motion", () => {
 import { Navbar } from "./Navbar";
 
 describe("Navbar", () => {
+  beforeEach(() => {
+    getJsonMock.mockReset();
+    getJsonMock.mockResolvedValue({ news: [] });
+    useDynamicTranslationMock.mockImplementation(({ key, source }: { key?: string; source: string }) =>
+      key ? `dynamic:${key}` : source,
+    );
+    getDynamicTranslationMock.mockImplementation(({ source }: { source: string }) => Promise.resolve(source));
+    i18nState.language = "it";
+    i18nState.resolvedLanguage = "it";
+  });
+
   it("shows a slow rotating compass in Wendy search and a configurable news ticker fallback", async () => {
     render(<Navbar />);
 
@@ -139,5 +163,27 @@ describe("Navbar", () => {
     expect(
       screen.getAllByText(DEFAULT_NEWS_TICKER_ITEMS[0] ?? "")[0],
     ).toBeInTheDocument();
+  });
+
+  it("requests ticker news in the selected language", async () => {
+    i18nState.language = "en-US";
+    i18nState.resolvedLanguage = "en-US";
+
+    render(<Navbar />);
+
+    await vi.waitFor(() => expect(getJsonMock).toHaveBeenCalled());
+    expect(getJsonMock.mock.calls[0]?.[0]).toContain("locale=en");
+  });
+
+  it("uses dynamic translations for global navbar labels", () => {
+    i18nState.language = "en-US";
+    i18nState.resolvedLanguage = "en-US";
+
+    render(<Navbar />);
+
+    expect(screen.getByRole("link", { name: "dynamic:nav.news.open" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:nav.wendy.openSearch" })).toBeInTheDocument();
+    expect(screen.getByText("dynamic:nav.wendy.placeholder")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:nav.login" })).toBeInTheDocument();
   });
 });

@@ -36,7 +36,7 @@ describe("DashboardCareerComparison", () => {
       />,
     );
 
-    expect(screen.getByText(/confronto carriere bloccato/i)).toBeInTheDocument();
+    expect(screen.getByText(/confronto settori e ruoli bloccato/i)).toBeInTheDocument();
     expect(screen.getByText(/salva almeno 3 settori/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /esplora e salva settori/i })).toHaveAttribute("href", "/settori");
   });
@@ -66,6 +66,6 @@ describe("DashboardCareerComparison", () => {
       />,
     );
 
-    expect(screen.getByLabelText(/confronto carriere.*azione principale/i)).toHaveClass("border-primary/35");
+    expect(screen.getByLabelText(/confronto settori e ruoli.*azione principale/i)).toHaveClass("border-primary/35");
   });
 });

@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY } from "@/lib/storage-keys";
+import i18n from "i18next";
+
+const dynamicTranslationMock = vi.hoisted(() => vi.fn(async ({ source }: { source: string }) => source));
+
+vi.mock("@/lib/dynamic-translation", () => ({
+  getDynamicTranslation: dynamicTranslationMock,
+}));
+
 import {
   ApiClientError,
   getJson,
@@ -12,12 +20,15 @@ import { setInMemoryToken } from "./api-fetch";
 describe("apiClient", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    dynamicTranslationMock.mockReset();
+    dynamicTranslationMock.mockImplementation(async ({ source }: { source: string }) => source);
     sessionStorage.clear();
     setInMemoryToken(null);
   });
 
   it("adds auth and parses JSON", async () => {
     setInMemoryToken("abc");
+    Object.defineProperty(i18n, "language", { configurable: true, value: "fr" });
     const fetchMock = vi
       .spyOn(globalThis, "fetch")
       .mockResolvedValue(
@@ -30,6 +41,7 @@ describe("apiClient", () => {
 
     const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
     expect(new Headers(init.headers).get("Authorization")).toBe("Bearer abc");
+    expect(new Headers(init.headers).get("Accept-Language")).toBe("fr");
   });
 
   it("stringifies JSON bodies", async () => {
@@ -104,6 +116,21 @@ describe("apiClient", () => {
       status: 0,
       message: expect.stringContaining("Server API locale non raggiungibile"),
     } satisfies Partial<ApiClientError>);
+  });
+
+  it("dynamically translates hardcoded client network errors", async () => {
+    dynamicTranslationMock.mockResolvedValueOnce("Local API server unavailable.");
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(getJson("/api/test")).rejects.toMatchObject({
+      name: "ApiClientError",
+      status: 0,
+      message: "Local API server unavailable.",
+    } satisfies Partial<ApiClientError>);
+    expect(dynamicTranslationMock).toHaveBeenCalledWith(expect.objectContaining({
+      key: "api.errors.localServerUnavailable",
+      source: expect.stringContaining("Server API locale non raggiungibile"),
+    }));
   });
 
   it("dispatches auth-expired when a tokenized request gets 401", async () => {

@@ -13,7 +13,6 @@ import { LoggedInHero } from "@/features/home/LoggedInHero";
 import { PersonalizedRecommendationsSection } from "@/features/home/PersonalizedRecommendationsSection";
 import { QuickToolsSection } from "@/features/home/QuickToolsSection";
 import { TrendingMobileStrip } from "@/features/home/TrendingMobileStrip";
-import { ONBOARDING_KEY } from "@/features/home/homeConstants";
 import { useHomeNews, useLatestRecommendations, useTrendingSectors } from "@/features/home/homeApi";
 import type { Persona } from "@/features/home/homeTypes";
 import { usePageMeta } from "@/lib/seo";
@@ -147,21 +146,25 @@ export default function Home() {
   const { data: latestResult, isLoading: isLatestLoading } =
     useLatestRecommendations(authReady && isLoggedIn && !!user);
 
-  // Utenti registrati vanno direttamente alla dashboard: la home è solo per ospiti
+  // Gli utenti gia' onboardati vanno alla dashboard; chi deve completarlo resta qui.
   useEffect(() => {
-    if (authReady && isLoggedIn) navigateTo("/dashboard");
-  }, [authReady, isLoggedIn, navigateTo]);
+    if (authReady && isLoggedIn && user?.onboardingCompleted) {
+      navigateTo("/dashboard");
+    }
+  }, [authReady, isLoggedIn, navigateTo, user?.onboardingCompleted]);
 
-  // Show onboarding wizard once per browser after login, if not already completed
+  // Show onboarding wizard while the server-side profile still needs it.
   useEffect(() => {
     if (!isLoggedIn || !user || isLatestLoading) return;
-    const done = localStorage.getItem(ONBOARDING_KEY);
-    if (done) return;
+    if (user.onboardingCompleted) {
+      setShowOnboarding(false);
+      return;
+    }
     const t = setTimeout(() => setShowOnboarding(true), 600);
     return () => clearTimeout(t);
   }, [isLoggedIn, user, isLatestLoading]);
 
-  if (authReady && isLoggedIn) return null;
+  if (authReady && isLoggedIn && user?.onboardingCompleted) return null;
 
   if (isLoggedIn && user && isLatestLoading) {
     return (
@@ -404,12 +407,10 @@ export default function Home() {
             }
             onClose={() => {
               setShowOnboarding(false);
-              localStorage.setItem(ONBOARDING_KEY, "1");
             }}
             onComplete={(journeyType) => {
               setShowOnboarding(false);
-              localStorage.setItem(ONBOARDING_KEY, "1");
-              updateUser({ journeyType });
+              updateUser({ journeyType, onboardingCompleted: true });
             }}
           />
         )}

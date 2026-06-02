@@ -1,6 +1,8 @@
 import type { DashboardEvent, DashboardObjective } from "@/hooks/useDashboardData";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { Briefcase, User } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 
 function ProfileRing({ percent }: { percent: number }) {
@@ -34,15 +36,59 @@ export function DashboardKpiStrip({
   confirmedSectorName?: string | null;
   sessionId?: number | null;
 }) {
+  const { i18n } = useTranslation();
+  const activeLanguage = i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
   const profileComplete = profilePercent >= 100;
+  const profileLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Completamento profilo",
+    key: "dashboard.kpi.profile.label",
+    context: "Dashboard KPI card label",
+  });
+  const profileCompleteLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Profilo completo",
+    key: "dashboard.kpi.profile.complete",
+    context: "Dashboard KPI profile completion state",
+  });
+  const profileMissingLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: `${100 - profilePercent}% mancante`,
+    key: "dashboard.kpi.profile.missing",
+    context: "Dashboard KPI missing profile percentage; keep the percentage unchanged",
+  });
+  const sectorLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Settore professionale",
+    key: "dashboard.kpi.sector.label",
+    context: "Dashboard KPI card label",
+  });
+  const chooseSectorLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Da scegliere",
+    key: "dashboard.kpi.sector.choose",
+    context: "Dashboard KPI fallback when no professional sector is selected",
+  });
+  const sectorConfirmedLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Settore confermato",
+    key: "dashboard.kpi.sector.confirmed",
+    context: "Dashboard KPI selected professional sector status",
+  });
+  const completeTestLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Completa il test",
+    key: "dashboard.kpi.sector.completeTest",
+    context: "Dashboard KPI prompt to complete the test",
+  });
 
   const cards = [
     {
       id: "profile",
       icon: null,
-      label: "Completamento profilo",
+      label: profileLabel,
       value: `${profilePercent}%`,
-      sub: profilePercent >= 100 ? "Profilo completo" : `${100 - profilePercent}% mancante`,
+      sub: profilePercent >= 100 ? profileCompleteLabel : profileMissingLabel,
       href: "/profilo",
       highlight: profilePercent >= 100,
       ring: true,
@@ -51,9 +97,9 @@ export function DashboardKpiStrip({
     {
       id: "sector",
       icon: Briefcase,
-      label: "Settore professionale",
-      value: confirmedSectorName ?? "Da scegliere",
-      sub: confirmedSectorName ? "Settore confermato" : "Completa il test",
+      label: sectorLabel,
+      value: confirmedSectorName ?? chooseSectorLabel,
+      sub: confirmedSectorName ? sectorConfirmedLabel : completeTestLabel,
       href: sessionId ? `/risultati/${sessionId}` : "/test",
       highlight: !!confirmedSectorName,
       ring: false,

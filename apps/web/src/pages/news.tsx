@@ -7,6 +7,7 @@ import {
   CATEGORY_CONFIG,
   NEWS_STALE_MS,
   readDiagnosticsFromError,
+  readNewsErrorCode,
   type NewsFeedResponse,
   type NewsSubscriptionsResponse,
   type ProfileData,
@@ -153,6 +154,7 @@ export default function News() {
   const displayError = feedQuery.isError && displayNews.length === 0;
   const loadMoreError = feedQuery.isError && displayNews.length > 0 ? feedQuery.error : null;
   const effectiveDiagnostics = displayDiagnostics ?? readDiagnosticsFromError(feedQuery.error);
+  const translationUnavailable = readNewsErrorCode(feedQuery.error) === "news_translation_unavailable";
   const retryDisplayNews = feedQuery.refetch;
 
   const subscribedCategories = CATEGORY_CONFIG.filter((c) => subscriptions.includes(c.id));
@@ -293,7 +295,14 @@ export default function News() {
             ? <NewsGridSkeleton count={6} />
             : displayError ? (
               <div className="text-center py-12">
-                <p className="text-muted-foreground mb-4">{t("news.loadError")}</p>
+                <p className="mb-2 text-lg font-semibold text-foreground">
+                  {translationUnavailable ? t("news.translationUnavailable.title") : t("news.loadError")}
+                </p>
+                {translationUnavailable && (
+                  <p className="mx-auto mb-4 max-w-xl text-sm text-muted-foreground">
+                    {t("news.translationUnavailable.desc")}
+                  </p>
+                )}
                 <Button variant="outline" onClick={() => retryDisplayNews()} className="gap-2 rounded-full">
                   <RefreshCw className="h-4 w-4" /> {t("news.retry")}
                 </Button>

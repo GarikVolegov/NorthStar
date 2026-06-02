@@ -7,6 +7,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { AuthUser } from "@/contexts/AuthContext";
 import { SUPPORTED_LANGUAGES } from "@/i18n";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import {
   JOURNEY_LABELS,
   LANGUAGE_LABELS,
@@ -44,6 +45,72 @@ interface ProfileMenuProps {
   onThemeChange: (theme: string) => void;
   onLanguageChange: (language: string) => void;
   onSignOut: () => void;
+}
+
+function useProfileMenuCopy(activeLanguage: string, insightsUnread: number) {
+  const insightCount = insightsUnread > 9 ? "9+" : String(insightsUnread);
+  return {
+    settings: useDynamicTranslation({
+      locale: activeLanguage,
+      source: "Impostazioni profilo",
+      key: "nav.profileMenu.settings",
+      context: "Profile menu settings action",
+    }),
+    wendyInsight: useDynamicTranslation({
+      locale: activeLanguage,
+      source: `Wendy ha ${insightCount} insight`,
+      key: "nav.profileMenu.wendyInsight",
+      context: "Profile menu unread Wendy insights action; keep the count unchanged",
+    }),
+    setJourney: useDynamicTranslation({
+      locale: activeLanguage,
+      source: "Imposta percorso",
+      key: "nav.profileMenu.setJourney",
+      context: "Profile menu action to choose the user's journey",
+    }),
+    memory: useDynamicTranslation({
+      locale: activeLanguage,
+      source: "Memoria di Wendy",
+      key: "nav.profileMenu.memory",
+      context: "Profile menu link to Wendy memory",
+    }),
+    memoryShort: useDynamicTranslation({
+      locale: activeLanguage,
+      source: "Memoria",
+      key: "nav.profileMenu.memoryShort",
+      context: "Compact profile menu link to Wendy memory",
+    }),
+    briefing: useDynamicTranslation({
+      locale: activeLanguage,
+      source: "Briefing Wendy",
+      key: "nav.profileMenu.briefing",
+      context: "Profile menu link to Wendy briefing",
+    }),
+    briefingShort: useDynamicTranslation({
+      locale: activeLanguage,
+      source: "Briefing",
+      key: "nav.profileMenu.briefingShort",
+      context: "Compact profile menu link to Wendy briefing",
+    }),
+    workspace: useDynamicTranslation({
+      locale: activeLanguage,
+      source: "Workspace",
+      key: "nav.profileMenu.workspace",
+      context: "Profile menu link to workspace",
+    }),
+    theme: useDynamicTranslation({
+      locale: activeLanguage,
+      source: "Tema",
+      key: "nav.profileMenu.theme",
+      context: "Profile menu theme section label",
+    }),
+    language: useDynamicTranslation({
+      locale: activeLanguage,
+      source: "Lingua",
+      key: "nav.profileMenu.language",
+      context: "Profile menu language section label",
+    }),
+  };
 }
 
 function ProfileHeader({
@@ -241,6 +308,7 @@ export function NavbarDesktopProfileMenu(props: ProfileMenuProps) {
     onNavigate,
     onSignOut,
   } = props;
+  const copy = useProfileMenuCopy(props.activeLanguage, insightsUnread);
 
   return (
     <>
@@ -258,7 +326,7 @@ export function NavbarDesktopProfileMenu(props: ProfileMenuProps) {
         path="/profilo"
         onClick={() => onNavigate("/profilo#impostazioni")}
       >
-        Impostazioni profilo
+        {copy.settings}
       </DesktopItem>
       <DropdownMenuSeparator />
       {insightsUnread > 0 && (
@@ -268,7 +336,7 @@ export function NavbarDesktopProfileMenu(props: ProfileMenuProps) {
             className="text-amber-500 focus:text-amber-600"
             onClick={() => onNavigate("/dashboard")}
           >
-            Wendy ha {insightsUnread > 9 ? "9+" : insightsUnread} insight
+            {copy.wendyInsight}
           </DesktopItem>
           <DropdownMenuSeparator />
         </>
@@ -279,7 +347,7 @@ export function NavbarDesktopProfileMenu(props: ProfileMenuProps) {
           path="/percorso"
           onClick={() => onNavigate("/percorso")}
         >
-          Imposta percorso
+          {copy.setJourney}
         </DesktopItem>
       )}
       <DesktopItem
@@ -294,7 +362,7 @@ export function NavbarDesktopProfileMenu(props: ProfileMenuProps) {
         className="text-sm text-muted-foreground"
         onClick={() => onNavigate("/wendy/memoria")}
       >
-        Memoria di Wendy
+        {copy.memory}
       </DesktopItem>
       <DesktopItem
         icon={<Sparkles className="mr-2 h-4 w-4" />}
@@ -302,7 +370,7 @@ export function NavbarDesktopProfileMenu(props: ProfileMenuProps) {
         className="text-sm text-muted-foreground"
         onClick={() => onNavigate("/profilo/briefing")}
       >
-        Briefing Wendy
+        {copy.briefing}
       </DesktopItem>
       <DesktopItem
         icon={<Users className="mr-2 h-4 w-4" />}
@@ -310,18 +378,18 @@ export function NavbarDesktopProfileMenu(props: ProfileMenuProps) {
         className="text-sm text-muted-foreground"
         onClick={() => onNavigate("/workspace")}
       >
-        Workspace
+        {copy.workspace}
       </DesktopItem>
       <DropdownMenuSeparator />
       <div className="flex min-h-9 items-center gap-2 px-2 py-1">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tema</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{copy.theme}</p>
         <ThemeButtons theme={props.theme} onThemeChange={props.onThemeChange} />
       </div>
       <DropdownMenuSeparator />
       <div className="flex min-h-9 items-center gap-2 px-2 py-1">
         <div className="flex min-w-0 flex-1 items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
           <Globe2 className="h-4 w-4 shrink-0" />
-          <span>Lingua</span>
+          <span>{copy.language}</span>
         </div>
         <LanguageButtons activeLanguage={props.activeLanguage} onLanguageChange={props.onLanguageChange} />
       </div>
@@ -351,6 +419,7 @@ export function NavbarMobileProfileMenu(props: ProfileMenuProps) {
     onNavigate,
     onSignOut,
   } = props;
+  const copy = useProfileMenuCopy(props.activeLanguage, insightsUnread);
 
   return (
     <>
@@ -369,7 +438,7 @@ export function NavbarMobileProfileMenu(props: ProfileMenuProps) {
           className="font-semibold text-foreground"
           onClick={() => onNavigate("/profilo#impostazioni")}
         >
-          Impostazioni profilo
+          {copy.settings}
         </MobileAction>
         {insightsUnread > 0 && (
           <MobileAction
@@ -377,7 +446,7 @@ export function NavbarMobileProfileMenu(props: ProfileMenuProps) {
             className="text-amber-500"
             onClick={() => onNavigate("/dashboard")}
           >
-            Wendy ha {insightsUnread > 9 ? "9+" : insightsUnread} insight
+            {copy.wendyInsight}
           </MobileAction>
         )}
         {!user.journeyType && (
@@ -386,7 +455,7 @@ export function NavbarMobileProfileMenu(props: ProfileMenuProps) {
             path="/percorso"
             onClick={() => onNavigate("/percorso")}
           >
-            Imposta percorso
+            {copy.setJourney}
           </MobileAction>
         )}
         <MobileAction
@@ -397,9 +466,9 @@ export function NavbarMobileProfileMenu(props: ProfileMenuProps) {
         </MobileAction>
         <div className="mt-1 grid grid-cols-3 gap-1.5">
           {[
-            { label: "Memoria", icon: Brain, path: "/wendy/memoria" },
-            { label: "Briefing", icon: Sparkles, path: "/profilo/briefing" },
-            { label: "Workspace", icon: Users, path: "/workspace" },
+            { label: copy.memoryShort, icon: Brain, path: "/wendy/memoria" },
+            { label: copy.briefingShort, icon: Sparkles, path: "/profilo/briefing" },
+            { label: copy.workspace, icon: Users, path: "/workspace" },
           ].map((item) => {
             const Icon = item.icon;
             return (
@@ -421,14 +490,14 @@ export function NavbarMobileProfileMenu(props: ProfileMenuProps) {
       <div className="space-y-1 px-2 py-1.5">
         <div className="flex min-h-9 items-center gap-2">
           <p className="w-16 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Tema
+            {copy.theme}
           </p>
           <ThemeButtons compact theme={props.theme} onThemeChange={props.onThemeChange} />
         </div>
         <div className="flex min-h-9 items-center gap-2">
           <div className="flex w-16 shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             <Globe2 className="h-3.5 w-3.5 shrink-0" />
-            <span>Lingua</span>
+            <span>{copy.language}</span>
           </div>
           <LanguageButtons compact activeLanguage={props.activeLanguage} onLanguageChange={props.onLanguageChange} />
         </div>

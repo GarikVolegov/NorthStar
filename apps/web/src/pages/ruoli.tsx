@@ -119,8 +119,8 @@ function RoleCard({ role }: { role: Role }) {
 
 export default function Ruoli() {
   usePageMeta({
-    title: "Lavori Professionali — NorthStar",
-    description: "Esplora tutti i lavori e le professioni disponibili per settore. Scopri competenze, stipendi e prospettive di crescita per ogni professione.",
+    title: "Ruoli target - NorthStar",
+    description: "Scegli il ruolo target dopo aver scelto il settore, poi passa alla ricerca di aziende e lavori reali.",
     path: "/ruoli",
   });
   useWendyPageContext({
@@ -194,14 +194,19 @@ export default function Ruoli() {
         <div className="container mx-auto px-4 max-w-5xl text-center">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary rounded-full px-4 py-1.5 text-sm font-medium mb-5">
             <Briefcase className="w-4 h-4" />
-            {isLoading ? "Lavori" : `${roles.length} lavori`}
+            {isLoading ? "Ruoli target" : `${roles.length} ruoli target`}
           </div>
           <h1 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
-            Esplora i <span className="text-primary">Lavori</span>
+            Scegli il <span className="text-primary">ruolo target</span>
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed max-w-xl mx-auto">
-            Scopri tutte le professioni disponibili per settore, con competenze richieste, fasce salariali e prospettive di crescita.
+            Il ruolo si sceglie dopo il settore: filtra le professioni collegate, approfondisci competenze e poi passa ad aziende e lavori reali.
           </p>
+          <Link href="/settori">
+            <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-primary/25 bg-background px-4 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/10">
+              Parti dai settori <ArrowRight className="h-4 w-4" />
+            </div>
+          </Link>
         </div>
       </section>
 
@@ -212,7 +217,7 @@ export default function Ruoli() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <SlidersHorizontal className="w-4 h-4" />
-              Filtra i lavori
+              Filtra i ruoli target
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -309,8 +314,8 @@ export default function Ruoli() {
             {isLoading
               ? "Caricamento…"
               : filtered.length === roles.length
-                ? `${roles.length} lavori disponibili`
-                : `${filtered.length} di ${roles.length} lavori`}
+                ? `${roles.length} ruoli disponibili`
+                : `${filtered.length} di ${roles.length} ruoli`}
           </p>
           {!isLoading && filtered.length === 0 && (
             <button onClick={clearAll} className="text-sm text-primary hover:underline">
@@ -345,14 +350,14 @@ export default function Ruoli() {
           <div className="mt-12 text-center rounded-3xl border border-primary/20 bg-primary/5 p-10">
             <Zap className="w-8 h-8 text-primary mx-auto mb-3" />
             <h2 className="text-2xl font-serif font-bold text-foreground mb-3">
-              Trova il lavoro giusto per te
+              Prima il settore, poi il ruolo
             </h2>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Fai il test RIASEC per scoprire quali ruoli sono più compatibili con la tua personalità e i tuoi punti di forza.
+              Se non hai ancora scelto un'area, torna ai settori: da li scegli il ruolo e poi arrivi alla ricerca lavoro.
             </p>
-            <Link href="/test">
+            <Link href="/settori">
               <div className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-3 rounded-full font-medium hover:bg-primary/90 transition-colors">
-                Inizia il test gratuito <ArrowRight className="w-4 h-4" />
+                Scegli settore e ruolo <ArrowRight className="w-4 h-4" />
               </div>
             </Link>
           </div>

@@ -48,7 +48,7 @@ function addPrompt(
   const key = text.toLowerCase();
   if (seen.has(key)) return;
   seen.add(key);
-  prompts.push({ label, prompt: text });
+  prompts.push({ ...prompt, label, prompt: text });
 }
 
 function sanitizeSuggestedPrompts(
@@ -77,6 +77,29 @@ function mergeSuggestedPrompts(
   return prompts;
 }
 
+function fallbackPrompt(
+  id: string,
+  label: string,
+  prompt: string,
+  labelContext: string,
+  promptContext: string,
+): WendySuggestedPrompt {
+  return {
+    label,
+    prompt,
+    labelTranslation: {
+      key: `wendy.suggestedPrompts.${id}.label`,
+      source: label,
+      context: labelContext,
+    },
+    promptTranslation: {
+      key: `wendy.suggestedPrompts.${id}.prompt`,
+      source: prompt,
+      context: promptContext,
+    },
+  };
+}
+
 export function buildWendyFallbackSuggestedPrompts(
   content: string,
   pageContext?: WendyPromptPageContext | null,
@@ -90,17 +113,32 @@ export function buildWendyFallbackSuggestedPrompts(
 
   if (adaptiveNextAction) {
     const phaseText = adaptivePhase ? ` nella fase ${adaptivePhase}` : "";
+    const prompt = `Usa il contesto della dashboard${phaseText}: guidami nell'azione "${adaptiveNextAction.label}" e prepara il passaggio verso ${adaptiveNextAction.href}.`;
     addPrompt(prompts, seen, {
       label: adaptiveNextAction.label,
-      prompt: `Usa il contesto della dashboard${phaseText}: guidami nell'azione "${adaptiveNextAction.label}" e prepara il passaggio verso ${adaptiveNextAction.href}.`,
+      prompt,
+      promptTranslation: {
+        key: "wendy.suggestedPrompts.adaptiveNextAction.prompt",
+        source: prompt,
+        context: "Wendy suggested follow-up prompt for the next dashboard action. Keep the action label and URL intact.",
+      },
     });
   }
 
   if (contextName) {
-    addPrompt(prompts, seen, {
-      label: `Approfondisci ${contextName}`,
-      prompt: `Approfondisci ${contextName} usando il contesto della pagina e dimmi cosa fare dopo.`,
-    });
+    const label = `Approfondisci ${contextName}`;
+    const prompt = `Approfondisci ${contextName} usando il contesto della pagina e dimmi cosa fare dopo.`;
+    addPrompt(
+      prompts,
+      seen,
+      fallbackPrompt(
+        "contextDeepDive",
+        label,
+        prompt,
+        "Wendy suggested follow-up label to inspect the current page entity. Keep the entity name intact.",
+        "Wendy suggested follow-up prompt to inspect the current page entity and decide the next step. Keep the entity name intact.",
+      ),
+    );
   }
 
   if (
@@ -108,14 +146,28 @@ export function buildWendyFallbackSuggestedPrompts(
     || normalizedContent.includes("competenz")
     || normalizedContent.includes("affinit")
   ) {
-    addPrompt(prompts, seen, {
-      label: "Usa il profilo",
-      prompt: "Usa gli strumenti dell'app sul profilo per trasformare questa analisi in priorita, lacune e prossimo passo verificabile.",
-    });
-    addPrompt(prompts, seen, {
-      label: "Trasforma in piano",
-      prompt: "Trasforma questa analisi in un piano operativo con priorita e primo passo.",
-    });
+    addPrompt(
+      prompts,
+      seen,
+      fallbackPrompt(
+        "useProfile",
+        "Usa il profilo",
+        "Usa gli strumenti dell'app sul profilo per trasformare questa analisi in priorita, lacune e prossimo passo verificabile.",
+        "Wendy suggested follow-up label that asks to use the user's profile data",
+        "Wendy suggested follow-up prompt that asks Wendy to use app profile tools and return priorities, gaps, and a verifiable next step",
+      ),
+    );
+    addPrompt(
+      prompts,
+      seen,
+      fallbackPrompt(
+        "transformPlan",
+        "Trasforma in piano",
+        "Trasforma questa analisi in un piano operativo con priorita e primo passo.",
+        "Wendy suggested follow-up label that turns the answer into an action plan",
+        "Wendy suggested follow-up prompt that asks Wendy to turn the answer into an operational plan with priorities and first step",
+      ),
+    );
   }
 
   if (
@@ -125,10 +177,17 @@ export function buildWendyFallbackSuggestedPrompts(
     || normalizedContent.includes("checkpoint")
     || normalizedContent.includes("milestone")
   ) {
-    addPrompt(prompts, seen, {
-      label: "Aggiorna progresso",
-      prompt: "Usa gli strumenti dell'app per leggere obiettivi e progresso, poi proponi l'aggiornamento o il prossimo checkpoint concreto.",
-    });
+    addPrompt(
+      prompts,
+      seen,
+      fallbackPrompt(
+        "updateProgress",
+        "Aggiorna progresso",
+        "Usa gli strumenti dell'app per leggere obiettivi e progresso, poi proponi l'aggiornamento o il prossimo checkpoint concreto.",
+        "Wendy suggested follow-up label for updating user progress",
+        "Wendy suggested follow-up prompt that asks Wendy to read goals and progress with app tools and propose a concrete checkpoint",
+      ),
+    );
   }
 
   if (
@@ -137,20 +196,41 @@ export function buildWendyFallbackSuggestedPrompts(
     || normalizedContent.includes("settori")
     || normalizedContent.includes("carriera")
   ) {
-    addPrompt(prompts, seen, {
-      label: "Confronta alternative",
-      prompt: "Confronta questa direzione con due alternative realistiche e indicami la scelta migliore.",
-    });
+    addPrompt(
+      prompts,
+      seen,
+      fallbackPrompt(
+        "compareAlternatives",
+        "Confronta alternative",
+        "Confronta questa direzione con due alternative realistiche e indicami la scelta migliore.",
+        "Wendy suggested follow-up label for comparing alternatives",
+        "Wendy suggested follow-up prompt that asks Wendy to compare the current direction with two realistic alternatives",
+      ),
+    );
   }
 
-  addPrompt(prompts, seen, {
-    label: "Prossima mossa concreta",
-    prompt: "Qual e la prossima azione concreta da fare oggi, con tempi e criteri di successo?",
-  });
-  addPrompt(prompts, seen, {
-    label: "Chiarisci i dubbi",
-    prompt: "Quali informazioni mancano per decidere meglio e quali domande dovrei farmi?",
-  });
+  addPrompt(
+    prompts,
+    seen,
+    fallbackPrompt(
+      "nextConcreteMove",
+      "Prossima mossa concreta",
+      "Qual e la prossima azione concreta da fare oggi, con tempi e criteri di successo?",
+      "Wendy suggested follow-up label for a practical next action",
+      "Wendy suggested follow-up prompt that asks Wendy for today's concrete action with timing and success criteria",
+    ),
+  );
+  addPrompt(
+    prompts,
+    seen,
+    fallbackPrompt(
+      "clarifyDoubts",
+      "Chiarisci i dubbi",
+      "Quali informazioni mancano per decidere meglio e quali domande dovrei farmi?",
+      "Wendy suggested follow-up label for clarifying doubts",
+      "Wendy suggested follow-up prompt that asks Wendy what information is missing and what questions the user should ask",
+    ),
+  );
 
   return prompts.slice(0, 3);
 }

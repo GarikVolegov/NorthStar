@@ -201,7 +201,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     if (syncedClerkIdRef.current === clerkUser.id) return;
-    syncedClerkIdRef.current = clerkUser.id;
 
     const clerkOnlyUser = clerkUserToAuthUser(clerkUser);
     const clerkEmail = getClerkEmail(clerkUser);
@@ -216,6 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const syncWithServer = async () => {
       try {
         if (!clerkUser.id || !clerkEmail) {
+          syncedClerkIdRef.current = null;
           setAuthSyncFailed(true);
           setAuthSyncError("Clerk non ha ancora restituito un'email valida per completare l'accesso.");
           setAuthReady(true);
@@ -224,6 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const clerkToken = await getToken().catch(() => null);
         if (!clerkToken) {
+          syncedClerkIdRef.current = null;
           setAuthSyncFailed(true);
           setAuthSyncError("Token Clerk non disponibile. Esci e accedi di nuovo.");
           setAuthReady(true);
@@ -247,6 +248,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
         const { northstar_token: nsToken, ...serverUser } = data;
         if (!nsToken) {
+          syncedClerkIdRef.current = null;
           clearNorthStarSession();
           setAuthSyncFailed(true);
           setAuthSyncError("Il server non ha restituito un token NorthStar valido.");
@@ -260,6 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthSyncError(null);
         setAuthTokenGetter(() => nsToken);
         setUser({ ...clerkOnlyUser, ...serverUser });
+        syncedClerkIdRef.current = clerkUser.id;
         localStorage.removeItem(REFERRAL_STORAGE_KEY);
         sessionStorage.removeItem(REFERRAL_STORAGE_KEY);
         queryClient.invalidateQueries();
@@ -267,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (ctrl.signal.aborted) return;
         const message = err instanceof Error ? err.message : "Errore di rete durante la sincronizzazione.";
         clientLogger.warn("[auth] clerk-sync request failed", { error: message });
+        syncedClerkIdRef.current = null;
         clearNorthStarSession();
         setAuthSyncFailed(true);
         setAuthSyncError(message);

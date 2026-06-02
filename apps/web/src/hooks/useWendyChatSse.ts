@@ -36,9 +36,17 @@ export interface WendyAdaptiveReasoning {
   latencyTargetMs?: number | undefined;
 }
 
+export interface WendySuggestedPromptTranslation {
+  key?: string | undefined;
+  source: string;
+  context?: string | undefined;
+}
+
 export interface WendySuggestedPrompt {
   label: string;
   prompt: string;
+  labelTranslation?: WendySuggestedPromptTranslation | undefined;
+  promptTranslation?: WendySuggestedPromptTranslation | undefined;
 }
 
 export type WendySseEvent =

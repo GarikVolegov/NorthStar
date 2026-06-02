@@ -9,8 +9,10 @@ const patchJsonMock = vi.hoisted(() => vi.fn());
 const getJsonMock = vi.hoisted(() => vi.fn());
 const deleteJsonMock = vi.hoisted(() => vi.fn());
 const updateUserMock = vi.hoisted(() => vi.fn());
+const logoutMock = vi.hoisted(() => vi.fn());
 const setMutedMock = vi.hoisted(() => vi.fn());
 const setIsLeftyMock = vi.hoisted(() => vi.fn());
+const navigateMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/apiClient", async () => {
   const actual = await vi.importActual<typeof import("@/lib/apiClient")>("@/lib/apiClient");
@@ -24,8 +26,13 @@ vi.mock("@/lib/apiClient", async () => {
 
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({
+    logout: logoutMock,
     updateUser: updateUserMock,
   }),
+}));
+
+vi.mock("wouter", () => ({
+  useLocation: () => ["/profilo", navigateMock],
 }));
 
 vi.mock("@/contexts/AppAudioProvider", () => ({
@@ -220,5 +227,31 @@ describe("ProfileSettings", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Nessuna modifica all'account");
     expect(screen.getByRole("button", { name: "Richiedi eliminazione account" })).toBeEnabled();
+  });
+
+  it("clears the current session and navigates to sign-in after account deletion succeeds", async () => {
+    deleteJsonMock.mockResolvedValue({ success: true });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const user = userEvent.setup();
+
+    renderWithClient(
+      <ProfileSettings
+        user={{
+          id: 7,
+          name: "Ada",
+          email: "ada@example.com",
+          testSessionId: null,
+          emailVerified: true,
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /Privacy/i }));
+    await user.click(screen.getByRole("button", { name: "Richiedi eliminazione account" }));
+
+    await waitFor(() => {
+      expect(logoutMock).toHaveBeenCalledTimes(1);
+    });
+    expect(navigateMock).toHaveBeenCalledWith("/sign-in", { replace: true });
   });
 });

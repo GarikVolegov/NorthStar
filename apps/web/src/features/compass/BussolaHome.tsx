@@ -10,7 +10,7 @@ import { useCompass, type CompassStage, type CompassBlockType } from "@/features
 import { CommittedActionPlan } from "@/features/compass/CommittedActionPlan";
 import {
   Compass, Sparkles, Target, Zap, ArrowRight, HelpCircle, Swords, FlaskConical,
-  Layers, BookOpen, HeartHandshake, Briefcase, Rocket, BrainCircuit, Newspaper,
+  Layers, BookOpen, HeartHandshake, Briefcase, BrainCircuit, Newspaper,
   UserCircle, type LucideIcon,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -53,8 +53,7 @@ const PHASES: Phase[] = [
     id: "sperimenta", n: 2, label: "Sperimenta", tagline: "Senti com'è davvero, prima di scegliere",
     stages: ["zero_ideas", "hypotheses"],
     tools: [
-      { href: `${BASE}settori`, icon: Layers, title: "Scegli settore e ruolo", desc: "Trova l'area, poi il ruolo da approfondire" },
-      { href: `${BASE}ruoli`, icon: Rocket, title: "Prova una giornata", desc: "Assaggia un ruolo concreto prima di puntarci" },
+      { href: `${BASE}settori`, icon: Layers, title: "Settore -> ruolo -> giornata tipo", desc: "Trova l'area, scegli il ruolo e poi provalo prima di puntarci" },
       { href: `${BASE}news`, icon: Newspaper, title: "Notizie lavoro", desc: "Cosa si muove nel mercato del lavoro" },
     ],
   },

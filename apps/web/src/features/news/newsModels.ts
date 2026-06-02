@@ -102,6 +102,18 @@ export function readDiagnosticsFromError(error: unknown): NewsFeedResponse["diag
   return diagnostics as NewsFeedResponse["diagnostics"];
 }
 
+export function readNewsErrorCode(error: unknown): string | undefined {
+  if (error && typeof error === "object") {
+    const body = (error as { body?: unknown }).body;
+    if (body && typeof body === "object") {
+      const code = (body as { error?: unknown }).error;
+      if (typeof code === "string") return code;
+    }
+  }
+
+  return error instanceof Error ? error.message : undefined;
+}
+
 export function timeAgoLabel(dateStr: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const h = Math.floor(diff / 3600000);

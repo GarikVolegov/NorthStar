@@ -17,8 +17,18 @@ type RouteResponseBody = {
 vi.mock("@workspace/db", () => ({
   usersTable: {
     id: "id",
+    name: "name",
+    email: "email",
     role: "role",
     clerkId: "clerkId",
+    deletedAt: "deletedAt",
+    purgedAt: "purgedAt",
+    stripeSubscriptionId: "stripeSubscriptionId",
+    journeyType: "journeyType",
+    journeyDecidedAt: "journeyDecidedAt",
+    journeyDecisionSource: "journeyDecisionSource",
+    testSessionId: "testSessionId",
+    onboardingCompleted: "onboardingCompleted",
   },
   db: {
     select: vi.fn(() => ({
@@ -80,6 +90,20 @@ describe("auth middleware", () => {
   });
 
   it("populates req.user for valid JWTs", async () => {
+    dbRows.value = [{
+      id: 42,
+      name: "Ada",
+      email: "ada@example.com",
+      role: "user",
+      deletedAt: null,
+      purgedAt: null,
+      stripeSubscriptionId: null,
+      journeyType: "growth",
+      journeyDecidedAt: null,
+      journeyDecisionSource: null,
+      testSessionId: null,
+      onboardingCompleted: true,
+    }];
     const token = jwt.sign(
       {
         userId: 42,
@@ -105,6 +129,41 @@ describe("auth middleware", () => {
       email: "ada@example.com",
       role: "user",
     });
+  });
+
+  it("rejects a valid JWT when the account has been deleted", async () => {
+    dbRows.value = [{
+      id: 42,
+      name: "Ada",
+      email: "ada@example.com",
+      role: "user",
+      deletedAt: new Date("2026-06-01T10:00:00.000Z"),
+      purgedAt: null,
+      stripeSubscriptionId: null,
+      journeyType: "growth",
+      journeyDecidedAt: null,
+      journeyDecisionSource: null,
+      testSessionId: null,
+      onboardingCompleted: true,
+    }];
+    const token = jwt.sign(
+      {
+        userId: 42,
+        name: "Ada",
+        email: "ada@example.com",
+        role: "user",
+        onboardingCompleted: true,
+        journeyType: "growth",
+        stripeSubscriptionId: null,
+        testSessionId: null,
+      },
+      "test-secret",
+    );
+
+    await request(appWith(requireAuth))
+      .get("/route")
+      .set("Authorization", `Bearer ${token}`)
+      .expect(401);
   });
 
   it("checks premium and admin access", async () => {
@@ -138,6 +197,20 @@ describe("auth middleware", () => {
   it("supports optional auth and admin wrapper aliases", async () => {
     const openApp = appWith(optionalAuth);
     await request(openApp).get("/route").expect(200);
+    dbRows.value = [{
+      id: 7,
+      name: "Root",
+      email: "root@example.com",
+      role: "user",
+      deletedAt: null,
+      purgedAt: null,
+      stripeSubscriptionId: null,
+      journeyType: null,
+      journeyDecidedAt: null,
+      journeyDecisionSource: null,
+      testSessionId: null,
+      onboardingCompleted: false,
+    }];
 
     const token = jwt.sign(
       {

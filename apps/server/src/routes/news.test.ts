@@ -200,6 +200,27 @@ describe("news routes", () => {
     expect(response.body.news[0].meaning.whyItMatters).not.toMatch(/NorthStar/i);
   });
 
+  it("does not return source-language feed items for a non-Italian requested locale", async () => {
+    aiServerMock.translateNewsForLocale.mockImplementation(async (item) => ({
+      ...item,
+      language: "it",
+      translationStatus: "source",
+    }));
+    mockSelectRows([publishedRows[0]]);
+
+    const response = await request(app())
+      .get("/api/news?locale=en")
+      .expect(503);
+
+    expect(response.body).toMatchObject({
+      news: [],
+      nextCursor: null,
+      source: "error",
+      status: "error",
+      error: "news_translation_unavailable",
+    });
+  });
+
   it("structures news detail around the user and concrete next steps", async () => {
     mockSelectRows([{ ...publishedRows[0], content: null }]);
 
@@ -234,6 +255,24 @@ describe("news routes", () => {
       expect.objectContaining({ key: "practical", body: expect.stringContaining("es:") }),
     ]);
     expect(response.body.article.content).not.toMatch(/NorthStar/i);
+  });
+
+  it("does not return source-language detail content for a non-Italian requested locale", async () => {
+    aiServerMock.translateNewsForLocale.mockImplementation(async (item) => ({
+      ...item,
+      language: "it",
+      translationStatus: "source",
+    }));
+    mockSelectRows([{ ...publishedRows[0], content: null }]);
+
+    const response = await request(app())
+      .get("/api/news/article/10?locale=en")
+      .expect(503);
+
+    expect(response.body).toMatchObject({
+      error: "news_translation_unavailable",
+      requestedLocale: "en",
+    });
   });
 
   it("adds provider diagnostics when the feed is empty", async () => {

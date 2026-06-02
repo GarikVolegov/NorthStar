@@ -20,7 +20,7 @@ describe("useWendyOpenAITTS", () => {
     const { result } = renderHook(() => useWendyOpenAITTS());
 
     await act(async () => {
-      await result.current.play("Leggi questa risposta");
+      await result.current.play("Leggi questa risposta").catch(() => undefined);
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
@@ -34,5 +34,29 @@ describe("useWendyOpenAITTS", () => {
         },
       }),
     );
+  });
+
+  it("rejects failed voice requests after exposing the error state", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({ error: "Voce Wendy non disponibile" }),
+    } as Response);
+
+    const { result } = renderHook(() => useWendyOpenAITTS());
+
+    let error: unknown;
+    await act(async () => {
+      try {
+        await result.current.play("Leggi questa risposta");
+      } catch (err) {
+        error = err;
+      }
+    });
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe("Voce Wendy non disponibile");
+    expect(result.current.state).toBe("error");
+    expect(result.current.error).toBe("Voce Wendy non disponibile");
   });
 });

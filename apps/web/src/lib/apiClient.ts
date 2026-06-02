@@ -1,4 +1,6 @@
 import { apiFetch } from "@/lib/api-fetch";
+import i18n from "i18next";
+import { getDynamicTranslation } from "@/lib/dynamic-translation";
 
 export class ApiClientError extends Error {
   constructor(
@@ -43,7 +45,16 @@ async function parseBody(res: Response): Promise<unknown> {
   }
 }
 
-function errorMessage(status: number, body: unknown): string {
+async function dynamicClientMessage(key: string, source: string, context: string): Promise<string> {
+  return getDynamicTranslation({
+    locale: i18n.language ?? "it",
+    source,
+    context,
+    key,
+  });
+}
+
+async function errorMessage(status: number, body: unknown): Promise<string> {
   if (body && typeof body === "object") {
     const maybe = body as { error?: unknown; message?: unknown };
     if (typeof maybe.error === "string") return maybe.error;
@@ -54,23 +65,41 @@ function errorMessage(status: number, body: unknown): string {
     status >= 500 &&
     (body == null || body === "")
   ) {
-    return "Server API locale non raggiungibile. Avvia il backend NorthStar su porta 3001 con `pnpm run dev:server` oppure usa `pnpm run dev:all`.";
+    return dynamicClientMessage(
+      "api.errors.localServerUnavailable",
+      "Server API locale non raggiungibile. Avvia il backend NorthStar su porta 3001 con `pnpm run dev:server` oppure usa `pnpm run dev:all`.",
+      "Development API error when Vite proxy cannot reach the local backend",
+    );
   }
-  return `API request failed with status ${status}`;
+  return dynamicClientMessage(
+    "api.errors.requestFailed",
+    `API request failed with status ${status}`,
+    "Generic API failure shown to the user",
+  );
 }
 
-function networkErrorMessage(): string {
+function networkErrorSourceMessage(): string {
   if (import.meta.env.DEV) {
     return "Server API locale non raggiungibile. Avvia il backend NorthStar su porta 3001 con `pnpm run dev:server` oppure usa `pnpm run dev:all`.";
   }
   return "Connessione al server NorthStar non riuscita. Controlla la rete e riprova.";
 }
 
+function networkErrorKey(): string {
+  return import.meta.env.DEV
+    ? "api.errors.localServerUnavailable"
+    : "api.errors.networkUnreachable";
+}
+
 async function safeApiFetch(input: string, init: RequestInit): Promise<Response> {
   try {
     return await apiFetch(input, init);
   } catch (error) {
-    throw new ApiClientError(networkErrorMessage(), 0, {
+    throw new ApiClientError(await dynamicClientMessage(
+      networkErrorKey(),
+      networkErrorSourceMessage(),
+      "Network failure before an API response is available",
+    ), 0, {
       error: "network_unreachable",
       cause: error instanceof Error ? error.message : String(error),
     });
@@ -85,7 +114,7 @@ export async function requestJson<T>(
   const res = await safeApiFetch(input, requestInit);
   const body = await parseBody(res);
   if (!res.ok && !okStatuses?.includes(res.status)) {
-    throw new ApiClientError(errorMessage(res.status, body), res.status, body);
+    throw new ApiClientError(await errorMessage(res.status, body), res.status, body);
   }
   return body as T;
 }
@@ -139,7 +168,7 @@ export async function stream(
   const res = await safeApiFetch(input, requestInit);
   if (!res.ok && !okStatuses?.includes(res.status)) {
     const body = await parseBody(res);
-    throw new ApiClientError(errorMessage(res.status, body), res.status, body);
+    throw new ApiClientError(await errorMessage(res.status, body), res.status, body);
   }
   return res;
 }

@@ -33,6 +33,7 @@ export function OnboardingWizard({
   const [horizon, setHorizon] = useState<Horizon>("open");
   const [openNote, setOpenNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const persona =
     PERSONAS.find((p) => p.id === selectedJourney) ?? DEFAULT_PERSONA;
@@ -75,6 +76,7 @@ export function OnboardingWizard({
 
   async function handleComplete() {
     setSaving(true);
+    setSaveError(null);
     try {
       await postJson<unknown>("/api/onboarding/complete", {
         journeyType: selectedJourney,
@@ -83,11 +85,13 @@ export function OnboardingWizard({
         horizon,
         openNote: openNote.trim() || undefined,
       });
+      setStep(3);
     } catch {
-      // non-blocking — l'utente va avanti comunque
+      setSaveError(
+        "Non sono riuscito a salvare il tuo onboarding. Controlla la connessione e riprova.",
+      );
     } finally {
       setSaving(false);
-      setStep(3);
     }
   }
 
@@ -364,6 +368,14 @@ export function OnboardingWizard({
                   <p className="text-sm text-muted-foreground mb-3">
                     In che arco di tempo vuoi vedere risultati concreti?
                   </p>
+                  {saveError && (
+                    <div
+                      role="alert"
+                      className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                    >
+                      {saveError}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {HORIZON_OPTIONS.map((h) => {
                       const Icon = h.icon;

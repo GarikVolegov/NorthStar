@@ -1,4 +1,5 @@
 import { AUTH_EXPIRED_EVENT, TOKEN_STORAGE_KEY } from "@/lib/storage-keys";
+import i18n from "i18next";
 
 // FIX #7: single in-memory token ref — avoids stale sessionStorage reads
 // when apiFetch is called in the same frame as login/logout
@@ -28,6 +29,9 @@ export function apiFetch(input: string, init: RequestInit = {}): Promise<Respons
 
   if (token && !hasAuthHeader) {
     headers.set("Authorization", `Bearer ${token}`);
+  }
+  if (!headers.has("Accept-Language") && i18n.language) {
+    headers.set("Accept-Language", i18n.language);
   }
   if (init.body && typeof init.body === "string" && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");

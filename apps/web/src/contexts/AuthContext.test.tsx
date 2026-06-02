@@ -58,11 +58,16 @@ const mockUser: AuthUser = {
 
 function renderAuth(children: ReactNode = <Probe />) {
   const client = new QueryClient();
-  return render(
+  const ui = (node: ReactNode) => (
     <QueryClientProvider client={client}>
-      <AuthProvider>{children}</AuthProvider>
-    </QueryClientProvider>,
+      <AuthProvider>{node}</AuthProvider>
+    </QueryClientProvider>
   );
+  const result = render(ui(children));
+  return {
+    ...result,
+    rerenderAuth: (node: ReactNode = children) => result.rerender(ui(node)),
+  };
 }
 
 describe("AuthContext", () => {
@@ -158,5 +163,60 @@ describe("AuthContext", () => {
     await waitFor(() =>
       expect(screen.getByTestId("sync-error")).toHaveTextContent("sync failed"),
     );
+  });
+
+  it("retries Clerk sync for the same Clerk user after a failed attempt", async () => {
+    clerkState.isSignedIn = true;
+    clerkState.user = {
+      id: "clerk-retry",
+      fullName: "Retry User",
+      username: "retry",
+      imageUrl: "avatar.png",
+      primaryEmailAddress: {
+        emailAddress: "retry@example.com",
+        verification: { status: "verified" },
+      },
+      emailAddresses: [],
+    };
+    clerkState.getToken.mockResolvedValue("clerk-token");
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        text: async () => JSON.stringify({ error: "temporary sync failure" }),
+        json: async () => ({ error: "temporary sync failure" }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            id: 3,
+            name: "Retry User",
+            email: "retry@example.com",
+            testSessionId: null,
+            northstar_token: "northstar-retry-token",
+          }),
+        json: async () => ({
+          id: 3,
+          name: "Retry User",
+          email: "retry@example.com",
+          testSessionId: null,
+          northstar_token: "northstar-retry-token",
+        }),
+      } as Response);
+
+    const { rerenderAuth } = renderAuth();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("sync-error")).toHaveTextContent("temporary sync failure"),
+    );
+
+    clerkState.user = { ...clerkState.user };
+    rerenderAuth();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("token")).toHaveTextContent("northstar-retry-token"),
+    );
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 });

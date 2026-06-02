@@ -33,6 +33,27 @@ describe("wendySuggestedPrompts", () => {
     );
   });
 
+  it("adds dynamic translation metadata to fallback prompts without changing their source payloads", () => {
+    const prompts = buildWendyFallbackSuggestedPrompts(
+      "Il tuo profilo mostra affinita con prodotto e dati.",
+    );
+
+    const profilePrompt = prompts.find((prompt) => prompt.label === "Usa il profilo");
+
+    expect(profilePrompt).toMatchObject({
+      label: "Usa il profilo",
+      prompt: "Usa gli strumenti dell'app sul profilo per trasformare questa analisi in priorita, lacune e prossimo passo verificabile.",
+      labelTranslation: {
+        key: "wendy.suggestedPrompts.useProfile.label",
+        source: "Usa il profilo",
+      },
+      promptTranslation: {
+        key: "wendy.suggestedPrompts.useProfile.prompt",
+        source: "Usa gli strumenti dell'app sul profilo per trasformare questa analisi in priorita, lacune e prossimo passo verificabile.",
+      },
+    });
+  });
+
   it("prioritizes the adaptive dashboard next action when page context provides it", () => {
     const prompts = buildWendyFallbackSuggestedPrompts("Wendy non ha prodotto suggerimenti.", {
       page: "dashboard",

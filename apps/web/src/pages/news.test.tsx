@@ -235,6 +235,22 @@ describe("News page reliability states", () => {
     expect(getJsonMock.mock.calls.some(([url]) => String(url).includes("locale=en"))).toBe(true);
   });
 
+  it("shows a language-specific unavailable state when translated news cannot be served", async () => {
+    i18nLanguageMock.value = "en";
+    getJsonMock.mockRejectedValue(Object.assign(new Error("news_translation_unavailable"), {
+      body: {
+        error: "news_translation_unavailable",
+        requestedLocale: "en",
+      },
+    }));
+
+    renderNews();
+
+    expect(await screen.findByText("news.translationUnavailable.title")).toBeInTheDocument();
+    expect(screen.getByText("news.translationUnavailable.desc")).toBeInTheDocument();
+    expect(screen.queryByText("news.loadError")).not.toBeInTheDocument();
+  });
+
   it("shows the four user-facing meaning sections for each news card", async () => {
     getJsonMock.mockResolvedValue({
       news: [meaningfulNewsItem("1", "News con significato chiaro")],

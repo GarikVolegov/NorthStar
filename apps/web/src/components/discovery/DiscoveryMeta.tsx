@@ -13,7 +13,7 @@ export interface DiscoveryMetaProps {
   sourceLabel?: string | undefined;
   personalization?: DiscoveryPersonalization | undefined;
   reasonLabels?: string[] | undefined;
-  className?: string;
+  className?: string | undefined;
 }
 
 export function DiscoveryMeta({

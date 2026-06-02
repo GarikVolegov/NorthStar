@@ -1,9 +1,11 @@
 import { WendyThinkingIndicator } from "@/components/WendyThinkingIndicator";
 import { WendyMessageBubble } from "@/components/search/WendyMessageBubble";
 import type { UseWendyChatReturn } from "@/hooks/useWendyChat";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useTranslation } from "react-i18next";
 import { WendyEmptyState } from "./WendyEmptyState";
 import { WendyOrb, type WendyOrbState } from "./WendyOrb";
 import { WendyPromptSuggestions } from "./WendyPromptSuggestions";
@@ -53,6 +55,8 @@ export function WendyConsole({
   showSuggestions = true,
   className,
 }: WendyConsoleProps) {
+  const { i18n } = useTranslation();
+  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const wasSpeakingRef = useRef(false);
   const [slowThinking, setSlowThinking] = useState(false);
@@ -61,6 +65,54 @@ export function WendyConsole({
 
   const hasConversation = chat.messages.length > 0 || chat.thinking.active || !!chat.streamError;
   const voiceLevel = useMemo(() => resolveWendyOrbLevel(chat), [chat]);
+  const subtitle = useDynamicTranslation({
+    locale,
+    key: "wendy.console.subtitle",
+    source: "AI Career Coach",
+    context: "Wendy console header subtitle",
+  });
+  const newConversationLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.console.newConversation",
+    source: "Nuova conversazione",
+    context: "Wendy console button aria-label to clear the current conversation",
+  });
+  const retryingLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.console.retrying",
+    source: "Riprovo a connettere...",
+    context: "Wendy console reconnecting helper text",
+  });
+  const cancelLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.console.cancel",
+    source: "Annulla",
+    context: "Cancel Wendy retry or stream operation",
+  });
+  const slowThinkingLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.console.slowThinking",
+    source: "Wendy sta ancora lavorando. Puoi interrompere e riprovare con una domanda piu breve.",
+    context: "Wendy console helper shown when the AI response is taking longer than expected",
+  });
+  const timeoutErrorLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.console.timeoutError",
+    source: "La risposta e andata in timeout.",
+    context: "Wendy console timeout error helper",
+  });
+  const genericErrorLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.console.genericError",
+    source: "Wendy non ha risposto correttamente.",
+    context: "Wendy console generic stream error helper",
+  });
+  const retryLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.console.retry",
+    source: "Riprova",
+    context: "Retry the last Wendy request",
+  });
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -111,7 +163,7 @@ export function WendyConsole({
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground">Wendy</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              AI Career Coach
+              {subtitle}
             </p>
           </div>
           {chat.messages.length > 0 && (
@@ -119,7 +171,7 @@ export function WendyConsole({
               type="button"
               onClick={chat.clearHistory}
               className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-              aria-label="Nuova conversazione"
+              aria-label={newConversationLabel}
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
@@ -173,21 +225,21 @@ export function WendyConsole({
         {chat.retryState.active && (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-primary">
             <span>
-              Riprovo a connettere... ({chat.retryState.attempt}/{chat.retryState.max})
+              {retryingLabel} <span>{chat.retryState.attempt}/{chat.retryState.max}</span>
             </span>
             <button
               type="button"
               onClick={chat.stopStream}
               className="font-semibold underline underline-offset-2"
             >
-              Annulla
+              {cancelLabel}
             </button>
           </div>
         )}
 
         {slowThinking && chat.thinking.active && !chat.retryState.active && (
           <div className="rounded-2xl border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-primary">
-            Wendy sta ancora lavorando. Puoi interrompere e riprovare con una domanda piu breve.
+            {slowThinkingLabel}
           </div>
         )}
 
@@ -195,15 +247,15 @@ export function WendyConsole({
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-destructive/20 bg-destructive/10 px-3 py-2 text-xs text-destructive">
             <span>
               {chat.streamError.message === "SSE_TIMEOUT"
-                ? "La risposta e andata in timeout."
-                : "Wendy non ha risposto correttamente."}
+                ? timeoutErrorLabel
+                : genericErrorLabel}
             </span>
             <button
               type="button"
               onClick={() => void chat.retryLast()}
               className="font-semibold underline underline-offset-2"
             >
-              Riprova
+              {retryLabel}
             </button>
           </div>
         )}

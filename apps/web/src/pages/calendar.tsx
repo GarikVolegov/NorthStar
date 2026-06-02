@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
 import { apiFetch } from "@/lib/api-fetch";
 import { ApiClientError, deleteJson, getJson } from "@/lib/apiClient";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -40,6 +41,7 @@ import {
   Plus,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -76,6 +78,11 @@ export interface CalendarEvent {
 }
 
 type ViewMode = "month" | "week" | "day";
+type CalendarPageLabels = {
+  addEvent: string;
+  allDay: string;
+  dayEmpty: string;
+};
 
 const CATEGORY_META: Record<EventCategory, { label: string; color: string; bg: string }> = {
   study:      { label: "Studio",      color: "text-blue-700",   bg: "bg-blue-100 border-blue-300" },
@@ -108,12 +115,171 @@ function apiErrorMessage(error: unknown, fallback: string) {
 }
 
 export default function Calendario() {
+  const { i18n } = useTranslation();
+  const activeLanguage = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
+  const pageTitle = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.page.title",
+    source: "Calendario",
+    context: "Calendar page title",
+  });
+  const pageSubtitle = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.page.subtitle",
+    source: "Pianifica sessioni, scadenze e obiettivi",
+    context: "Calendar page subtitle",
+  });
+  const viewLabels: Record<ViewMode, string> = {
+    month: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.view.month",
+      source: "Mese",
+      context: "Calendar view switcher label",
+    }),
+    week: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.view.week",
+      source: "Settimana",
+      context: "Calendar view switcher label",
+    }),
+    day: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.view.day",
+      source: "Giorno",
+      context: "Calendar view switcher label",
+    }),
+  };
+  const exportTitle = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.actions.exportTitle",
+    source: "Esporta in Google Calendar / iCal",
+    context: "Calendar export button title",
+  });
+  const exportLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.actions.exportIcs",
+    source: "Esporta .ics",
+    context: "Calendar export button label",
+  });
+  const newEventLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.actions.newEvent",
+    source: "Nuovo evento",
+    context: "Calendar create event button label",
+  });
+  const exportFailureMessage = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.error.exportFailed",
+    source: "Non siamo riusciti a esportare il calendario. Riprova tra poco.",
+    context: "Calendar export failure message",
+  });
+  const previousPeriodLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.nav.previous",
+    source: "Periodo precedente",
+    context: "Calendar previous period aria label",
+  });
+  const todayLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.nav.today",
+    source: "Vai a oggi",
+    context: "Calendar today navigation button label",
+  });
+  const nextPeriodLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.nav.next",
+    source: "Periodo successivo",
+    context: "Calendar next period aria label",
+  });
+  const loadUnavailableTitle = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.error.unavailableTitle",
+    source: "Calendario non disponibile",
+    context: "Calendar load error title",
+  });
+  const loadFallbackMessage = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.error.loadFallback",
+    source: "Non siamo riusciti a caricare gli eventi.",
+    context: "Calendar load fallback error message",
+  });
+  const loadPreservedMessage = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.error.loadPreserved",
+    source: "Gli eventi non sono stati sostituiti da uno stato vuoto.",
+    context: "Calendar load error assurance",
+  });
+  const retryLoadLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    key: "calendar.actions.retryLoad",
+    source: "Riprova caricamento calendario",
+    context: "Calendar load retry button label",
+  });
+  const categoryLabels: Record<EventCategory, string> = {
+    study: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.categories.study",
+      source: "Studio",
+      context: "Calendar category label",
+    }),
+    training: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.categories.training",
+      source: "Formazione",
+      context: "Calendar category label",
+    }),
+    interview: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.categories.interview",
+      source: "Colloquio",
+      context: "Calendar category label",
+    }),
+    deadline: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.categories.deadline",
+      source: "Scadenza",
+      context: "Calendar category label",
+    }),
+    task: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.categories.task",
+      source: "Attivita",
+      context: "Calendar category label",
+    }),
+    "follow-up": useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.categories.followUp",
+      source: "Follow-up",
+      context: "Calendar category label",
+    }),
+  };
+  const pageLabels: CalendarPageLabels = {
+    addEvent: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.actions.addEvent",
+      source: "Aggiungi evento",
+      context: "Calendar empty day add event button label",
+    }),
+    allDay: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.event.allDay",
+      source: "Tutto il giorno",
+      context: "Calendar event all-day label",
+    }),
+    dayEmpty: useDynamicTranslation({
+      locale: activeLanguage,
+      key: "calendar.day.empty",
+      source: "Nessun evento per questo giorno",
+      context: "Calendar empty day message",
+    }),
+  };
+
   useWendyPageContext({
     page: 'calendario',
-    title: 'Calendario',
+    title: pageTitle,
     capabilities: ['navigate', 'create_calendar_event', 'fill_form'],
     fields: ['event.title', 'event.date', 'event.category', 'event.notes'],
-    actions: ['Aggiungi evento', 'Pianifica settimana', 'Apri giorno'],
+    actions: [pageLabels.addEvent, 'Pianifica settimana', 'Apri giorno'],
   });
   const { user, isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
@@ -194,7 +360,7 @@ export default function Calendario() {
       anchor.remove();
       URL.revokeObjectURL(href);
     } catch {
-      setExportError("Non siamo riusciti a esportare il calendario. Riprova tra poco.");
+      setExportError(exportFailureMessage);
     } finally {
       setIsExporting(false);
     }
@@ -222,9 +388,9 @@ export default function Calendario() {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Calendar className="h-6 w-6 text-primary" />
-            Calendario
+            {pageTitle}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Pianifica sessioni, scadenze e obiettivi</p>
+          <p className="text-sm text-muted-foreground mt-0.5">{pageSubtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center rounded-full border bg-card overflow-hidden text-sm">
@@ -237,7 +403,7 @@ export default function Calendario() {
                   view === v ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                {v === "month" ? "Mese" : v === "week" ? "Settimana" : "Giorno"}
+                {viewLabels[v]}
               </button>
             ))}
           </div>
@@ -245,14 +411,14 @@ export default function Calendario() {
             type="button"
             onClick={() => void handleExportCalendar()}
             disabled={isExporting}
-            title="Esporta in Google Calendar / iCal"
+            title={exportTitle}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary border border-border hover:border-primary/30 rounded-full px-3 py-1.5 transition-all disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-            Esporta .ics
+            {exportLabel}
           </button>
           <Button size="sm" className="rounded-full gap-1" onClick={() => { setEditingEvent(null); setSelectedDate(new Date()); setModalOpen(true); }}>
-            <Plus className="h-4 w-4" /> Nuovo evento
+            <Plus className="h-4 w-4" /> {newEventLabel}
           </Button>
         </div>
       </div>
@@ -269,6 +435,8 @@ export default function Calendario() {
       {/* Calendar navigation */}
       <div className="flex items-center justify-between mb-4">
         <button
+          type="button"
+          aria-label={previousPeriodLabel}
           onClick={() => navigate(-1)}
           className="p-2 rounded-full hover:bg-muted transition-colors"
         >
@@ -281,13 +449,17 @@ export default function Calendario() {
             {view === "day" && format(currentDate, "EEEE d MMMM yyyy", { locale: it })}
           </h2>
           <button
+          type="button"
+          aria-label={todayLabel}
             onClick={() => setCurrentDate(new Date())}
             className="text-xs px-3 py-1 rounded-full border hover:bg-muted transition-colors text-muted-foreground"
           >
-            Oggi
+            {todayLabel}
           </button>
         </div>
         <button
+          type="button"
+          aria-label={nextPeriodLabel}
           onClick={() => navigate(1)}
           className="p-2 rounded-full hover:bg-muted transition-colors"
         >
@@ -307,10 +479,10 @@ export default function Calendario() {
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="min-w-0 space-y-2">
-              <p className="font-semibold">Calendario non disponibile</p>
+              <p className="font-semibold">{loadUnavailableTitle}</p>
               <p>
-                {apiErrorMessage(error, "Non siamo riusciti a caricare gli eventi.")}
-                {" "}Gli eventi non sono stati sostituiti da uno stato vuoto.
+                {apiErrorMessage(error, loadFallbackMessage)}
+                {" "}{loadPreservedMessage}
               </p>
               <Button
                 type="button"
@@ -319,7 +491,7 @@ export default function Calendario() {
                 className="rounded-full"
                 onClick={() => void refetch()}
               >
-                Riprova caricamento calendario
+                {retryLoadLabel}
               </Button>
             </div>
           </div>
@@ -348,6 +520,8 @@ export default function Calendario() {
               events={events}
               onEventClick={handleEventClick}
               onNewEvent={() => { setEditingEvent(null); setSelectedDate(currentDate); setModalOpen(true); }}
+              labels={pageLabels}
+              categoryLabels={categoryLabels}
             />
           )}
         </>
@@ -357,7 +531,7 @@ export default function Calendario() {
       <div className="mt-6 flex flex-wrap gap-3">
         {(Object.entries(CATEGORY_META) as [EventCategory, typeof CATEGORY_META[EventCategory]][]).map(([key, meta]) => (
           <div key={key} className={cn("flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border", meta.bg, meta.color)}>
-            {meta.label}
+            {categoryLabels[key]}
           </div>
         ))}
       </div>
@@ -513,11 +687,13 @@ function WeekView({ currentDate, events, onDayClick, onEventClick }: {
   );
 }
 
-function DayView({ currentDate, events, onEventClick, onNewEvent }: {
+function DayView({ currentDate, events, onEventClick, onNewEvent, labels, categoryLabels }: {
   currentDate: Date;
   events: CalendarEvent[];
   onEventClick: (e: CalendarEvent, ev: React.MouseEvent) => void;
   onNewEvent: () => void;
+  labels: CalendarPageLabels;
+  categoryLabels: Record<EventCategory, string>;
 }) {
   const dayEvents = events
     .filter((e) => eventOverlapsDay(e, currentDate))
@@ -533,9 +709,9 @@ function DayView({ currentDate, events, onEventClick, onNewEvent }: {
         {dayEvents.length === 0 ? (
           <div className="text-center py-12">
             <Calendar className="h-10 w-10 text-muted-foreground mx-auto mb-3 opacity-50" />
-            <p className="text-muted-foreground text-sm">Nessun evento per questo giorno</p>
+            <p className="text-muted-foreground text-sm">{labels.dayEmpty}</p>
             <Button variant="outline" size="sm" className="mt-3 rounded-full" onClick={onNewEvent}>
-              <Plus className="h-3.5 w-3.5 mr-1" /> Aggiungi evento
+              <Plus className="h-3.5 w-3.5 mr-1" /> {labels.addEvent}
             </Button>
           </div>
         ) : (
@@ -564,7 +740,7 @@ function DayView({ currentDate, events, onEventClick, onNewEvent }: {
                   </span>
                 </div>
               </div>
-              <Badge variant="outline" className="text-xs shrink-0">{CATEGORY_META[ev.category].label}</Badge>
+              <Badge variant="outline" className="text-xs shrink-0">{categoryLabels[ev.category]}</Badge>
             </div>
           ))
         )}

@@ -19,7 +19,7 @@ import { readToolCalls } from "./tool-call-parser";
 import { getOpenAIFallbackConfig, shouldFallbackToOpenAI, resolveActiveProvider } from "../client";
 import { createOpenAIProvider } from "./openai-provider";
 import { CHAT_ONCE_TIMEOUT, CHAT_TIMEOUT, normalizeFinishReason, withTimeout } from "./shared";
-import type { LLMProvider } from "./types";
+import type { LLMConfig, LLMProvider } from "./types";
 
 export type { ChatWithToolsResult, LLMConfig, LLMMessage, LLMProvider, ToolCall, ToolDefinitionOpenAI } from "./types";
 
@@ -45,6 +45,17 @@ function getGroqOpenRouterFallback(): LLMProvider | null {
   if (!process.env.OPENROUTER_API_KEY) { _groqOrFallback = null; return null; }
   try { _groqOrFallback = createOpenRouterProvider(); return _groqOrFallback; }
   catch { _groqOrFallback = null; return null; }
+}
+
+/**
+ * Quando Groq è rate-limited e si ripiega su OpenRouter, NON si deve riusare il
+ * nome modello Groq (es. "llama-3.3-70b-versatile"): OpenRouter lo rifiuta con
+ * 400 "not a valid model ID" e Wendy fallisce del tutto. Si rimuove il model
+ * così OpenRouter usa il suo default valido (OPENROUTER_MODEL).
+ */
+function toOpenRouterFallbackConfig(config: LLMConfig = {}): LLMConfig {
+  const { model: _groqModel, ...rest } = config;
+  return rest;
 }
 
 function createGroqProvider(): LLMProvider {
@@ -98,7 +109,7 @@ function createGroqProvider(): LLMProvider {
         const fallback = getGroqOpenRouterFallback();
         if (!fallback || !shouldFallbackFromGroq(err)) throw err;
         logger.warn({ err, model }, "Groq rate limited; falling back to OpenRouter");
-        return fallback.chat(messages, config);
+        return fallback.chat(messages, toOpenRouterFallbackConfig(config));
       }
     },
 
@@ -128,7 +139,7 @@ function createGroqProvider(): LLMProvider {
         const fallback = getGroqOpenRouterFallback();
         if (!fallback || !shouldFallbackFromGroq(err)) throw err;
         logger.warn({ err, model }, "Groq rate limited; falling back to OpenRouter");
-        return fallback.chatOnce(messages, config);
+        return fallback.chatOnce(messages, toOpenRouterFallbackConfig(config));
       }
     },
 
@@ -161,7 +172,7 @@ function createGroqProvider(): LLMProvider {
         const fallback = getGroqOpenRouterFallback();
         if (!fallback || !shouldFallbackFromGroq(err)) throw err;
         logger.warn({ err, model }, "Groq rate limited; falling back to OpenRouter");
-        return fallback.chatWithTools(messages, tools, config);
+        return fallback.chatWithTools(messages, tools, toOpenRouterFallbackConfig(config));
       }
     },
   };

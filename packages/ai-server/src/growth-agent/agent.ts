@@ -178,6 +178,8 @@ export async function* runGrowthAgent(
           userId, sessionId, userContext: enrichedContext, history, userMessage,
           normalizedMessage,
           routeDecision, memoryFactCount, maxHistory, requestId,
+          ...(wendyIntent ? { wendyIntent } : {}),
+          ...(opts.executeExternalTool ? { executeExternalTool: opts.executeExternalTool } : {}),
         })) {
           if (event.type === "error") {
             throw new Error(event.message);
@@ -248,95 +250,134 @@ export async function* runGrowthAgent(
     const allTools = buildGrowthAgentTools(wendyIntent);
     const hasTools = allTools.length > 0;
 
-    const result = await llm.chatWithTools(messages, hasTools ? allTools : [], {
-      model: route.model,
-      temperature,
-      maxTokens: evalResult.level === "low" ? wendyConfig.agent.maxTokensLow : wendyConfig.agent.maxTokensHigh,
-    });
+    // ── Multi-step agentic loop ────────────────────────────────────────────────
+    // Wendy può concatenare più round di tool (osserva risultato → decide il tool
+    // successivo) fino a `agent.maxToolTurns`. All'ultimo turno consentito gli
+    // strumenti vengono rimossi così il modello è obbligato a sintetizzare una
+    // risposta testuale invece di richiedere altri tool all'infinito.
+    const maxToolTurns = hasTools ? Math.max(1, wendyConfig.agent.maxToolTurns) : 1;
+    const baseAnswerMaxTokens =
+      evalResult.level === "low" ? wendyConfig.agent.maxTokensLow : wendyConfig.agent.maxTokensHigh;
 
-    llmSpan.end();
-    endLlmTimer();
-    const fullText = result.content ?? "";
-    recordLlmTokens(route.model, fullText.length);
+    let workingMessages: LLMMessage[] = messages;
+    let fullText = "";
+    let anyToolExecuted = false;
 
-    const endSupervisorTimer = wendyLatencySeconds.startTimer({ phase: "supervisor" });
-    const supervisorSpan = startSpan("supervisor_evaluation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });
+    for (let turn = 0; turn < maxToolTurns; turn++) {
+      const isFinalTurn = turn === maxToolTurns - 1;
+      const turnTools = hasTools && !isFinalTurn ? allTools : [];
+      // Sul turno finale dopo aver eseguito tool, lascia più spazio alla sintesi.
+      const turnMaxTokens =
+        isFinalTurn && anyToolExecuted ? wendyConfig.agent.followUpMaxTokens : baseAnswerMaxTokens;
 
-    const orderedToolCalls = result.toolCalls
-      .map((toolCall, index) => ({
-        id: toolCall.id || `tc_${index}`,
-        name: toolCall.name,
-        arguments: toolCall.arguments,
-      }))
-      .filter((toolCall) => toolCall.name);
+      const result = await llm.chatWithTools(workingMessages, turnTools, {
+        model: route.model,
+        temperature,
+        maxTokens: turnMaxTokens,
+      });
+      fullText = result.content ?? "";
+      recordLlmTokens(route.model, fullText.length);
 
-    if (result.finishReason === "tool_calls" && orderedToolCalls.length > 0) {
-      supervisorSpan.end();
-      endSupervisorTimer();
+      const orderedToolCalls = result.toolCalls
+        .map((toolCall, index) => ({
+          id: toolCall.id || `tc_${index}`,
+          name: toolCall.name,
+          arguments: toolCall.arguments,
+        }))
+        .filter((toolCall) => toolCall.name);
 
-      if (!orderedToolCalls.every((toolCall) => toolRegistry.isUiTool(toolCall.name))) {
-        const toolExecutor = opts.executeExternalTool ?? executeToolCall;
-        const toolResults: Array<{ toolCall: (typeof orderedToolCalls)[number]; toolData: unknown }> = [];
+      // Nessun tool richiesto → questa è la risposta finale.
+      if (result.finishReason !== "tool_calls" || orderedToolCalls.length === 0) {
+        break;
+      }
 
+      // Batch di soli UI tool → terminale (handoff al client).
+      if (orderedToolCalls.every((toolCall) => toolRegistry.isUiTool(toolCall.name))) {
+        llmSpan.end();
+        endLlmTimer();
         for (const toolCall of orderedToolCalls) {
-          const toolResult = await toolExecutor(toolCall.name, toolCall.arguments, userId);
-          const toolData = toolResult.ok ? toolResult.data : { error: toolResult.message };
-
-          if (toolResult.ok && isClientSideToolData(toolData)) {
-            yield { type: "tool_call", name: toolCall.name, result: toolData };
-            yield { type: "done", sources: [], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
-            saveAssistantMemory(`[tool: ${toolCall.name}]`);
-            return;
-          }
-
-          toolResults.push({ toolCall, toolData });
-          yield { type: "tool_call", name: toolCall.name, result: toolData };
+          const args = toolCall.arguments as unknown as UiToolArgs;
+          yield { type: "ui_tool" as const, name: toolCall.name as UiToolName, args };
         }
-
-        const toolSummary = toolResults
-          .map(({ toolCall, toolData }) => `${toolCall.name}: ${JSON.stringify(toolData)}`)
-          .join("\n");
-        const followUpMessages: LLMMessage[] = [
-          ...messages,
-          {
-            role: "assistant",
-            content: fullText || "Ho consultato gli strumenti disponibili.",
-          },
-          {
-            role: "user",
-            content: `Risultati degli strumenti:\n${toolSummary}\n\nRispondi all'utente in modo sintetico, citando solo cio che emerge dai risultati.`,
-          },
-        ];
-
-        const followUpText = await llm.chatOnce(followUpMessages, {
-          model: route.model,
-          temperature: 0.55,
-          maxTokens: wendyConfig.agent.followUpMaxTokens,
-        });
-        for (let i = 0; i < followUpText.length; i += wendyConfig.agent.chunkSize) {
-          yield { type: "token", value: followUpText.slice(i, i + wendyConfig.agent.chunkSize) };
-        }
-        yield { type: "done", sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults], evalResult, routeDecision };
-        saveAssistantMemory(followUpText);
+        yield {
+          type: "done",
+          sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
+          evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent),
+        };
+        saveAssistantMemory(`[UI: ${orderedToolCalls.map((toolCall) => toolCall.name).join(", ")}]`);
         return;
       }
 
-      for (const toolCall of orderedToolCalls) {
-        const args = toolCall.arguments as unknown as UiToolArgs;
+      // Tool dati → esegui, feed-back dei risultati, prosegui il loop.
+      const toolExecutor = opts.executeExternalTool ?? executeToolCall;
+      const toolResults: Array<{ toolCall: (typeof orderedToolCalls)[number]; toolData: unknown }> = [];
 
-        yield { type: "ui_tool" as const, name: toolCall.name as UiToolName, args };
+      for (const toolCall of orderedToolCalls) {
+        const toolResult = await toolExecutor(toolCall.name, toolCall.arguments, userId);
+        const toolData = toolResult.ok ? toolResult.data : { error: toolResult.message };
+
+        if (toolResult.ok && isClientSideToolData(toolData)) {
+          llmSpan.end();
+          endLlmTimer();
+          yield { type: "tool_call", name: toolCall.name, result: toolData };
+          yield { type: "done", sources: [], evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent) };
+          saveAssistantMemory(`[tool: ${toolCall.name}]`);
+          return;
+        }
+
+        anyToolExecuted = true;
+        toolResults.push({ toolCall, toolData });
+        yield { type: "tool_call", name: toolCall.name, result: toolData };
       }
 
+      const toolSummary = toolResults
+        .map(({ toolCall, toolData }) => `${toolCall.name}: ${JSON.stringify(toolData)}`)
+        .join("\n");
+      workingMessages = [
+        ...workingMessages,
+        {
+          role: "assistant",
+          content: fullText || "Ho consultato gli strumenti disponibili.",
+        },
+        {
+          role: "user",
+          content: `Risultati degli strumenti:\n${toolSummary}\n\nSe servono altri dati per rispondere bene, chiama un altro strumento; altrimenti rispondi all'utente in modo sintetico, citando solo cio che emerge dai risultati.`,
+        },
+      ];
+    }
+
+    llmSpan.end();
+    endLlmTimer();
+
+    // Risposta fondata sui tool → stream diretto (coerente con il follow-up
+    // storico: la supervisione non riscrive dati citati dagli strumenti).
+    if (anyToolExecuted) {
+      let toolGroundedText = fullText;
+      if (!toolGroundedText.trim()) {
+        toolGroundedText = getWendyRecoveryFallbackReply({
+          intent: wendyIntent ?? "conversation",
+          message: normalizedMessage,
+          ...(userContext.locale ? { locale: userContext.locale } : {}),
+        });
+      }
+      const CHUNK_SIZE = wendyConfig.agent.chunkSize;
+      for (let i = 0; i < toolGroundedText.length; i += CHUNK_SIZE) {
+        yield { type: "token", value: toolGroundedText.slice(i, i + CHUNK_SIZE) };
+      }
       yield {
         type: "done",
         sources: [...personaExamples, ...documentChunks, ...platformChunks, ...webResults],
-        evalResult, routeDecision, uiDirectives: buildUiDirectives(routeDecision.domain, routeDecision.intent),
+        evalResult, routeDecision,
       };
-      saveAssistantMemory(`[UI: ${orderedToolCalls.map((toolCall) => toolCall.name).join(", ")}]`);
+      saveAssistantMemory(toolGroundedText);
+      logger.info({ ...logFields, responseLength: toolGroundedText.length, toolTurns: maxToolTurns }, "response completed (tool-grounded)");
       return;
     }
 
     const draft = fullText;
+
+    const endSupervisorTimer = wendyLatencySeconds.startTimer({ phase: "supervisor" });
+    const supervisorSpan = startSpan("supervisor_evaluation", { requestId, domain: routeDecision.domain, intent: routeDecision.intent });
 
     const supervisorInput = {
       userMessage: normalizedMessage, draft,

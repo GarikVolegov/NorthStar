@@ -1,5 +1,6 @@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { deleteJson, postJson } from "@/lib/apiClient";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Calendar, Check, ChevronDown, ChevronUp, Clock, DollarSign, ExternalLink, Loader2, MapPin, Send, Sparkles, StickyNote, Trash2, X } from "lucide-react";
@@ -11,11 +12,15 @@ import { COLUMNS, STATUS_META, type Application, type AppStatus, type NoteEntry 
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-function getNoteErrorMessage(error: unknown) {
+function getNoteErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) {
     return error.message;
   }
-  return "Impossibile aggiornare il diario note. Riprova.";
+  return fallback;
+}
+
+function useApplicationCardText(locale: string, key: string, source: string, context = "Application card UI copy") {
+  return useDynamicTranslation({ locale, key, source, context });
 }
 
 export function AppCard({
@@ -33,13 +38,39 @@ export function AppCard({
   onDragEnd: () => void;
   onCoverLetter: () => void;
 }) {
-  const { t } = useTranslation();
+  const { i18n } = useTranslation();
+  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
   const formatDate = useFormatDate();
   const formatNoteDate = useFormatNoteDate();
   const queryClient = useQueryClient();
   const meta = STATUS_META[app.status];
   const otherStatuses = COLUMNS.filter((s) => s !== app.status);
   const notesLog: NoteEntry[] = Array.isArray(app.notesLog) ? app.notesLog : [];
+  const deleteApplicationLabel = useApplicationCardText(locale, "candidature.card.delete", "Elimina candidatura");
+  const confirmDeleteLabel = useApplicationCardText(locale, "candidature.card.confirmDelete", "Conferma eliminazione");
+  const cancelDeleteLabel = useApplicationCardText(locale, "candidature.card.cancelDelete", "Annulla eliminazione");
+  const openOfferLabel = useApplicationCardText(locale, "candidature.card.openOffer", "Apri offerta");
+  const coverLetterLabel = useApplicationCardText(locale, "candidature.card.coverLetter", "Genera lettera di presentazione");
+  const coverLetterTitle = useApplicationCardText(locale, "candidature.card.coverLetterTitle", "Genera lettera di presentazione AI");
+  const openDiaryLabel = useApplicationCardText(locale, "candidature.card.openDiary", "Apri diario note");
+  const closeDiaryLabel = useApplicationCardText(locale, "candidature.card.closeDiary", "Chiudi diario note");
+  const closeDiaryTitle = useApplicationCardText(locale, "candidature.card.closeDiaryTitle", "Chiudi diario");
+  const changeStatusLabel = useApplicationCardText(locale, "candidature.card.changeStatus", "Cambia stato candidatura");
+  const moveToLabel = useApplicationCardText(locale, "candidature.card.moveTo", "Sposta in");
+  const deleteNoteLabel = useApplicationCardText(locale, "candidature.card.deleteNote", "Elimina nota");
+  const addNoteLabel = useApplicationCardText(locale, "candidature.card.addNote", "Aggiungi nota");
+  const addNoteTitle = useApplicationCardText(locale, "candidature.card.addNoteTitle", "Aggiungi nota (Invio)");
+  const addNotePlaceholder = useApplicationCardText(locale, "candidature.card.addNotePlaceholder", "Aggiungi una nota di follow-up");
+  const noNotesYetLabel = useApplicationCardText(locale, "candidature.card.noNotesYet", "Nessuna nota ancora");
+  const noteFallbackError = useApplicationCardText(locale, "candidature.card.noteFallbackError", "Impossibile aggiornare il diario note. Riprova.");
+  const statusLabels: Record<AppStatus, string> = {
+    saved: useApplicationCardText(locale, "candidature.status.saved", STATUS_META.saved.label),
+    applied: useApplicationCardText(locale, "candidature.status.applied", STATUS_META.applied.label),
+    interview: useApplicationCardText(locale, "candidature.status.interview", STATUS_META.interview.label),
+    offer: useApplicationCardText(locale, "candidature.status.offer", STATUS_META.offer.label),
+    rejected: useApplicationCardText(locale, "candidature.status.rejected", STATUS_META.rejected.label),
+  };
+  const currentStatusLabel = statusLabels[app.status];
 
   const [notesOpen, setNotesOpen] = useState(false);
   const [noteInput, setNoteInput] = useState("");
@@ -70,7 +101,7 @@ export function AppCard({
       setNoteInput("");
     },
     onError: (error) => {
-      setNoteError(getNoteErrorMessage(error));
+      setNoteError(getNoteErrorMessage(error, noteFallbackError));
     },
   });
 
@@ -86,7 +117,7 @@ export function AppCard({
       setNoteError(null);
     },
     onError: (error) => {
-      setNoteError(getNoteErrorMessage(error));
+      setNoteError(getNoteErrorMessage(error, noteFallbackError));
     },
   });
 
@@ -124,7 +155,7 @@ export function AppCard({
                 }}
                 className="flex h-11 w-11 items-center justify-center rounded-lg bg-destructive/10 text-destructive transition-colors hover:bg-destructive/20 sm:h-8 sm:w-8"
                 disabled={deleting}
-                aria-label={`Conferma eliminazione candidatura ${app.company}`}
+                aria-label={`${confirmDeleteLabel}: ${app.company}`}
               >
                 {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               </button>
@@ -132,7 +163,7 @@ export function AppCard({
                 onClick={() => setConfirmingDelete(false)}
                 className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:h-8 sm:w-8"
                 disabled={deleting}
-                aria-label={`Annulla eliminazione candidatura ${app.company}`}
+                aria-label={`${cancelDeleteLabel}: ${app.company}`}
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -142,7 +173,7 @@ export function AppCard({
               onClick={(e) => { e.stopPropagation(); setConfirmingDelete(true); }}
               className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-all hover:bg-destructive/10 hover:text-destructive sm:h-8 sm:w-8 sm:opacity-0 sm:group-hover:opacity-100"
               disabled={deleting}
-              aria-label={`Elimina candidatura ${app.company}`}
+              aria-label={`${deleteApplicationLabel}: ${app.company}`}
             >
               {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
             </button>
@@ -191,8 +222,8 @@ export function AppCard({
           <a href={app.url} target="_blank" rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-primary"
-            title="Apri offerta"
-            aria-label={`Apri offerta ${app.company}`}>
+            title={openOfferLabel}
+            aria-label={`${openOfferLabel}: ${app.company}`}>
             <ExternalLink className="w-3 h-3" />
           </a>
         )}
@@ -200,8 +231,8 @@ export function AppCard({
         <button
           onClick={(e) => { e.stopPropagation(); onCoverLetter(); }}
           className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-violet-600"
-          title="Genera lettera di presentazione AI"
-          aria-label={`Genera lettera di presentazione per ${app.company}`}
+          title={coverLetterTitle}
+          aria-label={`${coverLetterLabel}: ${app.company}`}
         >
           <Sparkles className="w-3 h-3" />
         </button>
@@ -215,8 +246,8 @@ export function AppCard({
               ? "bg-primary/10 text-primary"
               : "text-muted-foreground hover:text-foreground hover:bg-muted",
           )}
-          title={notesOpen ? "Chiudi diario" : "Apri diario note"}
-          aria-label={notesOpen ? `Chiudi diario note ${app.company}` : `Apri diario note ${app.company}`}
+          title={notesOpen ? closeDiaryTitle : openDiaryLabel}
+          aria-label={notesOpen ? `${closeDiaryLabel}: ${app.company}` : `${openDiaryLabel}: ${app.company}`}
         >
           <StickyNote className="w-3 h-3" />
           {notesLog.length > 0 ? notesLog.length : ""}
@@ -228,8 +259,8 @@ export function AppCard({
           <DropdownMenuTrigger asChild>
             <button onClick={(e) => e.stopPropagation()}
               className={cn("flex min-h-11 items-center gap-1 rounded-full border px-3 text-[11px] font-semibold transition-opacity hover:opacity-80", meta.badge)}
-              aria-label={`Cambia stato candidatura ${app.company}: ${meta.label}`}>
-              {meta.emoji} {meta.label} <ChevronDown className="w-2.5 h-2.5" />
+              aria-label={`${changeStatusLabel}: ${app.company}, ${currentStatusLabel}`}>
+              {meta.emoji} {currentStatusLabel} <ChevronDown className="w-2.5 h-2.5" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
@@ -238,7 +269,7 @@ export function AppCard({
               return (
                 <DropdownMenuItem key={s} onClick={(e) => { e.stopPropagation(); onStatusChange(s); }}
                   className="text-xs gap-2 cursor-pointer">
-                  <span>{m.emoji}</span> {t("candidature.moveTo", { status: t(`candidature.status.${s}`) })}
+                  <span>{m.emoji}</span> {moveToLabel} {statusLabels[s]}
                 </DropdownMenuItem>
               );
             })}
@@ -265,7 +296,7 @@ export function AppCard({
                     onClick={() => deleteNoteMutation.mutate(i)}
                     disabled={deleteNoteMutation.isPending}
                     className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-muted-foreground opacity-100 transition-all hover:bg-destructive/10 hover:text-destructive sm:opacity-0 sm:group-hover/note:opacity-100"
-                    aria-label={`Elimina nota ${i + 1}`}
+                    aria-label={`${deleteNoteLabel} ${i + 1}`}
                   >
                     <X className="w-2.5 h-2.5" />
                   </button>
@@ -276,7 +307,7 @@ export function AppCard({
 
           {notesLog.length === 0 && (
             <p className="text-[11px] text-muted-foreground italic mb-2.5">
-              {t("candidature.noNotesYet")}
+              {noNotesYetLabel}
             </p>
           )}
 
@@ -298,15 +329,15 @@ export function AppCard({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submitNote(); }
               }}
-              placeholder={t("candidature.addNotePlaceholder")}
+              placeholder={addNotePlaceholder}
               className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-muted/60 px-3 text-xs transition-shadow placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-ring"
             />
             <button
               onClick={submitNote}
               disabled={!noteInput.trim() || addNoteMutation.isPending}
               className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
-              title="Aggiungi nota (Invio)"
-              aria-label="Aggiungi nota"
+              title={addNoteTitle}
+              aria-label={addNoteLabel}
             >
               {addNoteMutation.isPending
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />

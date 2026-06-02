@@ -11,6 +11,7 @@ import { useWendy } from "@/contexts/WendyProvider";
 import type { RouterOutput, SearchResult } from "@/hooks/useGlobalSearch";
 import { useWendyChat } from "@/hooks/useWendyChat";
 import { eventBus } from "@/lib/event-bus";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { ORDER, SUGGESTIONS_DEFAULTS, TYPE_CONFIG } from "./searchDialogConfig";
 import { useSearchDialogMobile } from "./useSearchDialogMobile";
@@ -43,6 +44,8 @@ interface SearchDialogProps {
   trackClick: (result: SearchResult) => void;
 }
 
+type SearchSuggestion = { title: string; description: string; url: string };
+
 // Main component
 
 export function SearchDialog({
@@ -60,7 +63,8 @@ export function SearchDialog({
   close,
   trackClick,
 }: SearchDialogProps) {
-  const { t } = useTranslation();
+  const { i18n, t } = useTranslation();
+  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
   const [, setLocation] = useLocation();
   const wendy = useWendy();
   const closeWendy = wendy.close;
@@ -153,21 +157,158 @@ export function SearchDialog({
   const hasSuggestions = suggestions.length > 0;
   const pageHints = getPageHints();
   const quickActions = pageHints.quickActions.slice(0, 3);
-  const activeSuggestions = hasSuggestions ? suggestions : SUGGESTIONS_DEFAULTS;
-  const mobileDragLabel = "Trascina verso il basso per chiudere";
-  const globalSearchTitle = "Ricerca globale";
-  const globalSearchDescription = "Cerca pagine, ruoli, articoli e contenuti NorthStar.";
-  const globalResultsDescription = "Risultati nell'app NorthStar.";
-  const searchPlaceholder = t("search.placeholder");
-  const searchingLabel = t("common.searching");
-  const searchInProgressLabel = "Ricerca in corso...";
-  const searchErrorTitle = "La ricerca globale non e disponibile adesso.";
-  const searchErrorHint = "Puoi riprovare tra poco o chiedere a Wendy.";
-  const searchErrorSideHint = "Puoi riprovare tra poco o chiedere a Wendy qui accanto.";
-  const searchEmptyTitle = `Nessun risultato globale per "${query}"`;
-  const searchEmptyHint = "Prova termini piu generali oppure chiedi a Wendy di guidarti.";
-  const searchEmptySideHint = "Wendy puo aiutarti a riformulare o ragionare sul prossimo passo.";
-  const askWendyCurrentLabel = `Chiedi a Wendy di guidarti su "${query}"`;
+  const mobileDragLabel = useDynamicTranslation({
+    locale,
+    key: "search.dialog.mobileDragLabel",
+    source: "Trascina verso il basso per chiudere",
+    context: "ARIA label for the mobile search sheet drag handle",
+  });
+  const globalSearchTitle = useDynamicTranslation({
+    locale,
+    key: "search.dialog.globalTitle",
+    source: "Ricerca globale",
+    context: "Search dialog title for global app search results",
+  });
+  const globalSearchDescription = useDynamicTranslation({
+    locale,
+    key: "search.dialog.globalDescription",
+    source: "Cerca pagine, ruoli, articoli e contenuti NorthStar.",
+    context: "Short description under the global search title",
+  });
+  const globalResultsDescription = useDynamicTranslation({
+    locale,
+    key: "search.dialog.globalResultsDescription",
+    source: "Risultati nell'app NorthStar.",
+    context: "Short description above compact side search results",
+  });
+  const wendyChatLabel = useDynamicTranslation({
+    locale,
+    key: "search.dialog.wendyChatLabel",
+    source: "Chat Wendy",
+    context: "ARIA label for the Wendy chat region inside global search",
+  });
+  const searchPlaceholder = useDynamicTranslation({
+    locale,
+    key: "search.dialog.placeholder",
+    source: t("search.placeholder"),
+    context: "Placeholder for the global search input",
+  });
+  const searchingLabel = useDynamicTranslation({
+    locale,
+    key: "search.dialog.searching",
+    source: t("common.searching"),
+    context: "Loading label while global search is running",
+  });
+  const searchInProgressLabel = useDynamicTranslation({
+    locale,
+    key: "search.dialog.searchInProgress",
+    source: "Ricerca in corso...",
+    context: "Compact loading label while global search side results are running",
+  });
+  const searchErrorTitle = useDynamicTranslation({
+    locale,
+    key: "search.dialog.errorTitle",
+    source: "La ricerca globale non e disponibile adesso.",
+    context: "Recoverable global search error title",
+  });
+  const searchErrorHint = useDynamicTranslation({
+    locale,
+    key: "search.dialog.errorHint",
+    source: "Puoi riprovare tra poco o chiedere a Wendy.",
+    context: "Recoverable global search error hint in the main results area",
+  });
+  const searchErrorSideHint = useDynamicTranslation({
+    locale,
+    key: "search.dialog.errorSideHint",
+    source: "Puoi riprovare tra poco o chiedere a Wendy qui accanto.",
+    context: "Recoverable global search error hint when Wendy is visible beside results",
+  });
+  const searchEmptyTitle = useDynamicTranslation({
+    locale,
+    key: "search.dialog.emptyTitle",
+    source: `Nessun risultato globale per "${query}"`,
+    context: "Empty global search result title. Preserve the quoted user query.",
+  });
+  const searchEmptyHint = useDynamicTranslation({
+    locale,
+    key: "search.dialog.emptyHint",
+    source: "Prova termini piu generali oppure chiedi a Wendy di guidarti.",
+    context: "Empty global search hint suggesting broader terms or Wendy",
+  });
+  const searchEmptySideHint = useDynamicTranslation({
+    locale,
+    key: "search.dialog.emptySideHint",
+    source: "Wendy puo aiutarti a riformulare o ragionare sul prossimo passo.",
+    context: "Empty global search hint when Wendy is visible beside results",
+  });
+  const askWendyCurrentLabel = useDynamicTranslation({
+    locale,
+    key: "search.dialog.askWendyCurrent",
+    source: `Chiedi a Wendy di guidarti su "${query}"`,
+    context: "Button label asking Wendy to help with the current search query. Preserve the quoted query.",
+  });
+  const degradedIndexLabel = useDynamicTranslation({
+    locale,
+    key: "search.dialog.indexStatus",
+    source: `indice ${indexStatus}`,
+    context: "Search index status badge. Preserve the status value.",
+  });
+  const [sectorSuggestion, testSuggestion, marketSuggestion, wendySuggestion] = SUGGESTIONS_DEFAULTS;
+  const defaultSectorTitle = useDynamicTranslation({
+    locale,
+    key: "search.dialog.defaultSuggestions.sectors.title",
+    source: sectorSuggestion.title,
+    context: "Default search suggestion title linking to sectors",
+  });
+  const defaultSectorDescription = useDynamicTranslation({
+    locale,
+    key: "search.dialog.defaultSuggestions.sectors.description",
+    source: sectorSuggestion.description,
+    context: "Default search suggestion description linking to sectors",
+  });
+  const defaultTestTitle = useDynamicTranslation({
+    locale,
+    key: "search.dialog.defaultSuggestions.test.title",
+    source: testSuggestion.title,
+    context: "Default search suggestion title linking to the career test",
+  });
+  const defaultTestDescription = useDynamicTranslation({
+    locale,
+    key: "search.dialog.defaultSuggestions.test.description",
+    source: testSuggestion.description,
+    context: "Default search suggestion description linking to the career test",
+  });
+  const defaultMarketTitle = useDynamicTranslation({
+    locale,
+    key: "search.dialog.defaultSuggestions.market.title",
+    source: marketSuggestion.title,
+    context: "Default search suggestion title linking to market trends",
+  });
+  const defaultMarketDescription = useDynamicTranslation({
+    locale,
+    key: "search.dialog.defaultSuggestions.market.description",
+    source: marketSuggestion.description,
+    context: "Default search suggestion description linking to market trends",
+  });
+  const defaultWendyTitle = useDynamicTranslation({
+    locale,
+    key: "search.dialog.defaultSuggestions.wendy.title",
+    source: wendySuggestion.title,
+    context: "Default search suggestion title linking to Wendy AI",
+  });
+  const defaultWendyDescription = useDynamicTranslation({
+    locale,
+    key: "search.dialog.defaultSuggestions.wendy.description",
+    source: wendySuggestion.description,
+    context: "Default search suggestion description linking to Wendy AI",
+  });
+  const defaultSuggestions: SearchSuggestion[] = [
+    { ...sectorSuggestion, title: defaultSectorTitle, description: defaultSectorDescription },
+    { ...testSuggestion, title: defaultTestTitle, description: defaultTestDescription },
+    { ...marketSuggestion, title: defaultMarketTitle, description: defaultMarketDescription },
+    { ...wendySuggestion, title: defaultWendyTitle, description: defaultWendyDescription },
+  ];
+  const activeSuggestions: SearchSuggestion[] = hasSuggestions ? suggestions : defaultSuggestions;
 
   // AI panel visible when streaming or has response
   const hasConversation = chat.messages.length > 0 || chat.thinking.active || !!chat.streamError;
@@ -343,7 +484,7 @@ export function SearchDialog({
                     </section>
                     )}
 
-                    <section className={cn(showSideResults ? "w-3/5" : "w-full")} aria-label="Chat Wendy">
+                    <section className={cn(showSideResults ? "w-3/5" : "w-full")} aria-label={wendyChatLabel}>
                       <WendyConsole
                         chat={chat}
                         query={query}
@@ -392,7 +533,7 @@ export function SearchDialog({
                         <span className="text-[10px] text-muted-foreground/60">{searchMode}</span>
                         {indexStatus !== "ready" && (
                           <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-500">
-                            indice {indexStatus}
+                            {degradedIndexLabel}
                           </span>
                         )}
                         <div className="ml-auto flex items-center gap-1">
@@ -485,7 +626,7 @@ export function SearchDialog({
                 )}
 
                 {mobileAIStack && (
-                  <section className="h-[52dvh] min-h-0 max-h-[52dvh] shrink-0 overflow-hidden border-t border-white/10" aria-label="Chat Wendy">
+                  <section className="h-[52dvh] min-h-0 max-h-[52dvh] shrink-0 overflow-hidden border-t border-white/10" aria-label={wendyChatLabel}>
                     <WendyConsole
                       chat={chat}
                       query={query}

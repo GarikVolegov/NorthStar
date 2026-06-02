@@ -1,7 +1,9 @@
 import { ArrowRight, BarChart3, BookOpen, BrainCircuit, Briefcase, Building2, Compass, HeartHandshake, MapPin, Mic2, Network, Newspaper, Rocket, Sparkles, Target, TrendingUp, Zap, type LucideIcon } from "lucide-react";
 import { Link } from "wouter";
 import type { AdaptiveDashboardPhase, AdaptiveSectionPresentation } from "./dashboard-adaptive-flow";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 
 type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
 
@@ -27,7 +29,27 @@ function JourneyToolCard({
   index: number;
   presentation?: AdaptiveSectionPresentation | undefined;
 }) {
-  const { href, icon: Icon, title, desc, badge } = tool;
+  const { href, icon: Icon, badge } = tool;
+  const { i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage || i18n.language || "it";
+  const title = useDynamicTranslation({
+    locale,
+    key: `dashboard.journeyTools.tools.${tool.id}.title`,
+    source: tool.title,
+    context: "Dashboard journey tool title",
+  });
+  const desc = useDynamicTranslation({
+    locale,
+    key: `dashboard.journeyTools.tools.${tool.id}.description`,
+    source: tool.desc,
+    context: "Dashboard journey tool description",
+  });
+  const badgeLabel = useDynamicTranslation({
+    locale,
+    key: `dashboard.journeyTools.badges.${badge?.toLowerCase() ?? "none"}`,
+    source: badge ?? "",
+    context: "Dashboard journey tool badge",
+  });
 
   return (
     <Link href={href}>
@@ -43,7 +65,7 @@ function JourneyToolCard({
             <Icon className="w-5 h-5" />
           </div>
           {badge && (
-            <span className="text-xs font-semibold bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5">{badge}</span>
+            <span className="text-xs font-semibold bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5">{badgeLabel}</span>
           )}
         </div>
         <div>
@@ -108,7 +130,7 @@ export function JourneyToolsSection({
     href: "/settori",
     icon: Target,
     title: "Scegli settore e ruolo",
-    desc: "Parti da un'area, poi scegli il ruolo target",
+    desc: "Scegli l'area, il ruolo target e poi passa ai lavori reali",
   };
 
   const INDECISO_FULL: ToolItem[] = [
@@ -117,7 +139,7 @@ export function JourneyToolsSection({
     { id: "cluesDiary", href: "/diario?mode=indizi", icon: Sparkles, title: "Diario degli Indizi", desc: "Annota un momento di energia o curiosità", badge: "Nuovo" },
     { id: "socraticSession", href: "/coach?mode=socratic", icon: BrainCircuit, title: "Sessione Socratica", desc: "4 step strutturati per fare chiarezza con Wendy", badge: "AI" },
     { id: "personalityTest", href: "/test", icon: Zap, title: "Test di personalità", desc: "Mappa la tua personalità professionale", badge: "Gratuito" },
-    { id: "exploreSectors", href: "/settori", icon: Target, title: "Scegli settore e ruolo", desc: "Parti da un'area, poi scegli il ruolo target" },
+    { id: "exploreSectors", href: "/settori", icon: Target, title: "Scegli settore e ruolo", desc: "Scegli l'area, il ruolo target e poi passa ai lavori reali" },
     { id: "newsWork", href: "/news", icon: Newspaper, title: "Notizie lavoro", desc: "Ultime notizie dal mercato del lavoro" },
   ];
 

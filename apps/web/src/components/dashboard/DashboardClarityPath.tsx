@@ -49,10 +49,10 @@ export function DashboardClarityPath({
     },
     {
       icon: Target,
-      label: "Esplora il mondo",
+      label: "Scegli settore e ruolo",
       desc: savedSectorsCount > 0
         ? `${savedSectorsCount} ${savedSectorsCount === 1 ? "settore salvato" : "settori salvati"}`
-        : "Sfoglia settori e ruoli per trovare una direzione concreta",
+        : "Apri un settore, scegli il ruolo target e poi passa ai lavori reali",
       cta: "Scegli settore e ruolo",
       href: "/settori",
       done: savedSectorsCount >= 3,
@@ -60,10 +60,10 @@ export function DashboardClarityPath({
     },
     {
       icon: Scale,
-      label: "Confronta & filtra",
+      label: "Confronta scelte",
       desc: savedSectorsCount >= 3
-        ? "Hai abbastanza dati per confrontare"
-        : "Salva 3+ settori per sbloccare il confronto",
+        ? "Confronta aree e ruoli prima di impegnarti"
+        : "Salva 3+ settori per confrontare aree e ruoli",
       cta: "Confronta",
       href: "/settori",
       done: hasDecided || adaptivePhase === "choose_path" || adaptivePhase === "active_journey",

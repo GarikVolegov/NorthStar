@@ -94,12 +94,12 @@ export function DashboardCareerComparison({
     return (
       <div className="rounded-2xl border border-dashed border-border bg-muted/20 p-5 text-center">
         <Scale className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
-        <p className="text-sm font-semibold text-foreground">Confronto carriere bloccato</p>
+        <p className="text-sm font-semibold text-foreground">Confronto settori e ruoli bloccato</p>
         <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted-foreground">
-          Salva almeno 3 aree dalla discovery per confrontare opzioni con abbastanza segnali.
+          Salva almeno 3 settori dalla discovery per confrontare opzioni e scegliere il ruolo target.
         </p>
         <Link href="/settori" className="mt-3 inline-block text-xs font-semibold text-primary hover:underline">
-          Esplora aree e ruoli -&gt;
+          Esplora e salva settori -&gt;
         </Link>
       </div>
     );
@@ -183,7 +183,7 @@ export function DashboardCareerComparison({
 
   return (
     <div
-      aria-label={`Confronto carriere${presentation?.priority === "primary" ? " azione principale" : ""}`}
+      aria-label={`Confronto settori e ruoli${presentation?.priority === "primary" ? " azione principale" : ""}`}
       className={cn(
         "rounded-2xl border bg-card p-5 shadow-sm",
         presentation?.priority === "primary" ? "border-primary/35 bg-primary/5 shadow-primary/10" : "border-border",
@@ -196,7 +196,7 @@ export function DashboardCareerComparison({
         </div>
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Confronto carriere
+            Confronto settori e ruoli
           </p>
           <p className="text-xs text-muted-foreground/70">I tuoi 2 settori più compatibili a confronto</p>
         </div>
@@ -265,7 +265,7 @@ export function DashboardCareerComparison({
           href="/settori"
           className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
         >
-          Esplora tutti i settori <ArrowRight className="h-3 w-3" />
+          Confronta settori e scegli il ruolo <ArrowRight className="h-3 w-3" />
         </Link>
       </div>
     </div>

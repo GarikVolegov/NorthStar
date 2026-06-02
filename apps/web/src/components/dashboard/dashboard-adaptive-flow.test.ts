@@ -56,7 +56,7 @@ describe("dashboard adaptive flow", () => {
 
     expect(result.phase).toBe("compare_options");
     expect(result.nextAction).toEqual({
-      label: "Confronta opzioni",
+      label: "Confronta settori e ruoli",
       href: "/settori",
       sectionId: "career_comparison",
     });

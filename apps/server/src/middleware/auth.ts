@@ -51,6 +51,21 @@ interface JwtPayload {
   testSessionId: number | null;
 }
 
+type AuthUserRow = {
+  id: number;
+  name: string;
+  email: string;
+  role: string | null;
+  stripeSubscriptionId: string | null;
+  journeyType: string | null;
+  journeyDecidedAt: Date | null;
+  journeyDecisionSource: string | null;
+  testSessionId: number | null;
+  onboardingCompleted: boolean | null;
+  deletedAt: Date | null;
+  purgedAt: Date | null;
+};
+
 let jwksCache: { keys: Array<{ kid: string; n: string; e: string }> } | null =
   null;
 let jwksCacheTime = 0;
@@ -108,15 +123,52 @@ async function verifyClerkToken(
   }
 }
 
+async function findActiveUserForJwt(userId: number): Promise<AuthUserRow | null> {
+  const [user] = await db
+    .select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+      role: usersTable.role,
+      stripeSubscriptionId: usersTable.stripeSubscriptionId,
+      journeyType: usersTable.journeyType,
+      journeyDecidedAt: usersTable.journeyDecidedAt,
+      journeyDecisionSource: usersTable.journeyDecisionSource,
+      testSessionId: usersTable.testSessionId,
+      onboardingCompleted: usersTable.onboardingCompleted,
+      deletedAt: usersTable.deletedAt,
+      purgedAt: usersTable.purgedAt,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, userId))
+    .limit(1);
+
+  if (!user || user.deletedAt || user.purgedAt) return null;
+  return user;
+}
+
+function attachAuthUser(req: Request, user: AuthUserRow): void {
+  req.user = {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role === "admin" ? "admin" : "user",
+    stripeSubscriptionId: user.stripeSubscriptionId,
+    journeyType: user.journeyType,
+    journeyDecidedAt: user.journeyDecidedAt?.toISOString() ?? null,
+    journeyDecisionSource: user.journeyDecisionSource ?? null,
+    testSessionId: user.testSessionId,
+    onboardingCompleted: user.onboardingCompleted ?? false,
+  };
+
+  if (req.log) {
+    req.log = req.log.child({ userId: user.id });
+  }
+}
+
 /**
- * requireAuth — 0 DB queries.
- *
- * Stable user data (id, role, onboardingCompleted, journeyType,
- * stripeSubscriptionId, testSessionId) is embedded in the JWT at
- * login/register time and extracted here without hitting the database.
- *
- * Only the `/me` endpoint makes a DB query for full profile data that
- * changes frequently (preferences, avatar, timezone, etc.).
+ * requireAuth validates the token, then checks the user row so deleted or
+ * purged accounts cannot keep using previously issued JWTs.
  */
 export async function requireAuth(
   req: Request,
@@ -132,24 +184,15 @@ export async function requireAuth(
   const token = authHeader.slice(7);
   try {
     const payload = verify(token, JWT_SECRET) as unknown as JwtPayload;
+    const dbUser = await findActiveUserForJwt(payload.userId);
 
-    req.user = {
-      id: payload.userId,
-      name: payload.name,
-      email: payload.email,
-      role: payload.role,
-      stripeSubscriptionId: payload.stripeSubscriptionId,
-      journeyType: payload.journeyType,
-      journeyDecidedAt: payload.journeyDecidedAt ?? null,
-      journeyDecisionSource: payload.journeyDecisionSource ?? null,
-      testSessionId: payload.testSessionId,
-      onboardingCompleted: payload.onboardingCompleted,
-    };
-
-    if (req.log) {
-      req.log = req.log.child({ userId: payload.userId });
+    if (!dbUser) {
+      logSecurityEvent("auth_failed", { userId: payload.userId, ip: req.ip, detail: "user_not_active" });
+      res.status(401).json({ error: "Token non valido" });
+      return;
     }
 
+    attachAuthUser(req, dbUser);
     next();
   } catch {
     // Fallback: prova a verificare come Clerk JWT
@@ -383,22 +426,10 @@ export async function optionalAuth(
   const token = authHeader.slice(7);
   try {
     const payload = verify(token, JWT_SECRET) as unknown as JwtPayload;
+    const dbUser = await findActiveUserForJwt(payload.userId);
 
-    req.user = {
-      id: payload.userId,
-      name: payload.name,
-      email: payload.email,
-      role: payload.role,
-      stripeSubscriptionId: payload.stripeSubscriptionId,
-      journeyType: payload.journeyType,
-      journeyDecidedAt: payload.journeyDecidedAt ?? null,
-      journeyDecisionSource: payload.journeyDecisionSource ?? null,
-      testSessionId: payload.testSessionId,
-      onboardingCompleted: payload.onboardingCompleted,
-    };
-
-    if (req.log) {
-      req.log = req.log.child({ userId: payload.userId });
+    if (dbUser) {
+      attachAuthUser(req, dbUser);
     }
   } catch {
     const clerkPayload = await verifyClerkToken(token);

@@ -1,4 +1,5 @@
 import type { DashboardSession } from "@/hooks/useDashboardData";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import {
   BarChart3,
@@ -12,6 +13,7 @@ import {
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 
 type JourneyId = "indeciso" | "dipendente" | "autonomo" | "azienda" | "investitore";
@@ -33,7 +35,7 @@ const JOURNEY_META: Record<JourneyId, JourneyMeta> = {
   investitore: { icon: BarChart3,   headline: "Analizza le opportunità",  subline: "Aree, trend e dati di mercato",        color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30" },
 };
 
-function ClarityScoreRing({ score }: { score: number }) {
+function ClarityScoreRing({ score, label }: { score: number; label: string }) {
   const clamped = Math.max(0, Math.min(100, score));
   const radius = 20;
   const circumference = 2 * Math.PI * radius;
@@ -60,7 +62,7 @@ function ClarityScoreRing({ score }: { score: number }) {
         <span className="relative text-sm font-bold tabular-nums text-white">{clamped}%</span>
       </div>
       <span className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-white/50">
-        <Compass className="h-2.5 w-2.5" /> Chiarezza
+        <Compass className="h-2.5 w-2.5" /> {label}
       </span>
     </div>
   );
@@ -85,15 +87,80 @@ export function DashboardHero({
   sessionId?: number | null;
   clarityScore?: number;
 }) {
-  const meta = journeyType ? JOURNEY_META[journeyType as JourneyId] : null;
+  const { i18n } = useTranslation();
+  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
+  const journeyId = journeyType as JourneyId | undefined;
+  const meta = journeyId ? JOURNEY_META[journeyId] : null;
   const Icon = meta?.icon ?? HelpCircle;
   const isIndeciso = journeyType === "indeciso";
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Buongiorno" : hour < 18 ? "Buon pomeriggio" : "Buonasera";
+  const greetingKey = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
+  const greetingSource = hour < 12 ? "Buongiorno" : hour < 18 ? "Buon pomeriggio" : "Buonasera";
   const firstName = userName?.split(" ")[0] ?? "";
   const profileComplete = (profilePercent ?? 0) >= 100;
   const sectorHref = sessionId ? `/risultati/${sessionId}` : "/test";
+  const heroKey = meta && journeyId ? journeyId : "default";
+  const headline = useDynamicTranslation({
+    locale,
+    key: `dashboard.hero.${heroKey}.headline`,
+    source: meta?.headline ?? "Il tuo pannello di controllo",
+    context: "Dashboard hero headline for the user's journey type",
+  });
+  const subline = useDynamicTranslation({
+    locale,
+    key: `dashboard.hero.${heroKey}.subline`,
+    source: meta?.subline ?? "Organizza percorso, profilo e prossimi passi in un unico spazio.",
+    context: "Dashboard hero supporting copy for the user's journey type",
+  });
+  const greeting = useDynamicTranslation({
+    locale,
+    key: `dashboard.hero.greeting.${greetingKey}`,
+    source: greetingSource,
+    context: "Dashboard hero time-based greeting",
+  });
+  const clarityLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.hero.clarity",
+    source: "Chiarezza",
+    context: "Dashboard hero clarity score label",
+  });
+  const chooseJourneyLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.hero.chooseJourney",
+    source: "Scegli il percorso",
+    context: "Dashboard hero call to action for users without a journey type",
+  });
+  const chooseSectorRoleJobsLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.hero.chooseSectorRoleJobs",
+    source: "Scegli settore, ruolo e lavori",
+    context: "Dashboard hero call to action for undecided users after completing the test",
+  });
+  const startTestLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.hero.startTest",
+    source: "Inizia il test",
+    context: "Dashboard hero call to action for undecided users without a completed test",
+  });
+  const takeTestLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.hero.takeTest",
+    source: "Fai il test",
+    context: "Dashboard hero call to action to take the orientation test",
+  });
+  const sectorLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.hero.sector",
+    source: "Settore",
+    context: "Dashboard hero confirmed professional sector label",
+  });
+  const manageProLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.hero.managePro",
+    source: "Gestisci abbonamento Pro",
+    context: "Dashboard hero Pro subscription link aria label",
+  });
 
   return (
     <div className="overflow-hidden rounded-2xl border">
@@ -110,15 +177,15 @@ export function DashboardHero({
                     <Icon className={cn("h-5 w-5", meta.color)} />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-xl font-bold leading-tight text-white sm:text-2xl">{meta.headline}</h2>
-                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-white/60">{meta.subline}</p>
+                    <h2 className="text-xl font-bold leading-tight text-white sm:text-2xl">{headline}</h2>
+                    <p className="mt-1 max-w-xl text-sm leading-relaxed text-white/60">{subline}</p>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <h2 className="text-xl font-bold leading-tight text-white sm:text-2xl">Il tuo pannello di controllo</h2>
+                  <h2 className="text-xl font-bold leading-tight text-white sm:text-2xl">{headline}</h2>
                   <p className="mt-1 max-w-xl text-sm leading-relaxed text-white/60">
-                    Organizza percorso, profilo e prossimi passi in un unico spazio.
+                    {subline}
                   </p>
                 </div>
               )}
@@ -127,7 +194,7 @@ export function DashboardHero({
             <div className="flex flex-wrap items-center gap-3 lg:justify-end">
               {/* Clarity Score ring — only for indeciso */}
               {isIndeciso && clarityScore !== undefined && (
-                <ClarityScoreRing score={clarityScore} />
+                <ClarityScoreRing score={clarityScore} label={clarityLabel} />
               )}
 
               <div className="flex flex-wrap gap-2">
@@ -136,7 +203,7 @@ export function DashboardHero({
                     href="/percorso"
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                   >
-                    <MapPin className="h-3.5 w-3.5" /> Scegli il percorso
+                    <MapPin className="h-3.5 w-3.5" /> {chooseJourneyLabel}
                   </Link>
                 ) : (
                   <Link
@@ -152,14 +219,14 @@ export function DashboardHero({
                     href="/settori"
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/20 px-4 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                   >
-                    Scegli settore e ruolo →
+                    {chooseSectorRoleJobsLabel}
                   </Link>
                 ) : !session ? (
                   <Link
                     href="/test"
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/20 px-4 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                   >
-                    {isIndeciso ? "Inizia il test →" : "Fai il test"}
+                    {isIndeciso ? startTestLabel : takeTestLabel}
                   </Link>
                 ) : null}
               </div>
@@ -174,14 +241,14 @@ export function DashboardHero({
                   className="inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 transition-colors hover:border-white/35 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                 >
                   <Briefcase className="h-3.5 w-3.5 shrink-0" />
-                  <span className="text-white/50">Settore</span>
+                  <span className="text-white/50">{sectorLabel}</span>
                   <span className="truncate">{confirmedSectorName}</span>
                 </Link>
               )}
               {isPremium && (
                 <Link
                   href="/abbonamento"
-                  aria-label="Gestisci abbonamento Pro"
+                  aria-label={manageProLabel}
                   className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/15 px-3 py-2 text-xs font-semibold text-primary transition-colors hover:bg-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                 >
                   <Crown className="h-3.5 w-3.5" /> Pro

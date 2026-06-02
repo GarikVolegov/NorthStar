@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { z } from "zod/v4";
 import OpenAI from "openai";
-import { optionalAuth } from "../middleware/auth";
+import { optionalAuth, requireAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
 import {
   wendyLimiter,
@@ -417,7 +417,7 @@ const voiceSchema = z.object({
   instructions: z.string().max(2000).optional(),
 });
 
-router.post("/voice", optionalAuth, async (req: Request, res: Response) => {
+router.post("/voice", requireAuth, async (req: Request, res: Response) => {
   const data = voiceSchema.parse(req.body);
   const log = req.log;
 
@@ -450,7 +450,7 @@ router.post("/voice", optionalAuth, async (req: Request, res: Response) => {
     log.error({ err }, "wendy voice error");
     res
       .status(500)
-      .json({ error: "TTS generation failed", message: String(err) });
+      .json({ error: "Servizio voce temporaneamente non disponibile" });
   }
 });
 

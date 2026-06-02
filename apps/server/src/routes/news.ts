@@ -29,6 +29,7 @@ const NEWS_AUTO_REFRESH_COOLDOWN_MS = process.env.NODE_ENV === "test" || process
   : Number(process.env.NEWS_AUTO_REFRESH_COOLDOWN_MS) || 5 * 60 * 1000;
 type NewsFeedStatus = "ok" | "empty" | "partial" | "error";
 type NewsRefreshReason = "empty" | "stale";
+type NewsTranslationStatus = "translated" | "source" | "failed";
 
 type NewsRefreshResult = {
   attempted: boolean;
@@ -191,6 +192,17 @@ async function sendNewsUnavailable(res: Response) {
   sendNewsUnavailableWithDiagnostics(res, await buildNewsProviderDiagnostics());
 }
 
+function sendNewsTranslationUnavailable(res: Response, locale: NewsLocale) {
+  res.status(503).json({
+    news: [],
+    nextCursor: null,
+    source: "error",
+    status: "error" satisfies NewsFeedStatus,
+    error: "news_translation_unavailable",
+    requestedLocale: locale,
+  });
+}
+
 function newsSearchWhere(search: string): SQL<unknown> | undefined {
   if (!search) return undefined;
   const pattern = `%${search}%`;
@@ -278,11 +290,21 @@ async function selectNewsRows(
 
 type MappedNewsItem = ReturnType<typeof mapNewsItem>;
 type MappedNewsDetail = ReturnType<typeof mapNewsDetail>;
+type TranslationAwareNews = {
+  language?: NewsLocale;
+  translationStatus?: NewsTranslationStatus;
+};
+
+function isInRequestedNewsLocale(item: TranslationAwareNews, locale: NewsLocale): boolean {
+  if (locale === "it") return true;
+  return item.language === locale && item.translationStatus !== "source" && item.translationStatus !== "failed";
+}
 
 async function localizeNewsItems(rows: NewsArticleRow[], locale: NewsLocale): Promise<MappedNewsItem[]> {
   const baseItems = rows.map((article) => mapNewsItem(article, "it"));
   if (locale === "it") return baseItems;
-  return await Promise.all(baseItems.map((item) => translateNewsForLocale(item, locale)));
+  const localized = await Promise.all(baseItems.map((item) => translateNewsForLocale(item, locale)));
+  return localized.filter((item) => isInRequestedNewsLocale(item, locale));
 }
 
 async function localizeNewsDetail(row: NewsArticleRow, locale: NewsLocale): Promise<MappedNewsDetail> {
@@ -347,11 +369,16 @@ router.get("/", async (req, res) => {
         news = await localizeNewsItems(results.flatMap((r) => r.articles), locale);
       }
 
+      const sourceArticleCount = results.reduce((count, result) => count + result.articles.length, 0);
       const anyMore = results.some((r) => r.hasMore);
       const lastNews = news.at(-1);
       const errors = results.filter((r) => "error" in r).map(() => "news_unavailable");
       if (errors.length > 0 && news.length === 0) {
         await sendNewsUnavailable(res);
+        return;
+      }
+      if (locale !== "it" && sourceArticleCount > 0 && news.length === 0) {
+        sendNewsTranslationUnavailable(res, locale);
         return;
       }
       const status: NewsFeedStatus = errors.length > 0 ? "partial" : newsStatus(news.length);
@@ -372,20 +399,25 @@ router.get("/", async (req, res) => {
       const cacheKey = `news:recent:real:v3:${locale}`;
       const cached = await cacheGet<MappedNewsItem[]>(cacheKey);
       if (cached && cached.length > 0 && !isStaleMappedNewsItem(cached[0])) {
-        const status = newsStatus(cached.length);
+        const localizedCached = cached.filter((item) => isInRequestedNewsLocale(item, locale));
+        if (localizedCached.length === 0 && locale !== "it") {
+          await cacheSet(cacheKey, [], 1);
+        } else {
+        const status = newsStatus(localizedCached.length);
         const diagnostics = status === "empty" ? await buildNewsProviderDiagnostics() : undefined;
         if (diagnostics && isTotalProviderFailure(diagnostics)) {
           sendNewsUnavailableWithDiagnostics(res, diagnostics);
           return;
         }
         res.json({
-          news: cached,
+          news: localizedCached,
           nextCursor: null,
           source: "live",
           status,
           ...(diagnostics ? { diagnostics } : {}),
         });
         return;
+        }
       }
     }
 
@@ -416,6 +448,10 @@ router.get("/", async (req, res) => {
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
 
     const mapped = await localizeNewsItems(capped, locale);
+    if (locale !== "it" && capped.length > 0 && mapped.length === 0) {
+      sendNewsTranslationUnavailable(res, locale);
+      return;
+    }
 
     // Cache non-filtered first page
     if (!category && !cursor && !search) {
@@ -489,7 +525,16 @@ router.get("/article/:id", async (req, res) => {
       return;
     }
 
-    res.json({ article: await localizeNewsDetail(article, locale) });
+    const localizedArticle = await localizeNewsDetail(article, locale);
+    if (!isInRequestedNewsLocale(localizedArticle, locale)) {
+      res.status(503).json({
+        error: "news_translation_unavailable",
+        requestedLocale: locale,
+      });
+      return;
+    }
+
+    res.json({ article: localizedArticle });
   } catch (err) {
     req.log?.error?.({ err }, "news detail error");
     res.status(500).json({ error: "Unable to load news article" });
@@ -515,6 +560,10 @@ router.get("/sector/:sectorName", async (req, res) => {
     const hasMore = articles.length > limitNum;
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
     const mapped = await localizeNewsItems(capped, locale);
+    if (locale !== "it" && capped.length > 0 && mapped.length === 0) {
+      sendNewsTranslationUnavailable(res, locale);
+      return;
+    }
 
     const last = mapped[mapped.length - 1];
     const nextCursor = hasMore && last

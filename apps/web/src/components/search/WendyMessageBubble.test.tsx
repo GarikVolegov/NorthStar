@@ -3,6 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import type { ChatMessage } from "@/hooks/useWendyChat";
 import { WendyMessageBubble } from "./WendyMessageBubble";
 
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    i18n: { language: "en-US", resolvedLanguage: "en-US" },
+  }),
+}));
+
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: ({ key, source }: { key?: string; source: string }) =>
+    key ? `dynamic:${key}` : source,
+}));
+
 function assistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   return {
     id: "msg-1",
@@ -32,7 +43,7 @@ describe("WendyMessageBubble", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /prossimo passo/i }));
 
-    expect(screen.getByText("Continua con Wendy")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:wendy.message.followUps.heading")).toBeInTheDocument();
     expect(onFollowUpPrompt).toHaveBeenCalledWith(
       "Dimmi cosa fare oggi",
       expect.stringContaining("Ho letto il tuo profilo."),
@@ -54,13 +65,14 @@ describe("WendyMessageBubble", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /piano/i }));
+    fireEvent.click(screen.getByRole("button", { name: "dynamic:wendy.suggestedPrompts.transformPlan.label" }));
 
-    expect(screen.getByText("Continua con Wendy")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:wendy.message.followUps.heading")).toBeInTheDocument();
     expect(onFollowUpPrompt).toHaveBeenCalledWith(
-      expect.stringContaining("piano"),
+      "dynamic:wendy.suggestedPrompts.transformPlan.prompt",
       expect.stringContaining("Il tuo profilo mostra"),
     );
+    expect(screen.queryByRole("button", { name: "Trasforma in piano" })).not.toBeInTheDocument();
   });
 
   it("renders recovery next steps after Wendy error messages", () => {
@@ -79,11 +91,11 @@ describe("WendyMessageBubble", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /prossima mossa/i }));
+    fireEvent.click(screen.getByRole("button", { name: "dynamic:wendy.suggestedPrompts.nextConcreteMove.label" }));
 
-    expect(screen.getByText("Continua con Wendy")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:wendy.message.followUps.heading")).toBeInTheDocument();
     expect(onFollowUpPrompt).toHaveBeenCalledWith(
-      expect.stringContaining("prossima azione"),
+      "dynamic:wendy.suggestedPrompts.nextConcreteMove.prompt",
       expect.stringContaining("Wendy non ha risposto correttamente."),
     );
   });

@@ -61,7 +61,21 @@ router.get("/status", requireAuth, async (req, res) => {
       .where(eq(userProfileSettingsTable.userId, userId))
       .limit(1);
 
-    res.json({ onboardingStep: profile?.onboardingStep ?? 0 });
+    const [user] = await db
+      .select({ onboardingCompleted: usersTable.onboardingCompleted })
+      .from(usersTable)
+      .where(eq(usersTable.id, userId))
+      .limit(1);
+
+    const profileStep = profile?.onboardingStep ?? 0;
+    const onboardingCompleted =
+      Boolean(user?.onboardingCompleted ?? req.user?.onboardingCompleted) ||
+      profileStep >= 4;
+
+    res.json({
+      onboardingCompleted,
+      onboardingStep: onboardingCompleted ? 4 : profileStep,
+    });
   } catch (e) {
     log.error({ e, userId }, "[onboarding] status error");
     res.status(500).json({ error: "Errore nel recupero status onboarding" });

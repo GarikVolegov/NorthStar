@@ -20,6 +20,7 @@ import interviewRouter from "./routes/interview";
 import authRouter from "./routes/auth";
 import statsRouter from "./routes/stats";
 import newsRouter from "./routes/news";
+import i18nRouter from "./routes/i18n";
 import newsSubsRouter from "./routes/news-subs";
 import trendingRouter from "./routes/trending";
 import voiceRouter from "./routes/voice";
@@ -100,6 +101,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/health", router: healthRouter, auth: "public", rateLimit: "none", description: "Liveness e readiness" },
   { path: "/api/healthz", router: healthRouter, auth: "public", rateLimit: "none", description: "Alias compat readiness" },
   { path: "/api/wiki", router: wikiRouter, auth: "public", description: "Wiki pubblico" },
+  { path: "/api/i18n", router: i18nRouter, auth: "public", description: "Traduzioni dinamiche UI" },
   { path: "/api/news", router: newsRouter, auth: "public", description: "News pubbliche" },
   { path: "/api/news/subscriptions", router: newsSubsRouter, auth: "public", description: "News subscriptions" },
   { path: "/api/trending-sectors", router: trendingRouter, auth: "public", description: "Settori trending" },

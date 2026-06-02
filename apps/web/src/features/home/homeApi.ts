@@ -1,14 +1,19 @@
 import { getJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { BASE } from "./homeConstants";
 import type { HomeNewsItem, LatestResult, TrendingSector } from "./homeTypes";
 
 export function useHomeNews() {
+  const { i18n } = useTranslation();
+  const activeLanguage =
+    i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
+
   return useQuery<{ news: HomeNewsItem[] }>({
-    queryKey: ["home-news"],
+    queryKey: ["home-news", activeLanguage],
     queryFn: () =>
       getJson<{ news: HomeNewsItem[] }>(
-        `${BASE}api/news?multi=true&categories=technology,business,education&perCategory=1`,
+        `${BASE}api/news?multi=true&categories=technology,business,education&perCategory=1&locale=${encodeURIComponent(activeLanguage)}`,
       ),
     staleTime: 600_000,
   });

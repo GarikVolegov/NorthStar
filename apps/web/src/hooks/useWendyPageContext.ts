@@ -4,7 +4,7 @@
  * Esteso per supportare il formato WendyPageContext del router (entityType, entityId, ecc.)
  * Compatibile con il WendyProvider esistente tramite il campo `data`.
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useWendy, type PageContext } from '../contexts/WendyProvider';
 
 export interface WendyPageContextInput {
@@ -31,6 +31,47 @@ export interface WendyPageContextInput {
   readinessBand?: string | undefined;
 }
 
+function listKey(values: string[] | undefined): string {
+  return values ? `list:${values.join("\u001f")}` : "none";
+}
+
+function actionKey(action: WendyPageContextInput["adaptiveNextAction"]): string {
+  return action ? `action:${[action.label, action.href, action.sectionId ?? ""].join("\u001f")}` : "none";
+}
+
+function useStableList(values: string[] | undefined): string[] | undefined {
+  const key = listKey(values);
+  const ref = useRef<{ key: string; value: string[] | undefined }>({
+    key,
+    value: values,
+  });
+
+  if (ref.current.key !== key) {
+    ref.current = { key, value: values };
+  }
+
+  return ref.current.value;
+}
+
+function useStableAdaptiveNextAction(
+  action: WendyPageContextInput["adaptiveNextAction"],
+): WendyPageContextInput["adaptiveNextAction"] {
+  const key = actionKey(action);
+  const ref = useRef<{
+    key: string;
+    value: WendyPageContextInput["adaptiveNextAction"];
+  }>({
+    key,
+    value: action,
+  });
+
+  if (ref.current.key !== key) {
+    ref.current = { key, value: action };
+  }
+
+  return ref.current.value;
+}
+
 /**
  * Imposta il contesto Wendy per la pagina corrente.
  * Si resetta a "default" quando il componente viene smontato.
@@ -47,6 +88,10 @@ export interface WendyPageContextInput {
  */
 export function useWendyPageContext(ctx: WendyPageContextInput): void {
   const { setPageContext } = useWendy();
+  const capabilities = useStableList(ctx.capabilities);
+  const fields = useStableList(ctx.fields);
+  const actions = useStableList(ctx.actions);
+  const adaptiveNextAction = useStableAdaptiveNextAction(ctx.adaptiveNextAction);
 
   useEffect(() => {
     const pageCtx: PageContext = {
@@ -57,14 +102,14 @@ export function useWendyPageContext(ctx: WendyPageContextInput): void {
         entityId:    ctx.entityId,
         entityName:  ctx.entityName,
         journeyType: ctx.journeyType,
-        capabilities: ctx.capabilities,
-        fields:       ctx.fields,
-        actions:      ctx.actions,
+        capabilities,
+        fields,
+        actions,
         sector:       ctx.sector,
         roleTitle:    ctx.roleTitle,
         currentTryADayScene: ctx.currentTryADayScene,
         adaptivePhase: ctx.adaptivePhase,
-        adaptiveNextAction: ctx.adaptiveNextAction,
+        adaptiveNextAction,
         clarityScore: ctx.clarityScore,
         savedSectorsCount: ctx.savedSectorsCount,
         readinessBand: ctx.readinessBand,
@@ -79,14 +124,14 @@ export function useWendyPageContext(ctx: WendyPageContextInput): void {
     ctx.entityId,
     ctx.entityName,
     ctx.journeyType,
-    ctx.capabilities,
-    ctx.fields,
-    ctx.actions,
+    capabilities,
+    fields,
+    actions,
     ctx.sector,
     ctx.roleTitle,
     ctx.currentTryADayScene,
     ctx.adaptivePhase,
-    ctx.adaptiveNextAction,
+    adaptiveNextAction,
     ctx.clarityScore,
     ctx.savedSectorsCount,
     ctx.readinessBand,

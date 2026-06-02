@@ -3,6 +3,7 @@ import request from "supertest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const executeWendyToolCallMock = vi.hoisted(() => vi.fn());
+const getLLMForRouteMock = vi.hoisted(() => vi.fn());
 const agentRegistryMock = vi.hoisted(() => ({
   getSnapshot: vi.fn(),
   update: vi.fn(),
@@ -97,7 +98,7 @@ vi.mock("@workspace/ai-server", async (importOriginal) => {
     ensureWendyConfigFresh: vi.fn(async () => undefined),
     evaluateWendyResponse: vi.fn(() => ({ ok: true, score: 1, issues: [] })),
     getEffectivePlan: vi.fn(async () => "free"),
-    getLLMForRoute: vi.fn(),
+    getLLMForRoute: getLLMForRouteMock,
     isLlmConfigured: vi.fn(() => true),
     loadMemory: vi.fn(async () => null),
     loadRecentSummaries: vi.fn(async () => []),
@@ -150,31 +151,34 @@ describe("ai Wendy route fallbacks", () => {
       }
       return { ok: true, data: { updated: true } };
     });
+    // Wendy must always reason through the LLM — never recite prescribed text.
+    getLLMForRouteMock.mockReturnValue({
+      chatWithTools: vi.fn(async () => ({
+        content: "RAGIONAMENTO_LLM_OK: partiamo dal passo piu utile per oggi.",
+        finishReason: "stop",
+        toolCalls: [],
+      })),
+      chatOnce: vi.fn(async () => "RAGIONAMENTO_LLM_OK"),
+      chat: vi.fn(),
+    });
   });
 
-  it("streams token, done, and coherent suggested prompts for Italian data-backed fallback actions", async () => {
+  it("reasons through the LLM (no prescribed reply) even for greetings and identity questions", async () => {
     const response = await request(app())
       .post("/api/ai/wendy")
       .set("Authorization", "Bearer test-token")
-      .send({ message: "Cosa dovrei fare oggi?", locale: "en" })
+      .send({ message: "chi sei?", locale: "it" })
       .expect(200);
 
     const events = parseSse(response.text);
     const token = events.find((event) => event.type === "token");
     const done = events.find((event) => event.type === "done");
 
-    expect(token?.value).toContain("Finire il portfolio");
-    expect(done).toMatchObject({
-      answerMode: "local-quick-action",
-      suggestedPrompts: expect.any(Array),
-    });
-    expect(done?.suggestedPrompts).toHaveLength(3);
-    expect(done?.suggestedPrompts).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ label: "Aggiorna obiettivo" }),
-      ]),
-    );
-    expect(JSON.stringify(done?.suggestedPrompts)).toMatch(/oggi|25 minuti|obiettivo/i);
+    // The answer comes from the LLM, not from a hardcoded template.
+    expect(getLLMForRouteMock).toHaveBeenCalled();
+    expect(token?.value).toContain("RAGIONAMENTO_LLM_OK");
+    expect(done).toMatchObject({ answerMode: "llm-fast-path" });
+    expect(typeof done?.requestId).toBe("string");
     expect(response.text).toMatch(/\n\ndata: \{"type":"done"/);
     expect(agentRegistryMock.clear).toHaveBeenCalled();
   });

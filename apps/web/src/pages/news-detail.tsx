@@ -1,6 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { readNewsErrorCode } from "@/features/news/newsModels";
 import { apiFetch } from "@/lib/api-fetch";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { usePageMeta } from "@/lib/seo";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -11,6 +13,7 @@ import {
   RefreshCw,
   Tag,
 } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useRoute } from "wouter";
 
@@ -95,18 +98,45 @@ function renderMeaningSections(
   ));
 }
 
+function dynamicMetadataKey(type: "sector" | "tag", value: string): string {
+  return `news.detail.${type}.${value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`;
+}
+
+function DynamicMetadataLabel({ locale, type, value }: { locale: string; type: "sector" | "tag"; value: string }) {
+  const label = useDynamicTranslation({
+    locale,
+    key: dynamicMetadataKey(type, value),
+    source: value,
+    context: `News detail ${type} metadata label`,
+  });
+  return <>{label}</>;
+}
+
+async function readResponseErrorBody(res: Response): Promise<unknown> {
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
 export default function NewsDetail() {
   const { t, i18n } = useTranslation();
   const [, params] = useRoute("/news/:id");
   const id = params?.id;
   const newsLocale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
+  const [imageFailed, setImageFailed] = useState(false);
 
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["news-detail", id, newsLocale],
     queryFn: async () => {
       const localeParam = `?locale=${encodeURIComponent(newsLocale)}`;
       const res = await apiFetch(`${BASE}api/news/article/${id}${localeParam}`);
-      if (!res.ok) throw new Error("news detail error");
+      if (!res.ok) {
+        const body = await readResponseErrorBody(res);
+        const code = body && typeof body === "object" ? (body as { error?: unknown }).error : undefined;
+        throw Object.assign(new Error(typeof code === "string" ? code : "news detail error"), { body });
+      }
       return res.json() as Promise<{ article: NewsDetailItem }>;
     },
     enabled: Boolean(id),
@@ -114,6 +144,8 @@ export default function NewsDetail() {
   });
 
   const article = data?.article;
+  const detailLocale = i18n.resolvedLanguage ?? i18n.language ?? "it";
+  const translationUnavailable = readNewsErrorCode(error) === "news_translation_unavailable";
 
   usePageMeta({
     title: article?.title ?? t("news.title"),
@@ -145,10 +177,10 @@ export default function NewsDetail() {
         <div className="container mx-auto max-w-3xl px-4 py-16 text-center">
           <Newspaper className="mx-auto mb-4 h-12 w-12 text-muted-foreground/40" />
           <h1 className="mb-2 text-2xl font-semibold text-foreground">
-            {t("news.detail.unavailableTitle")}
+            {translationUnavailable ? t("news.translationUnavailable.title") : t("news.detail.unavailableTitle")}
           </h1>
           <p className="mb-6 text-muted-foreground">
-            {t("news.detail.unavailableDesc")}
+            {translationUnavailable ? t("news.translationUnavailable.desc") : t("news.detail.unavailableDesc")}
           </p>
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Button
@@ -186,11 +218,15 @@ export default function NewsDetail() {
         </Button>
 
         <div className="mb-6 flex flex-wrap items-center gap-2">
-          <Badge variant="secondary">{article.category}</Badge>
-          {article.sector && <Badge variant="outline">{article.sector}</Badge>}
+          <Badge variant="secondary">{t(`news.categories.${article.category}`, { defaultValue: article.category })}</Badge>
+          {article.sector && (
+            <Badge variant="outline">
+              <DynamicMetadataLabel locale={detailLocale} type="sector" value={article.sector} />
+            </Badge>
+          )}
           <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
             <CalendarDays className="h-4 w-4" />
-            {formatDate(article.publishedAt, i18n.resolvedLanguage ?? i18n.language ?? "it")}
+            {formatDate(article.publishedAt, detailLocale)}
           </span>
         </div>
 
@@ -202,17 +238,23 @@ export default function NewsDetail() {
           {article.preview || article.description}
         </p>
 
-        {article.image ? (
+        {article.image && !imageFailed ? (
           <div className="mb-8 aspect-video overflow-hidden rounded-2xl border border-border bg-muted">
             <img
               src={article.image}
               alt={article.title}
               className="h-full w-full object-cover"
               loading="eager"
+              onError={() => setImageFailed(true)}
             />
           </div>
         ) : (
-          <div className="mb-8 aspect-video rounded-2xl border border-border bg-muted/60 flex items-center justify-center">
+          <div
+            data-testid="news-detail-image-fallback"
+            role="img"
+            aria-label={article.title}
+            className="mb-8 aspect-video rounded-2xl border border-border bg-muted/60 flex items-center justify-center"
+          >
             <Newspaper className="h-14 w-14 text-muted-foreground/40" />
           </div>
         )}
@@ -222,7 +264,7 @@ export default function NewsDetail() {
           {article.tags.slice(0, 4).map((tag) => (
             <span key={tag} className="inline-flex items-center gap-1">
               <Tag className="h-3.5 w-3.5" />
-              {tag}
+              <DynamicMetadataLabel locale={detailLocale} type="tag" value={tag} />
             </span>
           ))}
         </div>

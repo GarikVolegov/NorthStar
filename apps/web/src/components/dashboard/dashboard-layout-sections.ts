@@ -6,29 +6,47 @@ export interface DashboardSectionDefinition {
   id: string;
   label: string;
   description: string;
+  labelKey: string;
+  descriptionKey: string;
   size: WidgetLayout["size"];
 }
 
+function defineDashboardSection(
+  id: string,
+  label: string,
+  description: string,
+  size: WidgetLayout["size"],
+): DashboardSectionDefinition {
+  return {
+    id,
+    label,
+    description,
+    labelKey: `dashboard.layout.sections.${id}.label`,
+    descriptionKey: `dashboard.layout.sections.${id}.description`,
+    size,
+  };
+}
+
 const INDECISO_SECTIONS: DashboardSectionDefinition[] = [
-  { id: "clarity_path", label: "Mappa della chiarezza", description: "Stato della scelta e prossimi passi.", size: "lg" },
-  { id: "next_routine", label: "Prossima routine", description: "La prossima automazione personale configurabile con Wendy.", size: "md" },
-  { id: "discovery_feed", label: "Settori consigliati", description: "Settori suggeriti e salvabili per esplorare nuove direzioni.", size: "lg" },
-  { id: "personality", label: "Profilo personale", description: "Profilo, segnali e indicatori personali.", size: "md" },
-  { id: "career_comparison", label: "Confronto carriere", description: "Comparazione fra due percorsi consigliati.", size: "lg" },
-  { id: "wendy_prompts", label: "Prompt Wendy", description: "Azioni rapide per farti guidare da Wendy.", size: "lg" },
-  { id: "tools", label: "Strumenti del percorso", description: "Strumenti disponibili per il tuo percorso.", size: "lg" },
-  { id: "analysis", label: "Analisi personalizzata", description: "Professioni e modalita di lavoro suggerite dall'AI.", size: "lg" },
+  defineDashboardSection("clarity_path", "Mappa della chiarezza", "Stato della scelta e prossimi passi.", "lg"),
+  defineDashboardSection("next_routine", "Prossima routine", "La prossima automazione personale configurabile con Wendy.", "md"),
+  defineDashboardSection("discovery_feed", "Scelta settore e ruolo", "Settori consigliati con accesso ai ruoli target e ai lavori reali.", "lg"),
+  defineDashboardSection("personality", "Profilo personale", "Profilo, segnali e indicatori personali.", "md"),
+  defineDashboardSection("career_comparison", "Confronto carriere", "Comparazione fra due percorsi consigliati.", "lg"),
+  defineDashboardSection("wendy_prompts", "Prompt Wendy", "Azioni rapide per farti guidare da Wendy.", "lg"),
+  defineDashboardSection("tools", "Strumenti del percorso", "Strumenti disponibili per il tuo percorso.", "lg"),
+  defineDashboardSection("analysis", "Ruoli e competenze target", "Professioni, competenze e modalita di lavoro da collegare alla ricerca.", "lg"),
 ];
 
 const STANDARD_SECTIONS: DashboardSectionDefinition[] = [
-  { id: "kpi_strip", label: "Indicatori principali", description: "Progressi, settore, obiettivi e stato del profilo.", size: "lg" },
-  { id: "next_routine", label: "Prossima routine", description: "La prossima automazione personale configurabile con Wendy.", size: "md" },
-  { id: "week_timeline", label: "Timeline settimanale", description: "Eventi, obiettivi e prossima azione.", size: "lg" },
-  { id: "diary_objectives", label: "Diario e obiettivi", description: "Diario personale e avanzamento degli obiettivi.", size: "lg" },
-  { id: "personality", label: "Profilo personale", description: "Profilo, segnali e indicatori personali.", size: "md" },
-  { id: "wendy_insights", label: "Insight da Wendy", description: "Insight proattivi recenti da Wendy.", size: "md" },
-  { id: "tools", label: "Strumenti del percorso", description: "Strumenti disponibili per il tuo percorso.", size: "lg" },
-  { id: "analysis", label: "Analisi personalizzata", description: "Professioni e modalita di lavoro suggerite dall'AI.", size: "lg" },
+  defineDashboardSection("kpi_strip", "Indicatori principali", "Progressi, settore, obiettivi e stato del profilo.", "lg"),
+  defineDashboardSection("next_routine", "Prossima routine", "La prossima automazione personale configurabile con Wendy.", "md"),
+  defineDashboardSection("week_timeline", "Timeline settimanale", "Eventi, obiettivi e prossima azione.", "lg"),
+  defineDashboardSection("diary_objectives", "Diario e obiettivi", "Diario personale e avanzamento degli obiettivi.", "lg"),
+  defineDashboardSection("personality", "Profilo personale", "Profilo, segnali e indicatori personali.", "md"),
+  defineDashboardSection("wendy_insights", "Insight da Wendy", "Insight proattivi recenti da Wendy.", "md"),
+  defineDashboardSection("tools", "Strumenti del percorso", "Strumenti disponibili per il tuo percorso.", "lg"),
+  defineDashboardSection("analysis", "Ruoli e competenze target", "Professioni, competenze e modalita di lavoro da collegare alla ricerca.", "lg"),
 ];
 
 export function getDashboardJourneyLayout(journeyType?: string | null): DashboardJourneyLayout {

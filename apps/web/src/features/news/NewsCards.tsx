@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFavorites } from "@/hooks/useFavorites";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { AlertCircle, Bell, BellOff, Bookmark, BookmarkCheck, Clock, ExternalLink, Sparkles } from "lucide-react";
 import { useState } from "react";
@@ -32,18 +33,43 @@ const DIAGNOSTIC_STATUS_LABELS: Record<NonNullable<NewsFeedResponse["diagnostics
   unavailable: "Stato non disponibile",
 };
 
-function CategoryFallbackImage({ category, emoji }: { category: string; emoji: string }) {
+function useNewsDynamicText(locale: string, key: string, source: string, context = "News UI copy") {
+  return useDynamicTranslation({ locale, key, source, context });
+}
+
+function CategoryFallbackImage({ category, emoji, title, label }: { category: string; emoji: string; title: string; label: string }) {
   const config = CATEGORY_CONFIG.find((c) => c.id === category);
   return (
-    <div className={`aspect-video bg-gradient-to-br ${config?.gradient ?? "from-muted to-muted/50"} flex items-center justify-center`}>
-      <span className="text-4xl opacity-60">{emoji}</span>
+    <div
+      className={`aspect-video bg-gradient-to-br ${config?.gradient ?? "from-muted to-muted/50"} flex items-center justify-center`}
+      role="img"
+      aria-label={`${label}: ${title}`}
+    >
+      <span className="text-4xl opacity-60" aria-hidden="true">{emoji}</span>
     </div>
   );
 }
 
 export function NewsDiagnosticsPanel({ diagnostics }: { diagnostics: NonNullable<NewsFeedResponse["diagnostics"]> }) {
-  const { t } = useTranslation();
+  const { i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? i18n.language ?? "it";
   const tone = diagnosticTone(diagnostics.providerStatus);
+  const statusLabel = useNewsDynamicText(locale, `news.diagnostics.status.${diagnostics.providerStatus}`, DIAGNOSTIC_STATUS_LABELS[diagnostics.providerStatus]);
+  const actionLabel = useNewsDynamicText(locale, `news.diagnostics.${diagnostics.refreshAction}`, DIAGNOSTIC_ACTION_LABELS[diagnostics.refreshAction]);
+  const message = useNewsDynamicText(
+    locale,
+    "news.diagnostics.message",
+    diagnostics.message,
+    "News provider diagnostic message shown when the feed has issues",
+  );
+  const enabledSourcesLabel = useNewsDynamicText(locale, "news.diagnostics.enabledSources", "Fonti attive");
+  const sourcesWithErrorsLabel = useNewsDynamicText(locale, "news.diagnostics.sourcesWithErrors", "Con errori");
+  const lastAttemptLabel = useNewsDynamicText(locale, "news.diagnostics.lastAttempt", "Ultimo tentativo");
+  const noAttemptLabel = useNewsDynamicText(locale, "news.diagnostics.noAttempt", "Non registrato");
+  const lastRefreshErrorLabel = useNewsDynamicText(locale, "news.diagnostics.lastRefreshError", "Ultimo errore refresh");
+  const lastAttemptValue = diagnostics.lastAttemptAt
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(new Date(diagnostics.lastAttemptAt))
+    : noAttemptLabel;
 
   return (
     <div className={cn("mx-auto mt-5 max-w-xl rounded-2xl border px-5 py-4 text-left", tone)} role="status">
@@ -52,43 +78,37 @@ export function NewsDiagnosticsPanel({ diagnostics }: { diagnostics: NonNullable
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-background/70 px-2.5 py-1 text-xs font-semibold">
-              {t(`news.diagnostics.status.${diagnostics.providerStatus}`, {
-                defaultValue: DIAGNOSTIC_STATUS_LABELS[diagnostics.providerStatus],
-              })}
+              {statusLabel}
             </span>
             <span className="rounded-full bg-background/70 px-2.5 py-1 text-xs font-medium">
-              {t(`news.diagnostics.${diagnostics.refreshAction}`, {
-                defaultValue: DIAGNOSTIC_ACTION_LABELS[diagnostics.refreshAction],
-              })}
+              {actionLabel}
             </span>
           </div>
           <p className="mt-3 text-sm font-medium text-foreground">
-            {diagnostics.message}
+            {message}
           </p>
         </div>
       </div>
 
       <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
         <div className="rounded-lg bg-background/65 px-3 py-2">
-          <p className="text-muted-foreground">{t("news.diagnostics.enabledSources", { defaultValue: "Fonti attive" })}</p>
+          <p className="text-muted-foreground">{enabledSourcesLabel}</p>
           <p className="font-semibold text-foreground">{diagnostics.enabledSources}</p>
         </div>
         <div className="rounded-lg bg-background/65 px-3 py-2">
-          <p className="text-muted-foreground">{t("news.diagnostics.sourcesWithErrors", { defaultValue: "Con errori" })}</p>
+          <p className="text-muted-foreground">{sourcesWithErrorsLabel}</p>
           <p className="font-semibold text-foreground">{diagnostics.sourcesWithErrors}</p>
         </div>
         <div className="rounded-lg bg-background/65 px-3 py-2">
-          <p className="text-muted-foreground">{t("news.diagnostics.lastAttempt", { defaultValue: "Ultimo tentativo" })}</p>
+          <p className="text-muted-foreground">{lastAttemptLabel}</p>
           <p className="font-semibold text-foreground">
-            {diagnostics.lastAttemptAt
-              ? new Date(diagnostics.lastAttemptAt).toLocaleString("it-IT")
-              : t("news.diagnostics.noAttempt", { defaultValue: "Non registrato" })}
+            {lastAttemptValue}
           </p>
         </div>
       </div>
       {diagnostics.lastRefreshError && (
         <p className="mt-3 break-words rounded-lg bg-background/65 px-3 py-2 text-xs font-medium text-foreground">
-          {t("news.diagnostics.lastRefreshError", { defaultValue: "Ultimo errore refresh" })}: {diagnostics.lastRefreshError}
+          {lastRefreshErrorLabel}: {diagnostics.lastRefreshError}
         </p>
       )}
     </div>
@@ -117,7 +137,8 @@ export function SubscribeToggle({ category, subscribed, onToggle }: { category: 
 }
 
 export function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? i18n.language ?? "it";
   const [imageFailed, setImageFailed] = useState(false);
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -128,6 +149,7 @@ export function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?
   const detailHref = item.detailUrl ?? `/news/${item.id}`;
   const preview = item.preview ?? item.description;
   const sourceHref = item.sourceUrl ?? item.url;
+  const fallbackImageLabel = useNewsDynamicText(locale, "news.card.fallbackImage", "Immagine notizia");
   const meaningSections = item.meaning?.sections ?? (item.meaning ? [
     { key: "audience" as const, body: item.meaning.audience ?? "" },
     { key: "happened" as const, body: item.meaning.happened ?? preview ?? "" },
@@ -182,7 +204,7 @@ export function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?
           />
         </div>
       ) : (
-        <CategoryFallbackImage category={item.category} emoji={config?.emoji ?? "📰"} />
+        <CategoryFallbackImage category={item.category} emoji={config?.emoji ?? "NEWS"} title={item.title} label={fallbackImageLabel} />
       )}
       <div className="p-5 flex flex-col flex-1">
         <div className="flex items-center justify-between gap-2 mb-3">
@@ -236,7 +258,7 @@ export function NewsCard({ item, showSave = false }: { item: NewsItem; showSave?
             onClick={(e) => e.stopPropagation()}
             className="inline-flex min-h-11 items-center gap-1.5 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md px-2"
           >
-            Fonte <ExternalLink className="h-3 w-3" />
+            {t("news.openSource")} <ExternalLink className="h-3 w-3" />
           </a>
         </div>
       </div>

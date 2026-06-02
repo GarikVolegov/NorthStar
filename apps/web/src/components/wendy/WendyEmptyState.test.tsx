@@ -1,5 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+
+const useDynamicTranslationMock = vi.hoisted(() => vi.fn());
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    i18n: { language: 'en-US', resolvedLanguage: 'en-US' },
+  }),
+}));
+
+vi.mock('@/lib/dynamic-translation', () => ({
+  useDynamicTranslation: useDynamicTranslationMock,
+}));
+
 import {
   WendyEmptyState,
   _resetWendyEmptyStateForTest,
@@ -8,22 +21,29 @@ import {
 describe('WendyEmptyState', () => {
   beforeEach(() => {
     _resetWendyEmptyStateForTest();
+    useDynamicTranslationMock.mockImplementation(
+      ({ key, source }: { key?: string; source: string }) => key ? `dynamic:${key}` : source,
+    );
   });
 
   afterEach(() => {
     _resetWendyEmptyStateForTest();
+    vi.clearAllMocks();
   });
 
-  it('renders capability cards on first show', () => {
+  it('renders capability cards through dynamic translations on first show', () => {
     render(
       <WendyEmptyState
         starterPrompts={[]}
         onPromptSelect={() => undefined}
       />,
     );
-    expect(screen.getByText('Ti conosco')).toBeInTheDocument();
-    expect(screen.getByText('Mercato live')).toBeInTheDocument();
-    expect(screen.getByText('Agisco per te')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'dynamic:wendy.empty.regionLabel' })).toBeInTheDocument();
+    expect(screen.getByText('dynamic:wendy.empty.title')).toBeInTheDocument();
+    expect(screen.getByText('dynamic:wendy.empty.subtitle')).toBeInTheDocument();
+    expect(screen.getByText('dynamic:wendy.empty.capabilities.knowsYou.title')).toBeInTheDocument();
+    expect(screen.getByText('dynamic:wendy.empty.capabilities.marketLive.title')).toBeInTheDocument();
+    expect(screen.getByText('dynamic:wendy.empty.capabilities.actsForYou.title')).toBeInTheDocument();
   });
 
   it('renders starter prompts and forwards click to onPromptSelect', () => {
@@ -49,12 +69,10 @@ describe('WendyEmptyState', () => {
     const { rerender } = render(
       <WendyEmptyState starterPrompts={[]} onPromptSelect={() => undefined} />,
     );
-    const dismiss = screen.getByRole('button', {
-      name: /Nascondi la presentazione/i,
-    });
+    const dismiss = screen.getByRole('button', { name: 'dynamic:wendy.empty.dismiss' });
     fireEvent.click(dismiss);
     // Lo stato è dismissed → ri-render senza capability cards
-    expect(screen.queryByText('Ti conosco')).not.toBeInTheDocument();
+    expect(screen.queryByText('dynamic:wendy.empty.capabilities.knowsYou.title')).not.toBeInTheDocument();
 
     // Un nuovo render legge da localStorage e parte già dismissed
     rerender(
@@ -63,7 +81,7 @@ describe('WendyEmptyState', () => {
         onPromptSelect={() => undefined}
       />,
     );
-    expect(screen.queryByText('Ti conosco')).not.toBeInTheDocument();
+    expect(screen.queryByText('dynamic:wendy.empty.capabilities.knowsYou.title')).not.toBeInTheDocument();
     // ma i starter prompts restano visibili
     expect(screen.getByRole('button', { name: /Prova/i })).toBeInTheDocument();
   });
@@ -75,6 +93,6 @@ describe('WendyEmptyState', () => {
         onPromptSelect={() => undefined}
       />,
     );
-    expect(screen.queryByText(/Prova a chiedermi/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('dynamic:wendy.empty.startWith')).not.toBeInTheDocument();
   });
 });

@@ -33,6 +33,11 @@ import type { EvalResult } from "./self-evaluator";
 import type { Domain, RouteDecision } from "./router-agent";
 import { selectModelFor, modelFor } from "../model-router";
 import { wendyConfig } from "../config/wendy";
+import { getToolsForIntent, toolsToOpenAIFormat } from "../wendy-router/tool-registry";
+import { executeToolCall } from "../wendy-router/tool-handlers";
+import { isClientSideToolData } from "./tool-args";
+import type { WendyIntent } from "../wendy-router/types";
+import type { GrowthAgentToolExecutor } from "./agent-types";
 
 /**
  * @deprecated reflects the *baseline* (non-premium) model. The actual model is
@@ -76,11 +81,14 @@ export interface SpecialistRunOptions {
   requestId?:            string | undefined;
   behavioralPatterns?:   Array<{ patternType: string; description: string; confidence: number }> | undefined;
   routingHistorySummary?: string | undefined;
+  wendyIntent?:          WendyIntent | undefined;
+  executeExternalTool?:  GrowthAgentToolExecutor | undefined;
 }
 
 export type SpecialistEvent =
   | { type: "token";  value: string }
   | { type: "status"; value: string }           // ← NEW v4
+  | { type: "tool_call"; name: string; result: unknown }
   | { type: "done";   sources: RetrievedChunk[]; cot?: CoTResult | null | undefined; evalResult?: EvalResult | undefined; routeDecision: RouteDecision; supervisorResult?: SupervisorResult | undefined }
   | { type: "error";  message: string };
 
@@ -216,24 +224,76 @@ export abstract class SpecialistAgent {
       });
 
       const llm = getLLMForRoute({ provider: route.provider });
-      const draft = await llm.chatOnce(messages, {
-        model: route.model,
-        temperature,
-        maxTokens: evalResult.level === "low" ? sc.maxTokensLow : sc.maxTokensHigh,
-      });
+      const maxTokens = evalResult.level === "low" ? sc.maxTokensLow : sc.maxTokensHigh;
 
-      // ── 6. Supervisor gate ──────────────────────────────────────────────────
-      const supervisorInput = { userMessage: analysisMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
-      let supervisorResult  = await supervisorAgent.evaluate(supervisorInput);
-      let finalText         = draft;
+      // ── 6. Generazione con loop di tool multi-step ──────────────────────────
+      // Parità con il growth agent: lo specialista ora legge/scrive dati reali
+      // via i tool dell'app (mercato, bussola, obiettivi, RAG) invece di andare a
+      // memoria. Se non ci sono tool per l'intent (es. handoff parallelo senza
+      // wendyIntent), torna alla generazione testuale storica.
+      const wendyTools = opts.wendyIntent
+        ? toolsToOpenAIFormat(getToolsForIntent(opts.wendyIntent))
+        : [];
+      const toolExecutor = opts.executeExternalTool ?? executeToolCall;
 
-      if (!supervisorResult.pass) {
-        yield { type: "status", value: "🔄 Revisione qualità in corso..." };
-        logger.info({ domain: this.DOMAIN, supervisorScore: supervisorResult.score }, "specialist supervisor FAIL");
-        finalText        = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
-        supervisorResult = { ...supervisorResult, rewritten: true };
+      let draft = "";
+      let usedTools = false;
+
+      if (wendyTools.length > 0) {
+        const maxToolTurns = Math.max(1, wendyConfig.agent.maxToolTurns);
+        let workingMessages: LLMMessage[] = messages;
+        for (let turn = 0; turn < maxToolTurns; turn++) {
+          const isFinalTurn = turn === maxToolTurns - 1;
+          const result = await llm.chatWithTools(workingMessages, isFinalTurn ? [] : wendyTools, {
+            model: route.model,
+            temperature,
+            maxTokens: isFinalTurn && usedTools ? wendyConfig.agent.followUpMaxTokens : maxTokens,
+          });
+          draft = result.content ?? "";
+          const calls = result.toolCalls
+            .map((tc, i) => ({ id: tc.id || `tc_${i}`, name: tc.name, arguments: tc.arguments }))
+            .filter((c) => c.name);
+          if (result.finishReason !== "tool_calls" || calls.length === 0) break;
+
+          const collected: Array<{ name: string; data: unknown }> = [];
+          let clientSideHit = false;
+          for (const call of calls) {
+            const tr = await toolExecutor(call.name, call.arguments, userId);
+            const data = tr.ok ? tr.data : { error: tr.message };
+            yield { type: "tool_call", name: call.name, result: data };
+            if (tr.ok && isClientSideToolData(data)) { clientSideHit = true; break; }
+            usedTools = true;
+            collected.push({ name: call.name, data });
+          }
+          if (clientSideHit) {
+            yield { type: "done", sources: [...personaExamples, ...documentChunks, ...webResults], cot, evalResult, routeDecision };
+            return;
+          }
+          const summary = collected.map((r) => `${r.name}: ${JSON.stringify(r.data)}`).join("\n");
+          workingMessages = [
+            ...workingMessages,
+            { role: "assistant", content: draft || "Ho consultato gli strumenti disponibili." },
+            { role: "user", content: `Risultati degli strumenti:\n${summary}\n\nSe servono altri dati chiama un altro strumento; altrimenti rispondi citando solo cio che emerge dai risultati.` },
+          ];
+        }
       } else {
-        logger.info({ domain: this.DOMAIN, supervisorScore: supervisorResult.score }, "specialist supervisor PASS");
+        draft = await llm.chatOnce(messages, { model: route.model, temperature, maxTokens });
+      }
+
+      // ── 6b. Supervisor gate (saltato sulle risposte fondate sui tool) ───────
+      let finalText = draft;
+      let supervisorResult: SupervisorResult | undefined;
+      if (!usedTools) {
+        const supervisorInput = { userMessage: analysisMessage, draft, domain: routeDecision.domain, intent: routeDecision.intent };
+        supervisorResult = await supervisorAgent.evaluate(supervisorInput);
+        if (!supervisorResult.pass) {
+          yield { type: "status", value: "🔄 Revisione qualità in corso..." };
+          logger.info({ domain: this.DOMAIN, supervisorScore: supervisorResult.score }, "specialist supervisor FAIL");
+          finalText        = await supervisorAgent.rewrite(supervisorInput, supervisorResult);
+          supervisorResult = { ...supervisorResult, rewritten: true };
+        } else {
+          logger.info({ domain: this.DOMAIN, supervisorScore: supervisorResult.score }, "specialist supervisor PASS");
+        }
       }
 
       // ── 7. Stream final text ────────────────────────────────────────────────
@@ -244,7 +304,8 @@ export abstract class SpecialistAgent {
 
       yield {
         type: "done", sources: [...personaExamples, ...documentChunks, ...webResults],
-        cot, evalResult, routeDecision, supervisorResult,
+        cot, evalResult, routeDecision,
+        ...(supervisorResult ? { supervisorResult } : {}),
       };
 
       // ── 8. Fire-and-forget memory save (with timeout) ─────────────────────────

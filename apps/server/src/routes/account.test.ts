@@ -28,8 +28,17 @@ vi.mock("@workspace/db", () => ({
   usersTable: {
     id: "users.id",
     clerkId: "users.clerk_id",
+    name: "users.name",
+    email: "users.email",
+    role: "users.role",
     deletedAt: "users.deleted_at",
     purgedAt: "users.purged_at",
+    stripeSubscriptionId: "users.stripe_subscription_id",
+    journeyType: "users.journey_type",
+    journeyDecidedAt: "users.journey_decided_at",
+    journeyDecisionSource: "users.journey_decision_source",
+    testSessionId: "users.test_session_id",
+    onboardingCompleted: "users.onboarding_completed",
   },
   userProfileSettingsTable: { userId: "profile.user_id" },
   nftCertificatesTable: { userId: "nft.user_id" },
@@ -73,6 +82,23 @@ function token() {
   );
 }
 
+function authUserRow() {
+  return {
+    id: 42,
+    name: "Ada",
+    email: "ada@example.com",
+    role: "user",
+    deletedAt: null,
+    purgedAt: null,
+    stripeSubscriptionId: null,
+    journeyType: "indeciso",
+    journeyDecidedAt: null,
+    journeyDecisionSource: null,
+    testSessionId: null,
+    onboardingCompleted: true,
+  };
+}
+
 function app() {
   const instance = express();
   instance.use(express.json());
@@ -88,9 +114,11 @@ describe("account persistence-sensitive routes", () => {
   });
 
   it("returns an actionable export error when account data cannot be read", async () => {
-    limitMock.mockRejectedValueOnce(
-      Object.assign(new Error("relation does not exist"), { code: "42P01" }),
-    );
+    limitMock
+      .mockResolvedValueOnce([authUserRow()])
+      .mockRejectedValueOnce(
+        Object.assign(new Error("relation does not exist"), { code: "42P01" }),
+      );
 
     const response = await request(app())
       .get("/api/account/export")
@@ -107,6 +135,7 @@ describe("account persistence-sensitive routes", () => {
 
   it("exports account data with an explicit safe profile allowlist", async () => {
     limitMock
+      .mockResolvedValueOnce([authUserRow()])
       .mockResolvedValueOnce([
         {
           id: 42,
@@ -163,7 +192,9 @@ describe("account persistence-sensitive routes", () => {
   });
 
   it("returns a conflict with recovery action when deletion was already requested", async () => {
-    limitMock.mockResolvedValueOnce([{ id: 42, deletedAt: new Date("2026-05-20T10:00:00.000Z") }]);
+    limitMock
+      .mockResolvedValueOnce([authUserRow()])
+      .mockResolvedValueOnce([{ id: 42, deletedAt: new Date("2026-05-20T10:00:00.000Z") }]);
 
     const response = await request(app())
       .delete("/api/account")

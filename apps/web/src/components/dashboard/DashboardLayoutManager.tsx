@@ -18,19 +18,22 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Eye, EyeOff, GripVertical, RotateCcw } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   type DashboardSectionDefinition,
 } from "./dashboard-layout-sections";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 
 interface SortableItemProps {
   id: string;
   children: React.ReactNode;
   visible: boolean;
+  visibilityLabel: string;
   onToggleVisible: () => void;
 }
 
-function SortableItem({ id, children, visible, onToggleVisible }: SortableItemProps) {
+function SortableItem({ id, children, visible, visibilityLabel, onToggleVisible }: SortableItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
   const style: React.CSSProperties = {
@@ -54,7 +57,7 @@ function SortableItem({ id, children, visible, onToggleVisible }: SortableItemPr
       <button
         type="button"
         onClick={onToggleVisible}
-        aria-label={visible ? "Nascondi widget" : "Mostra widget"}
+        aria-label={visibilityLabel}
         className="absolute right-2 top-2 z-10 rounded-md p-1 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity"
       >
         {visible ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
@@ -64,6 +67,80 @@ function SortableItem({ id, children, visible, onToggleVisible }: SortableItemPr
         {children}
       </div>
     </div>
+  );
+}
+
+interface DashboardLayoutItemProps {
+  widget: WidgetLayout;
+  section: DashboardSectionDefinition | undefined;
+  locale: string;
+  onToggleVisible: () => void;
+}
+
+function DashboardLayoutItem({ widget, section, locale, onToggleVisible }: DashboardLayoutItemProps) {
+  const label = useDynamicTranslation({
+    locale,
+    source: section?.label ?? widget.id,
+    context: "Dashboard layout customization widget label.",
+    ...(section?.labelKey ? { key: section.labelKey } : {}),
+  });
+  const description = useDynamicTranslation({
+    locale,
+    source: section?.description ?? "Sezione dashboard",
+    context: "Dashboard layout customization widget description.",
+    ...(section?.descriptionKey ? { key: section.descriptionKey } : {}),
+  });
+  const visibleStatus = useDynamicTranslation({
+    locale,
+    source: "Visibile",
+    context: "Dashboard layout customization status badge for visible widgets.",
+    key: "dashboard.layout.status.visible",
+  });
+  const hiddenStatus = useDynamicTranslation({
+    locale,
+    source: "Nascosta",
+    context: "Dashboard layout customization status badge for hidden widgets.",
+    key: "dashboard.layout.status.hidden",
+  });
+  const hideWidgetLabel = useDynamicTranslation({
+    locale,
+    source: "Nascondi widget",
+    context: "Accessible label for the dashboard layout visibility toggle.",
+    key: "dashboard.layout.actions.hideWidget",
+  });
+  const showWidgetLabel = useDynamicTranslation({
+    locale,
+    source: "Mostra widget",
+    context: "Accessible label for the dashboard layout visibility toggle.",
+    key: "dashboard.layout.actions.showWidget",
+  });
+
+  return (
+    <SortableItem
+      id={widget.id}
+      visible={widget.visible}
+      visibilityLabel={widget.visible ? hideWidgetLabel : showWidgetLabel}
+      onToggleVisible={onToggleVisible}
+    >
+      <div className="rounded-xl border bg-muted/20 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground">
+              {label}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {description}
+            </p>
+          </div>
+          <span className={cn(
+            "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
+            widget.visible ? "border-primary/25 bg-primary/10 text-primary" : "border-border text-muted-foreground",
+          )}>
+            {widget.visible ? visibleStatus : hiddenStatus}
+          </span>
+        </div>
+      </div>
+    </SortableItem>
   );
 }
 
@@ -80,6 +157,8 @@ export function DashboardLayoutManager({
   defaultLayout,
   onLayoutChange,
 }: DashboardLayoutManagerProps) {
+  const { i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? i18n.language ?? "it";
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -115,6 +194,12 @@ export function DashboardLayoutManager({
   }
 
   const sectionsById = new Map(availableSections.map((section) => [section.id, section]));
+  const resetLabel = useDynamicTranslation({
+    locale,
+    source: "Ripristina layout",
+    context: "Dashboard layout customization reset button.",
+    key: "dashboard.layout.actions.reset",
+  });
 
   return (
     <div className="space-y-3">
@@ -125,31 +210,13 @@ export function DashboardLayoutManager({
       >
         <SortableContext items={ids} strategy={verticalListSortingStrategy}>
           {sortedLayout.map((widget) => (
-            <SortableItem
+            <DashboardLayoutItem
               key={widget.id}
-              id={widget.id}
-              visible={widget.visible}
+              widget={widget}
+              section={sectionsById.get(widget.id)}
+              locale={locale}
               onToggleVisible={() => handleToggleVisible(widget.id)}
-            >
-              <div className="rounded-xl border bg-muted/20 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground">
-                      {sectionsById.get(widget.id)?.label ?? widget.id}
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                      {sectionsById.get(widget.id)?.description ?? "Sezione dashboard"}
-                    </p>
-                  </div>
-                  <span className={cn(
-                    "rounded-full border px-2 py-0.5 text-[10px] font-semibold",
-                    widget.visible ? "border-primary/25 bg-primary/10 text-primary" : "border-border text-muted-foreground",
-                  )}>
-                    {widget.visible ? "Visibile" : "Nascosta"}
-                  </span>
-                </div>
-              </div>
-            </SortableItem>
+            />
           ))}
         </SortableContext>
       </DndContext>
@@ -163,7 +230,7 @@ export function DashboardLayoutManager({
           className="text-xs text-muted-foreground gap-1.5"
         >
           <RotateCcw className="h-3 w-3" />
-          Ripristina layout
+          {resetLabel}
         </Button>
       </div>
     </div>

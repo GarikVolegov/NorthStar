@@ -147,6 +147,7 @@ export function useWendyOpenAITTS(options: UseWendyOpenAITTSOptions = {}): UseWe
       const msg = err instanceof Error ? err.message : 'TTS error';
       setError(msg);
       setState('error');
+      throw new Error(msg);
     }
   }, [apiUrl, state, stop, earconEnabled, onStart, onEnd]);
 

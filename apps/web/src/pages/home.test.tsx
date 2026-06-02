@@ -1,9 +1,21 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import type React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const routerState = vi.hoisted(() => ({
   navigate: vi.fn(),
+}));
+
+const authState = vi.hoisted(() => ({
+  authReady: true,
+  isLoggedIn: false,
+  updateUser: vi.fn(),
+  user: null as null | {
+    id: number;
+    journeyType?: string;
+    name: string;
+    onboardingCompleted?: boolean;
+  },
 }));
 
 vi.mock("react-i18next", () => ({
@@ -52,12 +64,7 @@ vi.mock("wouter", () => ({
 }));
 
 vi.mock("@/contexts/AuthContext", () => ({
-  useAuth: () => ({
-    authReady: true,
-    isLoggedIn: false,
-    user: null,
-    updateUser: vi.fn(),
-  }),
+  useAuth: () => authState,
 }));
 
 vi.mock("@/contexts/WendyProvider", () => ({
@@ -130,7 +137,7 @@ vi.mock("@/components/calendario/ProssimiEventi", () => ({
 }));
 
 vi.mock("@/components/OnboardingWizard", () => ({
-  OnboardingWizard: () => null,
+  OnboardingWizard: () => <div data-testid="onboarding-wizard" />,
 }));
 
 vi.mock("@/components/brand/AppLogo", () => ({
@@ -141,6 +148,15 @@ import ChiSiamo from "./chi-siamo";
 import Home from "./home";
 
 describe("Home integrated landing", () => {
+  beforeEach(() => {
+    routerState.navigate.mockClear();
+    authState.authReady = true;
+    authState.isLoggedIn = false;
+    authState.updateUser.mockClear();
+    authState.user = null;
+    localStorage.clear();
+  });
+
   it("introduces NorthStar before showing persona choices to a new visitor", () => {
     const { container } = render(<Home />);
 
@@ -163,5 +179,27 @@ describe("Home integrated landing", () => {
     expect(routerState.navigate).toHaveBeenCalledWith("/#chi-siamo", {
       replace: true,
     });
+  });
+
+  it("keeps logged-in users on the home page when they still need onboarding", () => {
+    vi.useFakeTimers();
+    authState.isLoggedIn = true;
+    authState.user = {
+      id: 7,
+      journeyType: "indeciso",
+      name: "Ada",
+      onboardingCompleted: false,
+    };
+
+    render(<Home />);
+
+    expect(routerState.navigate).not.toHaveBeenCalledWith("/dashboard");
+
+    act(() => {
+      vi.advanceTimersByTime(601);
+    });
+
+    expect(screen.getByTestId("onboarding-wizard")).toBeInTheDocument();
+    vi.useRealTimers();
   });
 });

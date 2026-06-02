@@ -18,6 +18,7 @@ import {
   type AppStatus,
 } from "@/features/applications/applicationTypes";
 import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, BarChart3, Bell, Briefcase, Building2, DollarSign, FileText, Link2, Loader2, MapPin, Plus, Star, X } from "lucide-react";
@@ -26,8 +27,14 @@ import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
+
+function useApplicationsText(locale: string, key: string, source: string, context = "Applications tracking page UI copy") {
+  return useDynamicTranslation({ locale, key, source, context });
+}
+
 export default function Candidature() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
   const { user, isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
   const [addOpen, setAddOpen] = useState(false);
@@ -39,6 +46,57 @@ export default function Candidature() {
   const [view, setView] = useState<"kanban" | "stats">("kanban");
   const [draggingId, setDraggingId] = useState<number | null>(null);
   const [coverLetterApp, setCoverLetterApp] = useState<Application | null>(null);
+  const pageTitle = useApplicationsText(locale, "candidature.myCandidatures", "Le mie candidature");
+  const loadErrorShort = useApplicationsText(locale, "candidature.loadErrorShort", "Impossibile caricare le candidature");
+  const notConfiguredShort = useApplicationsText(locale, "candidature.notConfiguredShort", "Archivio candidature non collegato");
+  const noCandidaturesLabel = useApplicationsText(locale, "candidature.noCandidatures", "Nessuna candidatura ancora");
+  const addLabel = useApplicationsText(locale, "candidature.add", "Aggiungi");
+  const kanbanLabel = useApplicationsText(locale, "candidature.kanban", "Kanban");
+  const statisticsLabel = useApplicationsText(locale, "candidature.statistics", "Statistiche");
+  const retryLoadLabel = useApplicationsText(locale, "candidature.retryLoad", "Riprova caricamento");
+  const loadErrorTitle = useApplicationsText(locale, "candidature.loadError", "Candidature non disponibili");
+  const loadErrorDescription = useApplicationsText(locale, "candidature.loadErrorDesc", "Non siamo riusciti a caricare le candidature. Riprova tra poco.");
+  const retryLabel = useApplicationsText(locale, "candidature.retry", "Riprova");
+  const notConfiguredTitle = useApplicationsText(locale, "candidature.notConfiguredTitle", "Candidature non ancora collegate");
+  const notConfiguredDescription = useApplicationsText(
+    locale,
+    "candidature.notConfiguredDesc",
+    "Questa area e pronta, ma la persistenza delle candidature non e ancora collegata. Non salviamo modifiche finche il backend non sara connesso.",
+  );
+  const startTrackingTitle = useApplicationsText(locale, "candidature.startTracking", "Inizia a tracciare le candidature");
+  const startTrackingDescription = useApplicationsText(
+    locale,
+    "candidature.startTrackingDesc",
+    "Salva aziende, ruoli, link e follow-up per non perdere nessuna opportunita.",
+  );
+  const addFirstLabel = useApplicationsText(locale, "candidature.addFirst", "Aggiungi la prima candidatura");
+  const exploreJobsLabel = useApplicationsText(locale, "candidature.exploreJobs", "Esplora offerte lavoro");
+  const noAppsLabel = useApplicationsText(locale, "candidature.noApps", "Nessuna candidatura");
+  const editAppLabel = useApplicationsText(locale, "candidature.editApp", "Modifica candidatura");
+  const newAppLabel = useApplicationsText(locale, "candidature.newApp", "Nuova candidatura");
+  const companyLabel = useApplicationsText(locale, "candidature.company", "Azienda");
+  const roleLabel = useApplicationsText(locale, "candidature.role", "Ruolo");
+  const linkLabel = useApplicationsText(locale, "candidature.link", "Link");
+  const optionalLabel = useApplicationsText(locale, "candidature.optional", "opzionale");
+  const statusFieldLabel = useApplicationsText(locale, "candidature.statusLbl", "Stato");
+  const locationLabel = useApplicationsText(locale, "candidature.location", "Luogo");
+  const salaryLabel = useApplicationsText(locale, "candidature.salary", "Retribuzione");
+  const notesLabel = useApplicationsText(locale, "candidature.notes", "Note");
+  const cancelLabel = useApplicationsText(locale, "candidature.cancel", "Annulla");
+  const saveChangesLabel = useApplicationsText(locale, "candidature.saveChanges", "Salva modifiche");
+  const requiredFieldsLabel = useApplicationsText(locale, "candidature.requiredFields", "Azienda e ruolo sono obbligatori.");
+  const companyPlaceholder = useApplicationsText(locale, "candidature.companyPlaceholder", "es. Google Italia");
+  const rolePlaceholder = useApplicationsText(locale, "candidature.rolePlaceholder", "es. UX Designer");
+  const locationPlaceholder = useApplicationsText(locale, "candidature.locationPlaceholder", "es. Milano / Remote");
+  const salaryPlaceholder = useApplicationsText(locale, "candidature.salaryPlaceholder", "es. 45.000 EUR / 3.500 EUR mese");
+  const notesPlaceholder = useApplicationsText(locale, "candidature.notesPlaceholder", "Contatti, impressioni, dettagli importanti...");
+  const statusLabels: Record<AppStatus, string> = {
+    saved: useApplicationsText(locale, "candidature.status.saved", "Salvata"),
+    applied: useApplicationsText(locale, "candidature.status.applied", "Inviata"),
+    interview: useApplicationsText(locale, "candidature.status.interview", "Colloquio"),
+    offer: useApplicationsText(locale, "candidature.status.offer", "Offerta"),
+    rejected: useApplicationsText(locale, "candidature.status.rejected", "Rifiutata"),
+  };
 
   const { data, error, isError, isLoading, refetch } = useQuery({
     queryKey: ["applications", user?.id],
@@ -51,9 +109,7 @@ export default function Candidature() {
 
   const applications = data?.applications ?? [];
   const applicationsNotConfigured = data?.status === "not_configured";
-  const applicationsNotConfiguredMessage = t("candidature.notConfiguredDesc", {
-    defaultValue: "Questa area e pronta, ma la persistenza delle candidature non e ancora collegata. Non salviamo modifiche finche il backend non sara connesso.",
-  });
+  const applicationsNotConfiguredMessage = notConfiguredDescription;
 
   const createMutation = useMutation({
     mutationFn: (payload: ApplicationForm) =>
@@ -104,7 +160,7 @@ export default function Candidature() {
 
   function handleSubmit() {
     if (!form.company.trim() || !form.role.trim()) {
-      setFormError(t("candidature.requiredFields"));
+      setFormError(requiredFieldsLabel);
       return;
     }
     if (editApp) {
@@ -169,17 +225,17 @@ export default function Candidature() {
         <div className="max-w-screen-2xl mx-auto px-4 md:px-8 py-5">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-serif font-bold text-foreground">{t("candidature.myCandidatures")}</h1>
+              <h1 className="text-2xl font-serif font-bold text-foreground">{pageTitle}</h1>
               <p className="text-sm text-muted-foreground mt-0.5">
                 {isError
-                  ? t("candidature.loadErrorShort", { defaultValue: "Impossibile caricare le candidature" })
-                  : applicationsNotConfigured ? t("candidature.notConfiguredShort", { defaultValue: "Archivio candidature non collegato" })
-                  : total === 0 ? t("candidature.noCandidatures") : t("candidature.totalCount", { count: total })}
+                  ? loadErrorShort
+                  : applicationsNotConfigured ? notConfiguredShort
+                  : total === 0 ? noCandidaturesLabel : t("candidature.totalCount", { count: total })}
               </p>
             </div>
             {!applicationsNotConfigured && (
               <Button onClick={() => openAdd()} className="min-h-11 shrink-0 gap-2 rounded-full">
-                <Plus className="w-4 h-4" /> {t("candidature.add")}
+                <Plus className="w-4 h-4" /> {addLabel}
               </Button>
             )}
           </div>
@@ -193,7 +249,7 @@ export default function Candidature() {
                 const m = STATUS_META[s];
                 return (
                   <span key={s} className={cn("text-xs font-medium px-2.5 py-1 rounded-full border", m.badge)}>
-                    {m.emoji} {t(`candidature.status.${s}`)}: {count}
+                    {m.emoji} {statusLabels[s]}: {count}
                   </span>
                 );
               })}
@@ -212,7 +268,7 @@ export default function Candidature() {
                     view === v ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                 >
-                  {v === "kanban" ? <><Briefcase className="w-3.5 h-3.5" /> {t("candidature.kanban")}</> : <><BarChart3 className="w-3.5 h-3.5" /> {t("candidature.statistics")}</>}
+                  {v === "kanban" ? <><Briefcase className="w-3.5 h-3.5" /> {kanbanLabel}</> : <><BarChart3 className="w-3.5 h-3.5" /> {statisticsLabel}</>}
                 </button>
               ))}
             </div>
@@ -262,7 +318,7 @@ export default function Candidature() {
               <p className="text-sm text-destructive">{mutationError}</p>
             </div>
             <Button variant="outline" className="rounded-full" onClick={() => void refetch()}>
-              Riprova caricamento
+              {retryLoadLabel}
             </Button>
           </div>
         )}
@@ -276,15 +332,15 @@ export default function Candidature() {
               <AlertCircle className="w-8 h-8 text-destructive/70" />
             </div>
             <h2 className="text-lg font-semibold mb-2">
-              {t("candidature.loadError", { defaultValue: "Candidature non disponibili" })}
+              {loadErrorTitle}
             </h2>
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
               {error instanceof Error
                 ? error.message
-                : t("candidature.loadErrorDesc", { defaultValue: "Non siamo riusciti a caricare le candidature. Riprova tra poco." })}
+                : loadErrorDescription}
             </p>
             <Button onClick={() => void refetch()} variant="outline" className="rounded-full">
-              {t("candidature.retry", { defaultValue: "Riprova" })}
+              {retryLabel}
             </Button>
           </div>
         ) : applicationsNotConfigured ? (
@@ -293,7 +349,7 @@ export default function Candidature() {
               <AlertCircle className="w-8 h-8" />
             </div>
             <h2 className="text-lg font-semibold mb-2">
-              {t("candidature.notConfiguredTitle", { defaultValue: "Candidature non ancora collegate" })}
+              {notConfiguredTitle}
             </h2>
             <p className="text-sm text-muted-foreground max-w-sm">
               {applicationsNotConfiguredMessage}
@@ -304,15 +360,15 @@ export default function Candidature() {
             <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
               <Briefcase className="w-8 h-8 text-primary/60" />
             </div>
-            <h2 className="text-lg font-semibold mb-2">{t("candidature.startTracking")}</h2>
+            <h2 className="text-lg font-semibold mb-2">{startTrackingTitle}</h2>
             <p className="text-sm text-muted-foreground max-w-sm mb-6">
-              {t("candidature.startTrackingDesc")}
+              {startTrackingDescription}
             </p>
             <Button onClick={() => openAdd()} className="min-h-11 gap-2 rounded-full">
-              <Plus className="w-4 h-4" /> {t("candidature.addFirst")}
+              <Plus className="w-4 h-4" /> {addFirstLabel}
             </Button>
             <Button asChild variant="link" className="mt-2 text-primary">
-              <Link href="/lavori">{t("candidature.exploreJobs", { defaultValue: "Esplora offerte lavoro" })}</Link>
+              <Link href="/lavori">{exploreJobsLabel}</Link>
             </Button>
           </div>
         ) : view === "stats" ? (
@@ -345,7 +401,7 @@ export default function Candidature() {
                 >
                   <div className={cn("flex items-center gap-2 px-3 py-2.5 rounded-xl mb-3", meta.bg)}>
                     <span className="text-base">{meta.emoji}</span>
-                    <span className={cn("text-sm font-semibold flex-1", meta.color)}>{t(`candidature.status.${status}`)}</span>
+                    <span className={cn("text-sm font-semibold flex-1", meta.color)}>{statusLabels[status]}</span>
                     <Badge variant="outline" className={cn("text-xs h-5 px-1.5 font-semibold", meta.badge)}>
                       {cards.length}
                     </Badge>
@@ -354,7 +410,7 @@ export default function Candidature() {
                   <div className="space-y-2.5 flex-1">
                     {cards.length === 0 ? (
                       <div className="border-2 border-dashed border-border rounded-xl p-5 text-center">
-                        <p className="text-xs text-muted-foreground">{t("candidature.noApps")}</p>
+                        <p className="text-xs text-muted-foreground">{noAppsLabel}</p>
                       </div>
                     ) : (
                       cards.map((app) => (
@@ -378,7 +434,7 @@ export default function Candidature() {
                       onClick={() => openAdd(status)}
                       className="flex min-h-11 w-full items-center gap-2 rounded-xl border border-dashed border-border px-3 text-xs text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
                     >
-                      <Plus className="w-3.5 h-3.5" /> {t("candidature.addTo", { status: t(`candidature.status.${status}`).toLowerCase() })}
+                      <Plus className="w-3.5 h-3.5" /> {t("candidature.addTo", { status: statusLabels[status].toLowerCase() })}
                     </button>
                   </div>
                 </div>
@@ -393,7 +449,7 @@ export default function Candidature() {
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold">
-              {editApp ? t("candidature.editApp") : t("candidature.newApp")}
+              {editApp ? editAppLabel : newAppLabel}
             </DialogTitle>
           </DialogHeader>
 
@@ -401,23 +457,23 @@ export default function Candidature() {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2 sm:col-span-1">
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                  <Building2 className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.company")}
+                  <Building2 className="w-3.5 h-3.5 text-muted-foreground" /> {companyLabel}
                 </Label>
                 <Input value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                  placeholder="es. Google Italia" className="h-11 rounded-xl text-sm" />
+                  placeholder={companyPlaceholder} className="h-11 rounded-xl text-sm" />
               </div>
               <div className="col-span-2 sm:col-span-1">
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.role")}
+                  <Briefcase className="w-3.5 h-3.5 text-muted-foreground" /> {roleLabel}
                 </Label>
                 <Input value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                  placeholder="es. UX Designer" className="h-11 rounded-xl text-sm" />
+                  placeholder={rolePlaceholder} className="h-11 rounded-xl text-sm" />
               </div>
             </div>
 
             <div>
               <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                <Link2 className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.link")} <span className="font-normal text-muted-foreground">({t("candidature.optional")})</span>
+                <Link2 className="w-3.5 h-3.5 text-muted-foreground" /> {linkLabel} <span className="font-normal text-muted-foreground">({optionalLabel})</span>
               </Label>
               <Input value={form.url} onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
                 placeholder="https://..." className="h-11 rounded-xl text-sm" type="url" />
@@ -425,35 +481,35 @@ export default function Candidature() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs font-semibold mb-1.5 block">{t("candidature.statusLbl")}</Label>
+                <Label className="text-xs font-semibold mb-1.5 block">{statusFieldLabel}</Label>
                 <select value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as AppStatus }))}
                   className="h-11 w-full rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                  {COLUMNS.map((s) => <option key={s} value={s}>{STATUS_META[s].emoji} {t(`candidature.status.${s}`)}</option>)}
+                  {COLUMNS.map((s) => <option key={s} value={s}>{STATUS_META[s].emoji} {statusLabels[s]}</option>)}
                 </select>
               </div>
               <div>
                 <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.location")}
+                  <MapPin className="w-3.5 h-3.5 text-muted-foreground" /> {locationLabel}
                 </Label>
                 <Input value={form.location} onChange={(e) => setForm((f) => ({ ...f, location: e.target.value }))}
-                  placeholder="es. Milano / Remote" className="h-11 rounded-xl text-sm" />
+                  placeholder={locationPlaceholder} className="h-11 rounded-xl text-sm" />
               </div>
             </div>
 
             <div>
               <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.salary")} <span className="font-normal text-muted-foreground">({t("candidature.optional")})</span>
+                <DollarSign className="w-3.5 h-3.5 text-muted-foreground" /> {salaryLabel} <span className="font-normal text-muted-foreground">({optionalLabel})</span>
               </Label>
               <Input value={form.salary} onChange={(e) => setForm((f) => ({ ...f, salary: e.target.value }))}
-                placeholder="es. 45.000 € / 3.500 € mese" className="h-11 rounded-xl text-sm" />
+                placeholder={salaryPlaceholder} className="h-11 rounded-xl text-sm" />
             </div>
 
             <div>
               <Label className="text-xs font-semibold mb-1.5 block flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-muted-foreground" /> {t("candidature.notes")} <span className="font-normal text-muted-foreground">({t("candidature.optional")})</span>
+                <FileText className="w-3.5 h-3.5 text-muted-foreground" /> {notesLabel} <span className="font-normal text-muted-foreground">({optionalLabel})</span>
               </Label>
               <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Contatti, impressioni, dettagli importanti..." className="min-h-[70px] rounded-xl text-sm resize-none" />
+                placeholder={notesPlaceholder} className="min-h-[70px] rounded-xl text-sm resize-none" />
             </div>
 
             {formError && (
@@ -466,12 +522,12 @@ export default function Candidature() {
 
           <DialogFooter className="gap-2">
             <Button variant="outline" className="min-h-11 rounded-xl" onClick={() => { setAddOpen(false); setEditApp(null); }}>
-              {t("candidature.cancel")}
+              {cancelLabel}
             </Button>
             <Button className="min-h-11 gap-2 rounded-xl" onClick={handleSubmit}
               disabled={createMutation.isPending || updateMutation.isPending}>
               {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="w-4 h-4 animate-spin" />}
-              {editApp ? t("candidature.saveChanges") : t("candidature.add")}
+              {editApp ? saveChangesLabel : addLabel}
             </Button>
           </DialogFooter>
         </DialogContent>

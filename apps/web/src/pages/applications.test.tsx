@@ -8,6 +8,7 @@ const getJsonMock = vi.hoisted(() => vi.fn());
 const postJsonMock = vi.hoisted(() => vi.fn());
 const patchJsonMock = vi.hoisted(() => vi.fn());
 const deleteJsonMock = vi.hoisted(() => vi.fn());
+const useDynamicTranslationMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/apiClient", () => ({
   deleteJson: deleteJsonMock,
@@ -16,13 +17,17 @@ vi.mock("@/lib/apiClient", () => ({
   postJson: postJsonMock,
 }));
 
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: useDynamicTranslationMock,
+}));
+
 vi.mock("@/contexts/AuthContext", () => ({
   useAuth: () => ({ user: { id: 42 }, isLoggedIn: true }),
 }));
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
-    i18n: { language: "it-IT" },
+    i18n: { language: "it-IT", resolvedLanguage: "en-US" },
     t: (key: string, options?: { defaultValue?: string }) => options?.defaultValue ?? key,
   }),
 }));
@@ -51,6 +56,8 @@ describe("applications page reliability states", () => {
     postJsonMock.mockReset();
     patchJsonMock.mockReset();
     deleteJsonMock.mockReset();
+    useDynamicTranslationMock.mockReset();
+    useDynamicTranslationMock.mockImplementation(({ source }: { source: string }) => source);
   });
 
   it("shows an API error state instead of the empty-applications state when loading fails", async () => {
@@ -67,8 +74,53 @@ describe("applications page reliability states", () => {
 
     renderApplications();
 
-    expect(await screen.findByText("candidature.startTracking")).toBeInTheDocument();
-    expect(screen.queryByText("candidature.loadError")).not.toBeInTheDocument();
+    expect(await screen.findByText("Inizia a tracciare le candidature")).toBeInTheDocument();
+    expect(screen.queryByText("Candidature non disponibili")).not.toBeInTheDocument();
+  });
+
+  it("uses dynamic translations for page chrome and form placeholders without translating application data", async () => {
+    useDynamicTranslationMock.mockImplementation(({ key, source }: { key?: string; source: string }) =>
+      key ? `dynamic:${key}` : source,
+    );
+    getJsonMock.mockResolvedValue({
+      applications: [{
+        id: 7,
+        userId: 42,
+        company: "NorthStar",
+        role: "UX Reliability",
+        url: null,
+        status: "saved",
+        notes: null,
+        salary: null,
+        location: null,
+        appliedAt: "2026-05-20T00:00:00.000Z",
+        updatedAt: "2026-05-20T00:00:00.000Z",
+        notesLog: null,
+      }],
+      status: "ok",
+      totalCount: 1,
+    });
+
+    renderApplications();
+
+    expect(await screen.findByText("dynamic:candidature.myCandidatures")).toBeInTheDocument();
+    expect(await screen.findByText("NorthStar")).toBeInTheDocument();
+    expect(screen.getByText("UX Reliability")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "dynamic:candidature.add" }));
+
+    expect(await screen.findByText("dynamic:candidature.newApp")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("dynamic:candidature.companyPlaceholder")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("dynamic:candidature.rolePlaceholder")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("dynamic:candidature.locationPlaceholder")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("dynamic:candidature.notesPlaceholder")).toBeInTheDocument();
+    expect(useDynamicTranslationMock).toHaveBeenCalledWith(expect.objectContaining({
+      key: "candidature.myCandidatures",
+      locale: "en",
+      source: "Le mie candidature",
+    }));
+    expect(useDynamicTranslationMock).not.toHaveBeenCalledWith(expect.objectContaining({ source: "NorthStar" }));
+    expect(useDynamicTranslationMock).not.toHaveBeenCalledWith(expect.objectContaining({ source: "UX Reliability" }));
   });
 
   it("shows a setup state instead of the empty-applications CTA when persistence is not connected", async () => {
@@ -93,10 +145,10 @@ describe("applications page reliability states", () => {
 
     renderApplications();
 
-    fireEvent.click(await screen.findByRole("button", { name: /candidature.addFirst/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Aggiungi la prima candidatura/i }));
     fireEvent.change(screen.getByPlaceholderText("es. Google Italia"), { target: { value: "NorthStar" } });
     fireEvent.change(screen.getByPlaceholderText("es. UX Designer"), { target: { value: "UX Reliability" } });
-    fireEvent.click(screen.getByRole("button", { name: /^candidature.add$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Aggiungi$/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Persistenza candidature non disponibile");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
@@ -126,7 +178,7 @@ describe("applications page reliability states", () => {
     renderApplications();
 
     fireEvent.click(await screen.findByText("NorthStar"));
-    fireEvent.click(screen.getByRole("button", { name: /candidature.saveChanges/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Salva modifiche/i }));
 
     await waitFor(() => expect(patchJsonMock).toHaveBeenCalled());
     expect(await screen.findByRole("alert")).toHaveTextContent("Aggiornamento non salvato");
@@ -156,12 +208,12 @@ describe("applications page reliability states", () => {
 
     renderApplications();
 
-    fireEvent.click(await screen.findByRole("button", { name: /elimina candidatura northstar/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /elimina candidatura: northstar/i }));
 
     expect(deleteJsonMock).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: /conferma eliminazione candidatura northstar/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /conferma eliminazione: northstar/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /conferma eliminazione candidatura northstar/i }));
+    fireEvent.click(screen.getByRole("button", { name: /conferma eliminazione: northstar/i }));
 
     await waitFor(() => expect(deleteJsonMock).toHaveBeenCalledWith("/api/applications/7"));
   });

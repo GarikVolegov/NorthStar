@@ -6,7 +6,7 @@
  * No backend required for v1 — reactions are local only.
  */
 import { cn } from "@/lib/utils";
-import { Bookmark, BookmarkCheck, TrendingUp, X } from "lucide-react";
+import { ArrowRight, Bookmark, BookmarkCheck, TrendingUp, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "wouter";
 import type { AdaptiveSectionPresentation } from "./dashboard-adaptive-flow";
@@ -185,6 +185,15 @@ export function DashboardDiscoveryFeed({
                 <div className="mt-1">
                   <MatchBadge score={sector.matchScore} />
                 </div>
+                {!isCompact && (
+                  <Link
+                    href={`/settore/${sector.sectorId}#ruoli`}
+                    className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                  >
+                    Apri ruoli del settore
+                    <ArrowRight className="h-3 w-3" />
+                  </Link>
+                )}
               </div>
 
               {/* Actions */}
@@ -226,7 +235,7 @@ export function DashboardDiscoveryFeed({
         className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
       >
         <TrendingUp className="h-3 w-3" />
-        Esplora tutti i settori →
+        Scegli settore e ruolo →
       </Link>
     </div>
   );

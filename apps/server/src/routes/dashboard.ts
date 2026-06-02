@@ -6,6 +6,7 @@ import {
   db,
   testSessionsTable,
   userObjectivesTable,
+  usersTable,
 } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { isPersistenceSchemaError } from "../lib/persistence";
@@ -28,6 +29,31 @@ router.get("/", requireAuth, async (req, res) => {
   try {
     const user = req.user!;
     const now = new Date();
+    const [persistedUser] = await db
+      .select({
+        name: usersTable.name,
+        email: usersTable.email,
+        journeyType: usersTable.journeyType,
+        journeyDecidedAt: usersTable.journeyDecidedAt,
+        journeyDecisionSource: usersTable.journeyDecisionSource,
+        onboardingCompleted: usersTable.onboardingCompleted,
+      })
+      .from(usersTable)
+      .where(eq(usersTable.id, user.id))
+      .limit(1);
+    const dashboardUser = persistedUser
+      ? {
+          ...user,
+          name: persistedUser.name,
+          email: persistedUser.email,
+          journeyType: persistedUser.journeyType,
+          journeyDecidedAt: persistedUser.journeyDecidedAt instanceof Date
+            ? persistedUser.journeyDecidedAt.toISOString()
+            : persistedUser.journeyDecidedAt ?? null,
+          journeyDecisionSource: persistedUser.journeyDecisionSource ?? null,
+          onboardingCompleted: persistedUser.onboardingCompleted ?? false,
+        }
+      : user;
     const currentPlan = await getEffectivePlan(user.id);
 
     const [latestSession, objectives, upcomingEvents] = await Promise.all([
@@ -83,13 +109,13 @@ router.get("/", requireAuth, async (req, res) => {
 
     res.json({
       user: {
-        journeyType: user.journeyType,
-        journeyDecidedAt: user.journeyDecidedAt ?? null,
-        journeyDecisionSource: user.journeyDecisionSource ?? null,
-        name: user.name,
-        email: user.email,
+        journeyType: dashboardUser.journeyType,
+        journeyDecidedAt: dashboardUser.journeyDecidedAt ?? null,
+        journeyDecisionSource: dashboardUser.journeyDecisionSource ?? null,
+        name: dashboardUser.name,
+        email: dashboardUser.email,
         isPremium: planMeets(currentPlan, "pro"),
-        onboardingCompleted: user.onboardingCompleted,
+        onboardingCompleted: dashboardUser.onboardingCompleted,
       },
       session: latestSession[0] ?? null,
       objectives,

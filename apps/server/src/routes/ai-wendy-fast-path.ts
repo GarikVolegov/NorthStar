@@ -1,7 +1,6 @@
 import {
   buildLightPrompt,
   estimateTokens,
-  getFastPathFallbackReply,
   getLLMForRoute,
   getWendyRecoveryFallbackReply,
   toolsToOpenAIFormat,
@@ -150,13 +149,11 @@ export async function runWendyFastPath(input: {
           "wendy fast path text-only",
         );
       } catch (fallbackErr) {
-        const fallbackText = getFastPathFallbackReply({ intent, message, locale });
-        if (!fallbackText) throw fallbackErr;
         logger.warn(
           { err: fallbackErr, userId, requestId },
-          "[ai/wendy] fast path text-only failed, using local simple_qa fallback",
+          "[ai/wendy] fast path text-only failed, using honest recovery message",
         );
-        finalText = fallbackText;
+        finalText = getWendyRecoveryFallbackReply({ intent, message, locale });
       }
       outputTokens += estimateTokens(finalText);
       break;
@@ -232,13 +229,11 @@ export async function runWendyFastPath(input: {
         "wendy fast path text-only",
       );
     } catch (fallbackErr) {
-      const fallbackText = getFastPathFallbackReply({ intent, message, locale });
-      if (!fallbackText) throw fallbackErr;
       logger.warn(
         { err: fallbackErr, userId, requestId },
-        "[ai/wendy] empty fast path failed, using local simple_qa fallback",
+        "[ai/wendy] empty fast path failed, using honest recovery message",
       );
-      finalText = fallbackText;
+      finalText = getWendyRecoveryFallbackReply({ intent, message, locale });
     }
     outputTokens += estimateTokens(finalText);
   }

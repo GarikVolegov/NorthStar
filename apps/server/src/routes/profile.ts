@@ -37,6 +37,10 @@ router.get("/:userId", async (req, res) => {
       return;
     }
     const targetUserId = userId;
+    if (targetUserId !== req.user?.id) {
+      res.status(403).json({ error: "Accesso negato" });
+      return;
+    }
 
     let user;
     try {

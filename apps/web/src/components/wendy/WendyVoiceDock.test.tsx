@@ -1,9 +1,31 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { UseWendyChatReturn } from "@/hooks/useWendyChat";
 import { WendyVoiceDock } from "./WendyVoiceDock";
 
-function chatWithSttError(error: string | null): UseWendyChatReturn {
+const useDynamicTranslationMock = vi.hoisted(() => vi.fn());
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    i18n: { language: "en-US", resolvedLanguage: "en-US" },
+  }),
+}));
+
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: useDynamicTranslationMock,
+}));
+
+function chatWithErrors({
+  sttError = null,
+  openaiTtsError = null,
+  sttSupported = true,
+  isListening = false,
+}: {
+  sttError?: string | null;
+  openaiTtsError?: string | null;
+  sttSupported?: boolean;
+  isListening?: boolean;
+}): UseWendyChatReturn {
   return {
     messages: [],
     thinking: { active: false, label: "", startedAt: 0 },
@@ -40,16 +62,16 @@ function chatWithSttError(error: string | null): UseWendyChatReturn {
     toggleTts: vi.fn(),
     openaiTts: {
       isSpeaking: false,
-      error: null,
+      error: openaiTtsError,
       play: vi.fn(),
       stop: vi.fn(),
     },
     stt: {
       transcript: "",
       interimTranscript: "",
-      isListening: false,
-      error,
-      supported: true,
+      isListening,
+      error: sttError,
+      supported: sttSupported,
       start: vi.fn(),
       stop: vi.fn(),
       reset: vi.fn(),
@@ -60,19 +82,79 @@ function chatWithSttError(error: string | null): UseWendyChatReturn {
 }
 
 describe("WendyVoiceDock", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useDynamicTranslationMock.mockImplementation(
+      ({ key, source }: { key?: string; source: string }) => key ? `dynamic:${key}` : source,
+    );
+  });
+
   it("shows an actionable microphone permission error in voice mode", () => {
     render(
       <WendyVoiceDock
         value=""
         setValue={vi.fn()}
         onSubmit={vi.fn()}
-        chat={chatWithSttError("not-allowed")}
+        chat={chatWithErrors({ sttError: "not-allowed" })}
         voiceMode
         setVoiceMode={vi.fn()}
       />,
     );
 
-    expect(screen.getByRole("alert")).toHaveTextContent(/microfono/i);
-    expect(screen.getByRole("alert")).toHaveTextContent(/permesso/i);
+    expect(screen.getByRole("alert")).toHaveTextContent("dynamic:wendy.voice.errors.notAllowed");
+    expect(useDynamicTranslationMock).toHaveBeenCalledWith(expect.objectContaining({
+      key: "wendy.voice.errors.notAllowed",
+      source: "Permesso microfono negato. Abilita il microfono nel browser e riprova.",
+    }));
+  });
+
+  it("shows a voice playback error when OpenAI TTS fails", () => {
+    render(
+      <WendyVoiceDock
+        value=""
+        setValue={vi.fn()}
+        onSubmit={vi.fn()}
+        chat={chatWithErrors({ openaiTtsError: "Voce Wendy non disponibile" })}
+        voiceMode
+        setVoiceMode={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("alert")).toHaveTextContent("dynamic:wendy.voice.errors.playback");
+  });
+
+  it("uses dynamic translations for text mode input and controls", () => {
+    render(
+      <WendyVoiceDock
+        value=""
+        setValue={vi.fn()}
+        onSubmit={vi.fn()}
+        chat={chatWithErrors({})}
+        voiceMode={false}
+        setVoiceMode={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("dynamic:wendy.voice.inputPlaceholder")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:wendy.voice.dictateToWendy" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:wendy.voice.openVoiceMode" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:wendy.voice.sendToWendy" })).toBeInTheDocument();
+  });
+
+  it("uses dynamic translations for voice mode status and controls", () => {
+    render(
+      <WendyVoiceDock
+        value=""
+        setValue={vi.fn()}
+        onSubmit={vi.fn()}
+        chat={chatWithErrors({ isListening: true })}
+        voiceMode
+        setVoiceMode={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("status")).toHaveTextContent("dynamic:wendy.voice.status.listening");
+    expect(screen.getByRole("button", { name: "dynamic:wendy.voice.sendDictation" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:wendy.voice.toggleWendyVoice" })).toBeInTheDocument();
   });
 });

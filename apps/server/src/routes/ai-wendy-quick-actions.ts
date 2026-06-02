@@ -1,25 +1,23 @@
 import {
   estimateTokens,
-  getFastPathFallbackReply,
   getLlmUnavailableReply,
-  getWendyRecoveryFallbackReply,
-  shouldUseImmediateFastPathFallback,
-  shouldUseImmediateWendyRecoveryFallback,
 } from "@workspace/ai-server";
 import type { WendyIntent } from "@workspace/ai-server";
 import type { Logger } from "pino";
-import {
-  buildWendyDataBackedGuidedAction,
-  buildWendyDataBackedSuggestedPrompts,
-  classifyWendyDataBackedQuickAction,
-  formatWendyDataBackedQuickActionReply,
-} from "../lib/wendy-data-backed-quick-action";
-import { executeWendyToolCall } from "../lib/wendy-tool-executor";
-import { buildConfirmableClientAction } from "./ai-wendy-actions";
 
 type SendFn = (data: object) => void;
 type SendDoneFn = (extra?: Record<string, unknown>) => void;
 
+/**
+ * Gestisce i soli casi terminali NON-LLM prima della pipeline di ragionamento.
+ *
+ * Per design Wendy non emette risposte prescritte: saluti, identità, quick
+ * action e qualsiasi domanda passano dall'LLM (fast/full path) che ragiona sui
+ * dati reali dell'app e sui tool. L'unico caso gestito qui è l'assenza totale di
+ * un provider LLM configurato, dove restituiamo un avviso operativo onesto
+ * invece di un errore grezzo. In tutti gli altri casi ritorna null e il flusso
+ * prosegue verso la pipeline LLM.
+ */
 export async function handleWendyLocalQuickAction(input: {
   effectiveMessage: string;
   endStream: () => void;
@@ -35,7 +33,6 @@ export async function handleWendyLocalQuickAction(input: {
   userId: number;
 }) {
   const {
-    effectiveMessage,
     endStream,
     intent,
     llmConfigured,
@@ -49,12 +46,6 @@ export async function handleWendyLocalQuickAction(input: {
     userId,
   } = input;
 
-  const suggestedPromptExtraFor = (candidateMessage: string) => {
-    const kind = classifyWendyDataBackedQuickAction(candidateMessage);
-    return kind
-      ? { suggestedPrompts: buildWendyDataBackedSuggestedPrompts({ kind, locale }) }
-      : {};
-  };
   const finish = (text: string, extra: Record<string, unknown>) => {
     const outputTokens = estimateTokens(text);
     const ttftMs = Date.now() - startedAt;
@@ -63,99 +54,6 @@ export async function handleWendyLocalQuickAction(input: {
     endStream();
     return { assistantResponseForMemory: text, outputTokens, ttftMs };
   };
-
-  const dataBackedQuickAction = classifyWendyDataBackedQuickAction(effectiveMessage);
-  if (dataBackedQuickAction) {
-    const [objectivesResult, contextResult] = await Promise.all([
-      executeWendyToolCall("get_user_objectives", {}, userId),
-      executeWendyToolCall("get_user_context", {}, userId),
-    ]);
-    send({
-      type: "tool_call",
-      name: "get_user_objectives",
-      args: {},
-      result: objectivesResult.ok ? objectivesResult.data : null,
-    });
-    send({
-      type: "tool_call",
-      name: "get_user_context",
-      args: {},
-      result: contextResult.ok ? contextResult.data : null,
-    });
-
-    const quickActionText = formatWendyDataBackedQuickActionReply({
-      kind: dataBackedQuickAction,
-      locale,
-      objectives: objectivesResult.ok ? objectivesResult.data : undefined,
-      userContext: contextResult.ok ? contextResult.data : undefined,
-    });
-    const guidedAction = buildWendyDataBackedGuidedAction({
-      kind: dataBackedQuickAction,
-      objectives: objectivesResult.ok ? objectivesResult.data : undefined,
-      userContext: contextResult.ok ? contextResult.data : undefined,
-    });
-    if (guidedAction) {
-      const guidedActionResult = guidedAction.confirmBeforeExecution
-        ? {
-            ok: true as const,
-            data: buildConfirmableClientAction(guidedAction.toolName, guidedAction.args),
-          }
-        : await executeWendyToolCall(
-            guidedAction.toolName,
-            guidedAction.args,
-            userId,
-          );
-      send({
-        type: "tool_call",
-        name: guidedAction.toolName,
-        args: guidedAction.args,
-        result: guidedActionResult.ok ? guidedActionResult.data : null,
-      });
-    }
-
-    return finish(quickActionText, {
-      intent,
-      answerMode: "local-quick-action",
-      suggestedPrompts: buildWendyDataBackedSuggestedPrompts({
-        kind: dataBackedQuickAction,
-        locale,
-      }),
-      usage: {
-        model: "local-data-quick-action",
-        inputTokens: estimateTokens(message),
-        outputTokens: estimateTokens(quickActionText),
-      },
-    });
-  }
-
-  if (shouldUseImmediateWendyRecoveryFallback({ intent, message, llmConfigured })) {
-    const quickActionText = getWendyRecoveryFallbackReply({ intent, message, locale });
-    return finish(quickActionText, {
-      intent,
-      answerMode: "local-quick-action",
-      ...suggestedPromptExtraFor(message),
-      usage: {
-        model: "local-quick-action",
-        inputTokens: estimateTokens(message),
-        outputTokens: estimateTokens(quickActionText),
-      },
-    });
-  }
-
-  if (shouldUseImmediateFastPathFallback({ intent, message })) {
-    const fallbackText = getFastPathFallbackReply({ intent, message, locale });
-    if (fallbackText) {
-      return finish(fallbackText, {
-        intent,
-        answerMode: "local-fast-path",
-        usage: {
-          model: "local-fast-path",
-          inputTokens: estimateTokens(message),
-          outputTokens: estimateTokens(fallbackText),
-        },
-      });
-    }
-  }
 
   if (!llmConfigured) {
     const msg = getLlmUnavailableReply(locale);

@@ -27,6 +27,7 @@ vi.mock("@/hooks/useWendyChat", () => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
+    i18n: { language: "en-US", resolvedLanguage: "en-US" },
     t: (key: string, params?: Record<string, string>) => {
       if (key === "search.noResults") return `Nessun risultato per "${params?.query ?? ""}"`;
       if (key === "search.placeholder") return "Cerca settori, ruoli, articoli...";
@@ -36,6 +37,11 @@ vi.mock("react-i18next", () => ({
       return key;
     },
   }),
+}));
+
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: ({ key, source }: { key?: string; source: string }) =>
+    key ? `dynamic:${key}` : source,
 }));
 
 vi.mock("@/components/wendy/WendyConsole", () => ({
@@ -135,17 +141,35 @@ describe("SearchDialog", () => {
       results: [{ id: 1, type: "role", title: "UX Designer", description: "Design role", url: "/roles/ux", icon: "x", color: "blue" }],
     });
 
-    expect(screen.getByText("Ricerca globale")).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Chat Wendy" })).toBeInTheDocument();
+    expect(screen.getByText("dynamic:search.dialog.globalTitle")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "dynamic:search.dialog.wendyChatLabel" })).toBeInTheDocument();
+  });
+
+  it("renders search and Wendy chrome through dynamic translation", () => {
+    useWendyChatMock.mockReturnValue(chatReturn({
+      messages: [{ id: "m1", role: "assistant", content: "Ciao", timestamp: 1 }],
+    }));
+
+    renderDialog({
+      query: "design",
+      isError: true,
+      results: [],
+    });
+
+    expect(screen.getByText("dynamic:search.dialog.globalTitle")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "dynamic:search.dialog.wendyChatLabel" })).toBeInTheDocument();
+    expect(screen.getByText("dynamic:search.dialog.errorTitle")).toBeInTheDocument();
+    expect(screen.queryByText("Ricerca globale")).not.toBeInTheDocument();
+    expect(screen.queryByText("La ricerca globale non e disponibile adesso.")).not.toBeInTheDocument();
   });
 
   it("shows a clear empty search state that suggests asking Wendy", () => {
     renderDialog({ query: "zzzz" });
 
-    expect(screen.getByText('Nessun risultato globale per "zzzz"')).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Chiedi a Wendy/i })).toBeInTheDocument();
+    expect(screen.getByText("dynamic:search.dialog.emptyTitle")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:search.dialog.askWendyCurrent" })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Chiedi a Wendy/i }));
+    fireEvent.click(screen.getByRole("button", { name: "dynamic:search.dialog.askWendyCurrent" }));
 
     expect(sendMessage).toHaveBeenCalledWith("zzzz");
   });
@@ -153,8 +177,8 @@ describe("SearchDialog", () => {
   it("shows a recoverable global search error without hiding Wendy", () => {
     renderDialog({ query: "design", isError: true });
 
-    expect(screen.getByText("La ricerca globale non e disponibile adesso.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Chiedi a Wendy/i })).toBeInTheDocument();
+    expect(screen.getByText("dynamic:search.dialog.errorTitle")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:search.dialog.askWendyCurrent" })).toBeInTheDocument();
   });
 
   it("keeps mobile search results and Wendy chat inside one reachable sheet layout", () => {
@@ -169,7 +193,7 @@ describe("SearchDialog", () => {
     });
 
     const commandList = container.querySelector("[cmdk-list]");
-    const chatRegion = screen.getByRole("region", { name: "Chat Wendy" });
+    const chatRegion = screen.getByRole("region", { name: "dynamic:search.dialog.wendyChatLabel" });
 
     expect(commandList).toHaveClass("min-h-0", "flex-1", "max-h-none");
     expect(commandList).not.toHaveClass("max-h-[60vh]");
@@ -219,7 +243,7 @@ describe("SearchDialog", () => {
       }],
     });
 
-    const sideResults = screen.getByRole("region", { name: "Ricerca globale" });
+    const sideResults = screen.getByRole("region", { name: "dynamic:search.dialog.globalTitle" });
 
     expect(within(sideResults).getByText("Biblioteca crescita")).toBeInTheDocument();
     expect(within(sideResults).getByText("Personalizzato")).toBeInTheDocument();
@@ -252,7 +276,7 @@ describe("SearchDialog", () => {
       }],
     });
 
-    expect(screen.getByText("indice degraded")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:search.dialog.indexStatus")).toBeInTheDocument();
   });
 
   it("shows degraded index state with the default router confidence", () => {
@@ -271,6 +295,6 @@ describe("SearchDialog", () => {
       }],
     });
 
-    expect(screen.getByText("indice degraded")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:search.dialog.indexStatus")).toBeInTheDocument();
   });
 });

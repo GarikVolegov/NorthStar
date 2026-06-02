@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { ChevronRight, Clock } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import { CAT_COLOR, CAT_EMOJI } from "./homeConstants";
@@ -7,6 +8,7 @@ import type { HomeNewsItem } from "./homeTypes";
 
 export function HomeNewsCard({ item }: { item: HomeNewsItem }) {
   const { t } = useTranslation();
+  const [imageFailed, setImageFailed] = useState(false);
   const catColor = CAT_COLOR[item.category] ?? CAT_COLOR["general"];
   const catEmoji = CAT_EMOJI[item.category] ?? "ðŸŒ";
   const catLabel = t(`news.categories.${item.category}`, {
@@ -29,21 +31,24 @@ export function HomeNewsCard({ item }: { item: HomeNewsItem }) {
       href={item.detailUrl ?? `/news/${item.id}`}
       className="group flex flex-col rounded-2xl border border-border bg-card hover:border-primary/30 transition-all duration-300 overflow-hidden h-full"
     >
-      {item.image ? (
+      {item.image && !imageFailed ? (
         <div className="aspect-video overflow-hidden bg-muted">
           <img
             src={item.image}
             alt={item.title}
             loading="lazy"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            onError={(e) => {
-              (e.currentTarget as HTMLImageElement).style.display = "none";
-            }}
+            onError={() => setImageFailed(true)}
           />
         </div>
       ) : (
-        <div className="aspect-video bg-muted/60 flex items-center justify-center">
-          <span className="text-3xl opacity-60">{catEmoji}</span>
+        <div
+          data-testid="home-news-image-fallback"
+          role="img"
+          aria-label={item.title}
+          className="aspect-video bg-muted/60 flex items-center justify-center"
+        >
+          <span className="text-3xl opacity-60" aria-hidden="true">{catEmoji}</span>
         </div>
       )}
       <div className="p-5 flex-1 flex flex-col">

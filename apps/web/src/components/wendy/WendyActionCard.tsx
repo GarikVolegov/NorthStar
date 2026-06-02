@@ -1,4 +1,5 @@
 import type { WendyAction } from "@/hooks/useWendyActionExecutor";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -11,6 +12,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 interface WendyActionCardProps {
   action: WendyAction;
@@ -24,17 +26,60 @@ function actionIcon(type: string) {
   return Sparkles;
 }
 
-function statusCopy(action: WendyAction) {
-  if (action.status === "executed" || action.status === "done") return "Completata";
-  if (action.status === "running") return "Eseguo...";
-  if (action.status === "failed") return "Non riuscita";
-  if (action.status === "cancelled") return "Annullata";
-  if (action.requiresConfirmation) return "Da confermare";
-  return "Pronta";
+function statusCopy(action: WendyAction): { key: string; source: string } {
+  if (action.status === "executed" || action.status === "done") {
+    return { key: "wendy.action.status.completed", source: "Completata" };
+  }
+  if (action.status === "running") {
+    return { key: "wendy.action.status.running", source: "Eseguo..." };
+  }
+  if (action.status === "failed") {
+    return { key: "wendy.action.status.failed", source: "Non riuscita" };
+  }
+  if (action.status === "cancelled") {
+    return { key: "wendy.action.status.cancelled", source: "Annullata" };
+  }
+  if (action.requiresConfirmation) {
+    return { key: "wendy.action.status.needsConfirmation", source: "Da confermare" };
+  }
+  return { key: "wendy.action.status.ready", source: "Pronta" };
 }
 
 export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCardProps) {
+  const { i18n } = useTranslation();
+  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
   const [strongConfirmation, setStrongConfirmation] = useState("");
+  const status = statusCopy(action);
+  const statusLabel = useDynamicTranslation({
+    locale,
+    key: status.key,
+    source: status.source,
+    context: "Wendy action status badge",
+  });
+  const strongConfirmationLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.action.strongConfirmation.label",
+    source: "Testo di conferma",
+    context: "Wendy high-risk action confirmation input label",
+  });
+  const cancelLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.action.cancel",
+    source: "Annulla",
+    context: "Cancel a pending Wendy action",
+  });
+  const confirmLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.action.confirm",
+    source: "Conferma",
+    context: "Confirm a pending Wendy action",
+  });
+  const retryLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.action.retry",
+    source: "Riprova",
+    context: "Retry a failed Wendy action",
+  });
   const Icon = action.status === "executed" || action.status === "done"
     ? CheckCircle2
     : action.status === "failed" || action.status === "cancelled"
@@ -86,7 +131,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold text-foreground">{action.label}</p>
             <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {statusCopy(action)}
+              {statusLabel}
             </span>
           </div>
           {action.description && action.status !== "failed" && (
@@ -113,7 +158,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
           {strongConfirmationRequired && (action.status === "needs_confirmation" || action.status === "failed") && (
             <label className="mt-3 block text-xs text-muted-foreground">
               <span className="mb-1 block font-medium text-foreground">
-                Testo di conferma
+                {strongConfirmationLabel}
               </span>
               <input
                 type="text"
@@ -121,7 +166,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
                 onChange={(event) => setStrongConfirmation(event.target.value)}
                 placeholder={action.confirmationText}
                 className="h-10 w-full rounded-md border border-white/10 bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground/45 focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/30"
-                aria-label="Testo di conferma"
+                aria-label={strongConfirmationLabel}
               />
             </label>
           )}
@@ -137,7 +182,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
               className="inline-flex min-h-10 items-center gap-2 rounded-full border border-white/10 px-3 text-xs font-semibold text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
             >
               <X className="h-3.5 w-3.5" />
-              Annulla
+              {cancelLabel}
             </button>
           )}
           {action.requiresConfirmation && (action.status === "needs_confirmation" || canRetry) && (
@@ -153,7 +198,7 @@ export function WendyActionCard({ action, onConfirm, onCancel }: WendyActionCard
               )}
             >
               <Check className="h-3.5 w-3.5" />
-              {canRetry ? "Riprova" : "Conferma"}
+              {canRetry ? retryLabel : confirmLabel}
             </button>
           )}
         </div>

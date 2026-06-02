@@ -28,7 +28,7 @@ interface ProtectedRouteProps {
 export function ProtectedRoute({ component: Component, ...rest }: ProtectedRouteProps) {
   const { isLoaded, isSignedIn } = useUser();
   const { signOut } = useClerk();
-  const { authReady, isLoggedIn, authSyncFailed, authSyncError, logout } = useAuth();
+  const { authReady, isLoggedIn, authSyncFailed, authSyncError, logout, user } = useAuth();
 
   // Aspetta che sia Clerk che il sync locale siano pronti
   if (!isLoaded || !authReady) {
@@ -90,13 +90,18 @@ export function ProtectedRoute({ component: Component, ...rest }: ProtectedRoute
     );
   }
 
+  if (user?.onboardingCompleted === false) {
+    return <Redirect to="/" />;
+  }
+
   return <Component {...rest} />;
 }
 
 export function PublicOnlyRoute({ component: Component, ...rest }: ProtectedRouteProps) {
   const { isLoaded, isSignedIn } = useUser();
+  const { authReady, isLoggedIn, user } = useAuth();
 
-  if (!isLoaded) {
+  if (!isLoaded || (isSignedIn && !authReady)) {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-background z-50">
         <PageLoader />
@@ -104,8 +109,8 @@ export function PublicOnlyRoute({ component: Component, ...rest }: ProtectedRout
     );
   }
 
-  if (isSignedIn) {
-    return <Redirect to="/dashboard" />;
+  if (isSignedIn && isLoggedIn) {
+    return <Redirect to={user?.onboardingCompleted ? "/dashboard" : "/"} />;
   }
 
   return <Component {...rest} />;

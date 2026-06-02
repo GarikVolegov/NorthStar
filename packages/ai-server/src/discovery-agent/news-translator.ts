@@ -5,6 +5,7 @@ import { selectModelFor } from "../model-router";
 
 type NewsLocale = "it" | "en" | "es" | "fr" | "de";
 type NewsSectionKey = "audience" | "happened" | "why" | "practical";
+type NewsTranslationStatus = "translated" | "source" | "failed";
 
 type NewsMeaningSection = {
   key: NewsSectionKey;
@@ -28,6 +29,7 @@ export type TranslatableNewsItem = {
   description?: string | null;
   content?: string | null;
   language?: NewsLocale;
+  translationStatus?: NewsTranslationStatus;
   meaning?: TranslatableNewsMeaning;
 };
 
@@ -70,8 +72,9 @@ function mergeSections(
 }
 
 export async function translateNewsForLocale<T extends TranslatableNewsItem>(item: T, locale: NewsLocale): Promise<T> {
-  if (locale === "it") return { ...item, language: locale };
-  if (!isLlmConfigured()) return { ...item, language: locale };
+  if (locale === "it") return { ...item, language: locale, translationStatus: "source" };
+  const originalLanguage = item.language ?? "it";
+  if (!isLlmConfigured()) return { ...item, language: originalLanguage, translationStatus: "source" };
 
   const sections = item.meaning?.sections?.map((section) => ({
     key: section.key,
@@ -127,6 +130,7 @@ export async function translateNewsForLocale<T extends TranslatableNewsItem>(ite
     return {
       ...item,
       language: locale,
+      translationStatus: "translated",
       title: clean(parsed.title, 500) ?? item.title,
       preview: clean(parsed.preview, 500) ?? item.preview,
       description: clean(parsed.description, 500) ?? item.description,
@@ -135,6 +139,6 @@ export async function translateNewsForLocale<T extends TranslatableNewsItem>(ite
     };
   } catch (err) {
     logger.warn({ err, articleId: item.id, locale }, "[news-translator] dynamic translation failed");
-    return { ...item, language: locale };
+    return { ...item, language: originalLanguage, translationStatus: "failed" };
   }
 }

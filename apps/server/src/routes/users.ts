@@ -133,13 +133,24 @@ router.post("/", async (req, res) => {
 
 router.patch("/onboarding", requireAuth, async (req, res) => {
   const userId = req.user!.id;
+  const now = new Date();
 
-  await db
-    .update(usersTable)
-    .set({ onboardingCompleted: true, updatedAt: new Date() })
-    .where(eq(usersTable.id, userId));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(usersTable)
+      .set({ onboardingCompleted: true, updatedAt: now })
+      .where(eq(usersTable.id, userId));
 
-  res.json({ onboardingCompleted: true });
+    await tx
+      .insert(userProfileSettingsTable)
+      .values({ userId, onboardingStep: 4, updatedAt: now })
+      .onConflictDoUpdate({
+        target: userProfileSettingsTable.userId,
+        set: { onboardingStep: 4, updatedAt: now },
+      });
+  });
+
+  res.json({ onboardingCompleted: true, onboardingStep: 4 });
 });
 
 /* ─── GET /api/users/:userId/public  —  profilo pubblico ──────────── */

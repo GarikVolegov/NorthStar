@@ -51,4 +51,12 @@ describe("DashboardDiscoveryFeed", () => {
 
     expect(screen.getByLabelText(/product design.*settore promosso/i)).toHaveClass("border-primary/35");
   });
+
+  it("links every sector recommendation to the role choice step", () => {
+    render(<DashboardDiscoveryFeed sectors={sectors} userId={7} />);
+
+    const roleLinks = screen.getAllByRole("link", { name: /apri ruoli del settore/i });
+    expect(roleLinks[0]).toHaveAttribute("href", "/settore/1#ruoli");
+    expect(screen.getByRole("link", { name: /scegli settore e ruolo/i })).toHaveAttribute("href", "/settori");
+  });
 });

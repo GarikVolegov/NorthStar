@@ -10,11 +10,40 @@
  */
 import { SignUp } from "@clerk/react";
 import { AppLogo } from "@/components/brand/AppLogo";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { Sparkles } from "lucide-react";
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 
 export default function SignUpPage() {
+  const { i18n } = useTranslation();
+  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
+  const brandTagline = useDynamicTranslation({
+    locale,
+    key: "auth.brandTagline",
+    source: "Il tuo orientamento professionale",
+    context: "Authentication page brand tagline",
+  });
+  const subtitle = useDynamicTranslation({
+    locale,
+    key: "auth.signUp.subtitle",
+    source: "Gratis - inizia il tuo percorso oggi",
+    context: "Sign-up page subtitle",
+  });
+  const hasAccountLabel = useDynamicTranslation({
+    locale,
+    key: "auth.signUp.hasAccount",
+    source: "Hai gia' un account?",
+    context: "Sign-up footer prompt before the sign-in link",
+  });
+  const signInLabel = useDynamicTranslation({
+    locale,
+    key: "auth.signUp.signIn",
+    source: "Accedi",
+    context: "Sign-up footer link to sign in",
+  });
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const referralCode = params.get("ref") ?? params.get("referralCode");
@@ -33,13 +62,13 @@ export default function SignUpPage() {
           </div>
           <div>
             <span className="font-bold text-lg text-foreground leading-none block">NorthStar</span>
-            <span className="text-xs text-muted-foreground leading-none">Il tuo orientamento professionale</span>
+            <span className="text-xs text-muted-foreground leading-none">{brandTagline}</span>
           </div>
         </Link>
         <div className="flex items-center gap-2 mt-1">
           <Sparkles className="h-3.5 w-3.5 text-primary" />
           <p className="text-sm text-muted-foreground text-center">
-            Gratis — inizia il tuo percorso oggi
+            {subtitle}
           </p>
         </div>
       </div>
@@ -49,17 +78,18 @@ export default function SignUpPage() {
         routing="path"
         path="/sign-up"
         signInUrl="/sign-in"
-        forceRedirectUrl="/dashboard"
-        fallbackRedirectUrl="/dashboard"
+        forceRedirectUrl="/"
+        fallbackRedirectUrl="/"
       />
 
       {/* Footer */}
       <p className="mt-8 text-xs text-muted-foreground text-center">
-        Hai già un account?{" "}
+        {hasAccountLabel}{" "}
         <Link href="/sign-in" className="text-primary hover:underline font-semibold">
-          Accedi
+          {signInLabel}
         </Link>
       </p>
     </div>
   );
 }
+

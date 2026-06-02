@@ -2,7 +2,10 @@ import { UiToolRenderer } from "@/components/wendy/UiToolRenderer";
 import { WendyActionCard } from "@/components/wendy/WendyActionCard";
 import type { ChatMessage as WendyMessage } from "@/hooks/useWendyChat";
 import { withWendySuggestedPromptFallback } from "@/hooks/wendySuggestedPrompts";
+import type { WendySuggestedPrompt } from "@/hooks/useWendyChatSse";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "react-i18next";
 import { WendySources } from "./WendySources";
 
 interface WendyMessageBubbleProps {
@@ -31,6 +34,87 @@ function buildFollowUpContext(message: WendyMessage, selectedLabel: string): str
   ].filter(Boolean).join("\n\n");
 }
 
+function useWendyMessageLocale(): string {
+  const { i18n } = useTranslation();
+  return (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
+}
+
+function WendySuggestedPromptList({
+  message,
+  suggestedPrompts,
+  onFollowUpPrompt,
+}: {
+  message: WendyMessage;
+  suggestedPrompts: WendySuggestedPrompt[];
+  onFollowUpPrompt: (prompt: string, contextPrompt?: string) => void;
+}) {
+  const locale = useWendyMessageLocale();
+  const ariaLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.message.followUps.ariaLabel",
+    source: "Prossimi passi Wendy",
+    context: "ARIA label for Wendy follow-up suggested prompt chips",
+  });
+  const heading = useDynamicTranslation({
+    locale,
+    key: "wendy.message.followUps.heading",
+    source: "Continua con Wendy",
+    context: "Small heading above Wendy follow-up suggested prompt chips",
+  });
+
+  return (
+    <div className="mt-1.5 max-w-full space-y-2" aria-label={ariaLabel}>
+      <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {heading}
+      </p>
+      <div className="flex max-w-full flex-wrap gap-1.5">
+        {suggestedPrompts.map((item) => (
+          <WendySuggestedPromptButton
+            key={`${message.id}-${item.prompt}`}
+            message={message}
+            prompt={item}
+            onFollowUpPrompt={onFollowUpPrompt}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function WendySuggestedPromptButton({
+  message,
+  prompt,
+  onFollowUpPrompt,
+}: {
+  message: WendyMessage;
+  prompt: WendySuggestedPrompt;
+  onFollowUpPrompt: (prompt: string, contextPrompt?: string) => void;
+}) {
+  const locale = useWendyMessageLocale();
+  const label = useDynamicTranslation({
+    locale,
+    source: prompt.labelTranslation?.source ?? prompt.label,
+    context: prompt.labelTranslation?.context ?? "Wendy follow-up suggested prompt button label",
+    ...(prompt.labelTranslation?.key ? { key: prompt.labelTranslation.key } : {}),
+  });
+  const promptText = useDynamicTranslation({
+    locale,
+    source: prompt.promptTranslation?.source ?? prompt.prompt,
+    context: prompt.promptTranslation?.context ?? "Prompt sent to Wendy when the user clicks a follow-up chip",
+    ...(prompt.promptTranslation?.key ? { key: prompt.promptTranslation.key } : {}),
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={() => onFollowUpPrompt(promptText, buildFollowUpContext(message, label))}
+      className="inline-flex min-h-8 max-w-full items-center rounded-full border border-primary/20 bg-primary/8 px-2.5 text-left text-[11px] font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+    >
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
 export function WendyMessageBubble({
   message,
   onConfirmAction,
@@ -52,24 +136,12 @@ export function WendyMessageBubble({
             <div className="rounded-2xl rounded-tl-sm border border-destructive/20 bg-destructive/8 px-3.5 py-2.5 text-sm text-destructive">
               {message.content}
             </div>
-            {suggestedPrompts.length > 0 && (
-              <div className="mt-1.5 max-w-full space-y-2" aria-label="Prossimi passi Wendy">
-                <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                  Continua con Wendy
-                </p>
-                <div className="flex max-w-full flex-wrap gap-1.5">
-                  {suggestedPrompts.map((item) => (
-                    <button
-                      key={`${message.id}-${item.prompt}`}
-                      type="button"
-                      onClick={() => onFollowUpPrompt?.(item.prompt, buildFollowUpContext(message, item.label))}
-                      className="inline-flex min-h-8 max-w-full items-center rounded-full border border-primary/20 bg-primary/8 px-2.5 text-left text-[11px] font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-                    >
-                      <span className="truncate">{item.label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+            {suggestedPrompts.length > 0 && onFollowUpPrompt && (
+              <WendySuggestedPromptList
+                message={message}
+                suggestedPrompts={suggestedPrompts}
+                onFollowUpPrompt={onFollowUpPrompt}
+              />
             )}
           </div>
         </div>
@@ -123,23 +195,11 @@ export function WendyMessageBubble({
                 />
               ))}
               {suggestedPrompts.length > 0 && onFollowUpPrompt && (
-                <div className="mt-1.5 max-w-full space-y-2" aria-label="Prossimi passi Wendy">
-                  <p className="px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Continua con Wendy
-                  </p>
-                  <div className="flex max-w-full flex-wrap gap-1.5">
-                    {suggestedPrompts.map((item) => (
-                      <button
-                        key={`${message.id}-${item.prompt}`}
-                        type="button"
-                        onClick={() => onFollowUpPrompt(item.prompt, buildFollowUpContext(message, item.label))}
-                        className="inline-flex min-h-8 max-w-full items-center rounded-full border border-primary/20 bg-primary/8 px-2.5 text-left text-[11px] font-semibold text-foreground transition-colors hover:border-primary/35 hover:bg-primary/12 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-                      >
-                        <span className="truncate">{item.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <WendySuggestedPromptList
+                  message={message}
+                  suggestedPrompts={suggestedPrompts}
+                  onFollowUpPrompt={onFollowUpPrompt}
+                />
               )}
               <WendySources message={message} />
             </>

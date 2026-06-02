@@ -1,7 +1,9 @@
 import { useProactiveInsights, type ProactiveInsight } from "@/hooks/useProactiveInsights";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { Compass, Sparkles } from "lucide-react";
 import { useMemo } from "react";
+import { useTranslation } from "react-i18next";
 
 interface StarterPrompt {
   label: string;
@@ -29,7 +31,21 @@ export function WendyPromptSuggestions({
   compact = false,
   className,
 }: WendyPromptSuggestionsProps) {
+  const { i18n } = useTranslation();
+  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
   const { insights } = useProactiveInsights();
+  const ariaLabel = useDynamicTranslation({
+    locale,
+    key: "wendy.promptSuggestions.ariaLabel",
+    source: "Suggerimenti Wendy",
+    context: "ARIA label for Wendy proactive and starter prompt suggestions",
+  });
+  const heading = useDynamicTranslation({
+    locale,
+    key: "wendy.promptSuggestions.heading",
+    source: "Wendy ti suggerisce",
+    context: "Small heading above Wendy proactive and starter prompt suggestions",
+  });
 
   const prompts = useMemo(() => {
     const proactive = (insights as InsightWithPrompt[])
@@ -53,11 +69,11 @@ export function WendyPromptSuggestions({
   if (prompts.length === 0) return null;
 
   return (
-    <section className={cn("space-y-2", className)} aria-label="Suggerimenti Wendy">
+    <section className={cn("space-y-2", className)} aria-label={ariaLabel}>
       <div className="flex items-center gap-2 px-1">
         <Sparkles className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
         <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Wendy ti suggerisce
+          {heading}
         </p>
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">

@@ -444,6 +444,7 @@ router.post(
     const preparedContext = await prepareWendyContext({
       effectiveMessage,
       intent,
+      locale,
       logger: rootLogger,
       ...(pageContext ? { pageContext: pageContext as WendyPageContext } : {}),
       requestId,

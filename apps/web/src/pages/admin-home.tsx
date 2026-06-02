@@ -224,7 +224,7 @@ export default function AdminHome() {
                   { href: "/test", label: "Test RIASEC" },
                   { href: "/profilo", label: "Profilo utente" },
                   { href: "/crescita", label: "Modulo crescita" },
-                  { href: "/calendar", label: "Calendario" },
+                  { href: "/calendario", label: "Calendario" },
                   { href: "/wiki/1", label: "Wendy AI" },
                 ].map((l) => (
                   <a

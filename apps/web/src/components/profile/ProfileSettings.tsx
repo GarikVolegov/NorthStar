@@ -49,6 +49,7 @@ import {
   Volume2,
 } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -87,7 +88,8 @@ export function ProfileSettings({
 }: ProfileSettingsProps) {
   const { isLefty, setIsLefty } = useLefty();
   const appAudio = useAppAudio();
-  const { updateUser } = useAuth();
+  const { logout, updateUser } = useAuth();
+  const [, navigate] = useLocation();
   const queryClient = useQueryClient();
   const [backgroundPickerOpen, setBackgroundPickerOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState(false);
@@ -182,7 +184,8 @@ export function ProfileSettings({
     setAccountActionSuccess(null);
     try {
       await deleteJson(`${BASE}api/account`);
-      setAccountActionSuccess("Eliminazione account avviata. Lo stato verra' aggiornato dal server.");
+      logout();
+      navigate("/sign-in", { replace: true });
     } catch (error) {
       setAccountActionError(
         `Eliminazione non avviata: ${apiErrorMessage(error, "riprova tra poco")}. Nessuna modifica all'account e' stata applicata.`,

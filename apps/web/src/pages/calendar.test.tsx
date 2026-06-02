@@ -9,6 +9,7 @@ const getJsonMock = vi.hoisted(() => vi.fn());
 const deleteJsonMock = vi.hoisted(() => vi.fn());
 const apiFetchMock = vi.hoisted(() => vi.fn());
 const toastMock = vi.hoisted(() => vi.fn());
+const useDynamicTranslationMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/apiClient", async () => {
   const actual = await vi.importActual<typeof import("@/lib/apiClient")>("@/lib/apiClient");
@@ -21,6 +22,10 @@ vi.mock("@/lib/apiClient", async () => {
 
 vi.mock("@/lib/api-fetch", () => ({
   apiFetch: apiFetchMock,
+}));
+
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: useDynamicTranslationMock,
 }));
 
 vi.mock("@/contexts/AuthContext", () => ({
@@ -37,6 +42,10 @@ vi.mock("@/hooks/use-toast", () => ({
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
+    i18n: {
+      resolvedLanguage: "en-US",
+      language: "it",
+    },
     t: (key: string) => {
       const labels: Record<string, string> = {
         "calendar.editEvent": "Modifica evento",
@@ -116,6 +125,12 @@ function isoAtDayOffset(dayOffset: number, hour: number) {
 describe("calendar persistence states", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getJsonMock.mockReset();
+    deleteJsonMock.mockReset();
+    apiFetchMock.mockReset();
+    toastMock.mockReset();
+    useDynamicTranslationMock.mockReset();
+    useDynamicTranslationMock.mockImplementation(({ source }: { source: string }) => source);
     localStorage.clear();
     sessionStorage.clear();
     Object.defineProperty(URL, "createObjectURL", {
@@ -142,6 +157,32 @@ describe("calendar persistence states", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Calendario non disponibile");
     expect(screen.getByRole("button", { name: "Riprova caricamento calendario" })).toBeInTheDocument();
+  });
+
+  it("uses dynamic translations for calendar page chrome and retryable states", async () => {
+    useDynamicTranslationMock.mockImplementation(({ key, source }: { key?: string; source: string }) =>
+      key ? `dynamic:${key}` : source,
+    );
+    getJsonMock.mockRejectedValue(new Error("calendar unavailable"));
+
+    renderCalendar();
+
+    expect(await screen.findByText("dynamic:calendar.page.title")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:calendar.page.subtitle")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:calendar.view.day" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:calendar.actions.exportIcs" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:calendar.actions.newEvent" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:calendar.nav.previous" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:calendar.nav.today" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "dynamic:calendar.nav.next" })).toBeInTheDocument();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("dynamic:calendar.error.unavailableTitle");
+    expect(alert).toHaveTextContent("dynamic:calendar.error.loadPreserved");
+    expect(useDynamicTranslationMock).toHaveBeenCalledWith(expect.objectContaining({
+      key: "calendar.page.title",
+      locale: "en",
+      source: "Calendario",
+    }));
   });
 
   it("keeps the event dialog open when delete persistence fails", async () => {
@@ -212,5 +253,21 @@ describe("calendar persistence states", () => {
     fireEvent.click(screen.getByRole("button", { name: "Giorno" }));
 
     expect(await screen.findByText("Workshop multi-giorno")).toBeInTheDocument();
+  });
+
+  it("names the calendar navigation controls for assistive technology", async () => {
+    getJsonMock.mockImplementation((url: string) => {
+      if (url.includes("api/calendar/events?")) return Promise.resolve({ events: [] });
+      if (url.includes("api/calendar/quota")) return Promise.resolve({ isPremium: false, eventCount: 0, eventLimit: 25 });
+      if (url.includes("api/sectors")) return Promise.resolve([]);
+      if (url.includes("api/objectives/me")) return Promise.resolve([]);
+      return Promise.resolve({});
+    });
+
+    renderCalendar();
+
+    expect(await screen.findByRole("button", { name: "Periodo precedente" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Vai a oggi" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Periodo successivo" })).toBeInTheDocument();
   });
 });

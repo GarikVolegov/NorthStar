@@ -1,7 +1,22 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JourneyToolsSection } from "./JourneyToolsSection";
+
+const useDynamicTranslationMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: useDynamicTranslationMock,
+}));
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    i18n: {
+      language: "it",
+      resolvedLanguage: "en-US",
+    },
+  }),
+}));
 
 vi.mock("wouter", () => ({
   Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
@@ -12,6 +27,13 @@ vi.mock("wouter", () => ({
 }));
 
 describe("JourneyToolsSection", () => {
+  beforeEach(() => {
+    useDynamicTranslationMock.mockReset();
+    useDynamicTranslationMock.mockImplementation(({ key, source }: { key?: string; source: string }) =>
+      key ? `dynamic:${key}` : source,
+    );
+  });
+
   it("condenses tools when the adaptive presentation is compact", () => {
     render(
       <JourneyToolsSection
@@ -22,8 +44,11 @@ describe("JourneyToolsSection", () => {
     );
 
     expect(screen.getAllByRole("link")).toHaveLength(3);
-    expect(screen.getByRole("link", { name: /esplora settori/i })).toBeInTheDocument();
-    expect(screen.queryByText(/notizie lavoro/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /dynamic:dashboard\.journeyTools\.tools\.exploreSectors\.title/i })).toHaveAttribute(
+      "href",
+      "/settori",
+    );
+    expect(screen.queryByText("dynamic:dashboard.journeyTools.tools.newsWork.title")).not.toBeInTheDocument();
   });
 
   it("marks the phase tool as the emphasized card when presentation is primary", () => {
@@ -35,7 +60,38 @@ describe("JourneyToolsSection", () => {
       />,
     );
 
-    const choosePathLink = screen.getByRole("link", { name: /scegli percorso/i });
+    const choosePathLink = screen.getByRole("link", { name: /dynamic:dashboard\.journeyTools\.tools\.choosePath\.title/i });
     expect(choosePathLink.firstElementChild).toHaveClass("sm:col-span-2");
+  });
+
+  it("translates rendered tool titles, descriptions, and badges with the selected locale", () => {
+    render(<JourneyToolsSection journeyType="dipendente" sectorId={7} />);
+
+    expect(screen.getByRole("link", { name: /dynamic:dashboard\.journeyTools\.tools\.skillsGap\.title/i })).toHaveAttribute(
+      "href",
+      "/skills-gap/7",
+    );
+    expect(screen.getByText("dynamic:dashboard.journeyTools.tools.skillsGap.description")).toBeInTheDocument();
+    expect(screen.getAllByText("dynamic:dashboard.journeyTools.badges.ai")).not.toHaveLength(0);
+    expect(screen.queryByText("Competenze da sviluppare")).not.toBeInTheDocument();
+
+    expect(useDynamicTranslationMock).toHaveBeenCalledWith(expect.objectContaining({
+      locale: "en-US",
+      key: "dashboard.journeyTools.tools.skillsGap.title",
+      source: "Competenze da sviluppare",
+      context: "Dashboard journey tool title",
+    }));
+    expect(useDynamicTranslationMock).toHaveBeenCalledWith(expect.objectContaining({
+      locale: "en-US",
+      key: "dashboard.journeyTools.tools.skillsGap.description",
+      source: "Identifica cosa ti manca per salire di livello",
+      context: "Dashboard journey tool description",
+    }));
+    expect(useDynamicTranslationMock).toHaveBeenCalledWith(expect.objectContaining({
+      locale: "en-US",
+      key: "dashboard.journeyTools.badges.ai",
+      source: "AI",
+      context: "Dashboard journey tool badge",
+    }));
   });
 });

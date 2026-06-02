@@ -154,6 +154,18 @@ export type { EnricherResult } from "./discovery-agent/enricher-agent";
 export { runNewsPublisher } from "./discovery-agent/news-publisher";
 export { translateNewsForLocale } from "./discovery-agent/news-translator";
 export type { TranslatableNewsItem } from "./discovery-agent/news-translator";
+export {
+  clearDynamicUiTranslationCache,
+  SUPPORTED_DYNAMIC_UI_LOCALES,
+  translateDynamicUiStrings,
+} from "./i18n/dynamic-ui-translator";
+export type {
+  DynamicUiLocale,
+  DynamicUiTranslationItem,
+  DynamicUiTranslationResult,
+  DynamicUiTranslationResultItem,
+  DynamicUiTranslationStatus,
+} from "./i18n/dynamic-ui-translator";
 export { PUBLIC_NEWS_SOURCES, isPublicNewsArticleSource, isPublishableDiscoveryNews } from "./discovery-agent/news-policy";
 export { getOpenAIFallbackConfig, shouldFallbackToOpenAI } from "./client";
 export type { NewsPublisherResult } from "./discovery-agent/news-publisher";
@@ -202,7 +214,7 @@ export type { SearchProfessionRowsResult } from "./wendy-router/tool-handlers-da
 export { getSkillCooccurrenceRows } from "./wendy-router/tool-handlers-market";
 export { resolveWendyRoute } from "./wendy-router/router";
 export { buildLightPrompt }  from "./wendy-router/light-prompt";
-export { getFastPathFallbackReply, getWendyRecoveryFallbackReply, shouldUseImmediateFastPathFallback, shouldUseImmediateWendyRecoveryFallback, shouldUseWendyQuickActionFastPath, getLlmUnavailableReply } from "./wendy-router/fast-path-fallback";
+export { getWendyRecoveryFallbackReply, shouldUseWendyQuickActionFastPath, getLlmUnavailableReply } from "./wendy-router/fast-path-fallback";
 export { detectWendyLanguage, isLikelyItalianWendyMessage, type WendyDetectedLanguage } from "./wendy-router/language-detection";
 export { isLlmConfigured, resolveActiveProvider, hasGroqKey, hasOpenRouterKey, hasOpenAIKey } from "./client";
 export { getLocalWendyReply, getLocalWendyFallbackReply, isLocalWendyReplyMessage } from "./wendy-router/local-reply";

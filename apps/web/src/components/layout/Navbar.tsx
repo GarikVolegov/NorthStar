@@ -26,6 +26,7 @@ import {
 import { apiFetch } from "@/lib/api-fetch";
 import { getJson } from "@/lib/apiClient";
 import { NAV_LABELS } from "@/lib/constants";
+import { getDynamicTranslation, useDynamicTranslation } from "@/lib/dynamic-translation";
 import { useReducedMotion } from "@/lib/motion";
 import { useClerk } from "@clerk/react";
 import { LazyMotion, domAnimation, m } from "framer-motion";
@@ -68,25 +69,85 @@ export function Navbar() {
       : ["indeciso", "dipendente", "autonomo", "azienda", "investitore"].includes(user.journeyType)
         ? (user.journeyType as NavPhase)
         : "new-user";
+  const activeLanguage =
+    i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
 
   useEffect(() => {
     const cats = JOURNEY_CATEGORIES[phase].join(",");
 
-    getJson<{ news?: Array<{ title: string }> }>(`${BASE}api/news?multi=true&categories=${cats}&perCategory=2`)
+    getJson<{ news?: Array<{ title: string }> }>(
+      `${BASE}api/news?multi=true&categories=${cats}&perCategory=2&locale=${encodeURIComponent(activeLanguage)}`,
+    )
       .then((data) => {
         if (data?.news?.length) {
           setNewsTitles(data.news.map((item) => item.title));
         }
       })
       .catch(() => {});
-  }, [phase]);
+  }, [activeLanguage, phase]);
 
   const isWendyActive =
     wendy.phase === "thinking" || wendy.phase === "speaking";
   const displayName = user?.name || user?.email || NAV_LABELS.profilo;
   const initial = displayName.trim().charAt(0).toUpperCase() || "N";
-  const activeLanguage =
-    i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
+  const newsLinkLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Apri le notizie NorthStar",
+    key: "nav.news.open",
+    context: "Navbar news ticker link accessible label",
+  });
+  const wendyButtonLabelSource =
+    insightsUnread > 0
+      ? `Apri Wendy (${insightsUnread > 9 ? "9+" : insightsUnread} insight non letti)`
+      : "Apri ricerca Wendy";
+  const wendyButtonLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: wendyButtonLabelSource,
+    key: insightsUnread > 0 ? "nav.wendy.openWithUnread" : "nav.wendy.openSearch",
+    context: "Navbar Wendy search button accessible label",
+  });
+  const wendyPlaceholder = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Chiedi a Wendy...",
+    key: "nav.wendy.placeholder",
+    context: "Navbar Wendy search placeholder",
+  });
+  const closeProfileMenuLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Chiudi menu profilo",
+    key: "nav.profileMenu.close",
+    context: "Navbar mobile profile menu backdrop accessible label",
+  });
+  const profileMenuDialogLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Menu profilo",
+    key: "nav.profileMenu.dialog",
+    context: "Navbar mobile profile menu dialog label",
+  });
+  const openProfileMenuLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: `Apri menu profilo di ${displayName}`,
+    key: "nav.profileMenu.open",
+    context: "Navbar profile menu button accessible label; keep the user name unchanged",
+  });
+  const applicationsLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: t("nav.applications", { defaultValue: "Candidature" }),
+    key: "nav.applications",
+    context: "Navbar profile menu applications link",
+  });
+  const logoutLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: t("nav.logout", { defaultValue: "Esci" }),
+    key: "nav.logout",
+    context: "Navbar profile menu logout action",
+  });
+  const loginLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: t("nav.login", { defaultValue: "Accedi" }),
+    key: "nav.login",
+    context: "Navbar sign-in button",
+  });
   const tickerTitles =
     newsTitles.length > 0 ? newsTitles : DEFAULT_NEWS_TICKER_ITEMS;
   const mobileMenuScale = !isMobile
@@ -172,9 +233,23 @@ export function Navbar() {
     if (!affiliatePreview.referralLink) return;
     if (navigator.share) {
       try {
+        const [title, text] = await Promise.all([
+          getDynamicTranslation({
+            locale: activeLanguage,
+            source: "Invito NorthStar",
+            key: "nav.affiliateInvite.shareTitle",
+            context: "Native share title for a NorthStar referral invite",
+          }),
+          getDynamicTranslation({
+            locale: activeLanguage,
+            source: "Iscriviti a NorthStar tramite il mio link.",
+            key: "nav.affiliateInvite.shareText",
+            context: "Native share text for a NorthStar referral invite",
+          }),
+        ]);
         await navigator.share({
-          title: "Invito NorthStar",
-          text: "Iscriviti a NorthStar tramite il mio link.",
+          title,
+          text,
           url: affiliatePreview.referralLink,
         });
         return;
@@ -196,8 +271,8 @@ export function Navbar() {
         insightsUnread,
         affiliatePreview,
         affiliateLinkCopied,
-        applicationsLabel: t("nav.applications"),
-        logoutLabel: t("nav.logout"),
+        applicationsLabel,
+        logoutLabel,
         onNavigate: goToProfilePath,
         onCopyAffiliate: () => void copyAffiliateLink(),
         onShareAffiliate: () => void shareAffiliateLink(),
@@ -215,7 +290,7 @@ export function Navbar() {
       {profileMenuOpen && isMobile && (
         <m.button
           type="button"
-          aria-label="Chiudi menu profilo"
+          aria-label={closeProfileMenuLabel}
           className="fixed inset-0 z-[45] bg-background/35 backdrop-blur-md"
           initial={prefersReduced ? {} : { opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -228,7 +303,7 @@ export function Navbar() {
         <m.div
           role="dialog"
           aria-modal="true"
-          aria-label="Menu profilo"
+          aria-label={profileMenuDialogLabel}
           className="fixed left-1/2 top-1/2 z-[60] w-[min(348px,calc(100vw-24px))] overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl"
           style={{
             transform: `translate(-50%, -50%) scale(${mobileMenuScale})`,
@@ -252,7 +327,7 @@ export function Navbar() {
             href="/news"
             onMouseEnter={() => prefetchRoute("/news")}
             onFocus={() => prefetchRoute("/news")}
-            aria-label="Apri le notizie NorthStar"
+            aria-label={newsLinkLabel}
             className="hidden h-11 basis-1/2 items-center gap-2 overflow-hidden rounded-full border border-white/10 bg-white/5 px-3 transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 md:flex"
           >
             <Newspaper className="h-4 w-4 shrink-0 text-primary" />
@@ -297,7 +372,7 @@ export function Navbar() {
             }}
             onMouseEnter={() => prefetchRoute("/wendy")}
             onFocus={() => prefetchRoute("/wendy")}
-            aria-label={insightsUnread > 0 ? `Apri Wendy (${insightsUnread > 9 ? '9+' : insightsUnread} insight non letti)` : "Apri ricerca Wendy"}
+            aria-label={wendyButtonLabel}
             className="group relative h-12 min-w-0 flex-1 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
           >
             {insightsUnread > 0 && (
@@ -349,7 +424,7 @@ export function Navbar() {
                 wendy.isOpen ? "border-primary/30" : "border-white/10"
               } ${isWendyActive ? "border-transparent" : ""}`}
             >
-              <span className="min-w-0 flex-1 truncate">Chiedi a Wendy...</span>
+              <span className="min-w-0 flex-1 truncate">{wendyPlaceholder}</span>
               <kbd className="ml-2 hidden items-center gap-0.5 rounded border border-border bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline-flex">
                 Cmd K
               </kbd>
@@ -365,7 +440,7 @@ export function Navbar() {
                 <DropdownMenuTrigger asChild>
                   <m.button
                     type="button"
-                    aria-label={`Apri menu profilo di ${displayName}`}
+                    aria-label={openProfileMenuLabel}
                     className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 px-0 text-sm font-semibold text-foreground transition-all hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 sm:w-auto sm:max-w-[14rem] sm:justify-start sm:gap-2 sm:px-2.5 md:max-w-[18rem]"
                     onPointerDown={(event) => {
                       if (!isMobile) return;
@@ -422,7 +497,7 @@ export function Navbar() {
                 onMouseEnter={() => prefetchRoute("/sign-in")}
               >
                 <button className="flex h-11 items-center rounded-full border border-primary/30 bg-primary px-4 text-sm font-bold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70">
-                  {t("nav.login")}
+                  {loginLabel}
                 </button>
               </Link>
             )}

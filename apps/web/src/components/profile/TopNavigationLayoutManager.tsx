@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { TOP_NAV_MAX_VISIBLE } from "@/hooks/useTopNavigationLayout";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { TOP_NAVIGATION_ICONS, type TopNavigationCatalogItem, type TopNavigationLayoutItem } from "@/lib/top-navigation";
 import {
@@ -22,6 +23,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, GripVertical, Lock, RotateCcw } from "lucide-react";
 import type { CSSProperties } from "react";
+import { useTranslation } from "react-i18next";
 
 interface TopNavigationLayoutManagerProps {
   layout: TopNavigationLayoutItem[];
@@ -78,6 +80,44 @@ function SortableNavItem({
   onMove: (from: number, to: number) => void;
   onToggle: (id: string) => void;
 }) {
+  const { i18n } = useTranslation();
+  const activeLanguage = i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
+  const translatedLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: item.label,
+    key: `nav.topNavigation.${item.id}`,
+    context: "Top navigation layout item label",
+  });
+  const dragLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: `Sposta ${item.label}`,
+    key: "profile.navigation.move",
+    context: "Top navigation drag handle accessible label; keep the item name unchanged",
+  });
+  const lockedLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Bloccato",
+    key: "profile.navigation.locked",
+    context: "Top navigation locked item indicator",
+  });
+  const moveUpLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: `Sposta su ${item.label}`,
+    key: "profile.navigation.moveUp",
+    context: "Top navigation move item up accessible label; keep the item name unchanged",
+  });
+  const moveDownLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: `Sposta giu ${item.label}`,
+    key: "profile.navigation.moveDown",
+    context: "Top navigation move item down accessible label; keep the item name unchanged",
+  });
+  const toggleLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: `${item.visible ? "Nascondi" : "Mostra"} ${item.label}`,
+    key: item.visible ? "profile.navigation.hide" : "profile.navigation.show",
+    context: "Top navigation visibility toggle accessible label; keep the item name unchanged",
+  });
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
   const Icon = item.iconKey === "brand" ? null : TOP_NAVIGATION_ICONS[item.iconKey];
   const style: CSSProperties = {
@@ -97,7 +137,7 @@ function SortableNavItem({
     >
       <button
         type="button"
-        aria-label={`Sposta ${item.label}`}
+        aria-label={dragLabel}
         className="cursor-grab rounded-md p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing"
         {...attributes}
         {...listeners}
@@ -108,8 +148,8 @@ function SortableNavItem({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-          <p className="truncate text-sm font-medium">{item.label}</p>
-          {item.locked && <Lock className="h-3 w-3 text-muted-foreground" aria-label="Bloccato" />}
+          <p className="truncate text-sm font-medium">{translatedLabel}</p>
+          {item.locked && <Lock className="h-3 w-3 text-muted-foreground" aria-label={lockedLabel} />}
         </div>
         <p className="truncate text-xs text-muted-foreground">{item.href}</p>
       </div>
@@ -120,7 +160,7 @@ function SortableNavItem({
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          aria-label={`Sposta su ${item.label}`}
+          aria-label={moveUpLabel}
           disabled={index === 0}
           onClick={() => onMove(index, index - 1)}
         >
@@ -131,7 +171,7 @@ function SortableNavItem({
           variant="ghost"
           size="icon"
           className="h-7 w-7"
-          aria-label={`Sposta giu ${item.label}`}
+          aria-label={moveDownLabel}
           disabled={index === total - 1}
           onClick={() => onMove(index, index + 1)}
         >
@@ -140,7 +180,7 @@ function SortableNavItem({
       </div>
 
       <Switch
-        aria-label={`${item.visible ? "Nascondi" : "Mostra"} ${item.label}`}
+        aria-label={toggleLabel}
         checked={item.visible}
         disabled={item.locked || (!item.visible && visibleCount >= TOP_NAV_MAX_VISIBLE)}
         onCheckedChange={() => onToggle(item.id)}
@@ -163,6 +203,32 @@ export function TopNavigationLayoutManager({
   );
   const editableItems = mergeLayout(layout, availableItems);
   const visibleCount = editableItems.filter((item) => item.visible).length;
+  const { i18n } = useTranslation();
+  const activeLanguage = i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
+  const topBarLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Barra superiore",
+    key: "profile.navigation.topBar",
+    context: "Profile settings top navigation customization title",
+  });
+  const visibleCountLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: `${visibleCount}/${TOP_NAV_MAX_VISIBLE} sezioni visibili`,
+    key: "profile.navigation.visibleCount",
+    context: "Profile settings top navigation visible sections count; keep numbers unchanged",
+  });
+  const savingLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Salvataggio...",
+    key: "profile.navigation.saving",
+    context: "Profile settings top navigation saving state",
+  });
+  const resetLabel = useDynamicTranslation({
+    locale: activeLanguage,
+    source: "Ripristina barra",
+    key: "profile.navigation.reset",
+    context: "Profile settings reset top navigation button",
+  });
 
   function commit(items: EditableItem[]) {
     return onLayoutChange(toLayout(items.map((item, position) => ({ ...item, position }))));
@@ -190,10 +256,10 @@ export function TopNavigationLayoutManager({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="text-sm font-medium">Barra superiore</p>
-          <p className="text-xs text-muted-foreground">{visibleCount}/{TOP_NAV_MAX_VISIBLE} sezioni visibili</p>
+          <p className="text-sm font-medium">{topBarLabel}</p>
+          <p className="text-xs text-muted-foreground">{visibleCountLabel}</p>
         </div>
-        {isSaving && <span className="text-xs text-muted-foreground">Salvataggio...</span>}
+        {isSaving && <span className="text-xs text-muted-foreground">{savingLabel}</span>}
       </div>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -219,7 +285,7 @@ export function TopNavigationLayoutManager({
       <div className="flex justify-end">
         <Button type="button" variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={onReset}>
           <RotateCcw className="h-3 w-3" />
-          Ripristina barra
+          {resetLabel}
         </Button>
       </div>
     </div>

@@ -5,46 +5,14 @@ type SuggestedPrompt = {
   prompt: string;
 };
 
-type Objective = {
-  id?: unknown;
-  text?: unknown;
-  progress?: unknown;
-  category?: unknown;
-  dueDate?: unknown;
-};
-
-type Sector = {
-  name?: unknown;
-};
-
-type UserContextData = {
-  journeyType?: unknown;
-  topObjectives?: unknown;
-  preferredSectors?: unknown;
-};
-
 function normalize(message: string): string {
   return message
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-function asObjectives(value: unknown): Objective[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is Objective => typeof item === "object" && item !== null);
-}
-
-function asSectors(value: unknown): Sector[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter((item): item is Sector => typeof item === "object" && item !== null);
-}
-
-function text(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
 }
 
 function wantsEnglish(locale: unknown): boolean {
@@ -64,28 +32,11 @@ function uniqueLimit(prompts: SuggestedPrompt[]): SuggestedPrompt[] {
     .slice(0, 3);
 }
 
-function progress(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-function objectiveId(value: unknown): number | null {
-  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
-}
-
-function objectiveRowsFromPayload(value: unknown): Objective[] {
-  return asObjectives(
-    typeof value === "object" && value !== null && "objectives" in value
-      ? (value as { objectives?: unknown }).objectives
-      : undefined,
-  );
-}
-
-function primaryObjective(objectives: Objective[]): Objective | undefined {
-  return objectives
-    .filter((objective) => text(objective.text))
-    .sort((a, b) => progress(b.progress) - progress(a.progress))[0];
-}
-
+/**
+ * Classifica un messaggio in una quick action nota. Usato SOLO per proporre
+ * suggested prompts (chip di navigazione) — mai per generare una risposta
+ * prescritta: la risposta vera la produce sempre l'LLM ragionando sui dati/tool.
+ */
 export function classifyWendyDataBackedQuickAction(message: string): QuickActionKind | null {
   const normalized = normalize(message);
   if (
@@ -110,84 +61,6 @@ export function classifyWendyDataBackedQuickAction(message: string): QuickAction
     /\bprossim[ao]\b.*\b(azion\w*|pass\w*|moss\w*)\b/.test(normalized) ||
     /\bnext\b.*\b(step|action|move)\b/.test(normalized)
   ) return "today";
-  return null;
-}
-
-export function buildWendyDataBackedGuidedAction(input: {
-  kind: QuickActionKind;
-  objectives?: unknown;
-  userContext?: unknown;
-}): {
-  toolName: "update_objective_progress" | "save_objective" | "set_filters" | "open_view";
-  args: Record<string, unknown>;
-  confirmBeforeExecution?: boolean;
-} | null {
-  if (
-    input.kind !== "today" &&
-    input.kind !== "progress" &&
-    input.kind !== "profile" &&
-    input.kind !== "sectors" &&
-    input.kind !== "complete"
-  ) return null;
-
-  const objectiveRows = objectiveRowsFromPayload(input.objectives);
-  const userContext = typeof input.userContext === "object" && input.userContext !== null
-    ? input.userContext as UserContextData
-    : {};
-  const topObjectives = objectiveRows.length > 0
-    ? objectiveRows
-    : asObjectives(userContext.topObjectives);
-  const firstObjective = primaryObjective(topObjectives);
-  const id = objectiveId(firstObjective?.id);
-  const sectors = asSectors(userContext.preferredSectors).map((sector) => text(sector.name)).filter(Boolean);
-
-  if (input.kind === "sectors") {
-    const firstSector = sectors[0];
-    if (firstSector) {
-      return {
-        toolName: "set_filters",
-        confirmBeforeExecution: true,
-        args: {
-          listType: "sectors",
-          filters: {
-            q: firstSector,
-            source: "wendy_personal_fit",
-          },
-        },
-      };
-    }
-    return {
-      toolName: "open_view",
-      confirmBeforeExecution: true,
-      args: { viewId: "settori" },
-    };
-  }
-
-  if (firstObjective && id) {
-    const currentProgress = progress(firstObjective.progress);
-    const nextProgress = input.kind === "complete"
-      ? 100
-      : Math.min(100, Math.max(currentProgress + 15, currentProgress === 0 ? 15 : currentProgress));
-    return {
-      toolName: "update_objective_progress",
-      args: {
-        objectiveId: id,
-        progress: nextProgress,
-      },
-    };
-  }
-
-  if (input.kind === "today" || input.kind === "progress") {
-    return {
-      toolName: "save_objective",
-      args: {
-        text: "Definire il prossimo passo professionale e completarlo in 25 minuti",
-        category: "career",
-        deadlineWeeks: 1,
-      },
-    };
-  }
-
   return null;
 }
 
@@ -266,97 +139,4 @@ export function buildWendyDataBackedSuggestedPrompts(input: {
     { label: "Trova blocco", prompt: "Trova l'obiettivo piu bloccato e suggerisci un micro-step per sbloccarlo." },
     { label: "Pianifica prossimo", prompt: "Scegli il prossimo passo dell'obiettivo e trasformalo in un piano da 25 minuti." },
   ]);
-}
-
-export function formatWendyDataBackedQuickActionReply(input: {
-  kind: QuickActionKind;
-  locale?: string | undefined;
-  objectives?: unknown;
-  userContext?: unknown;
-}): string {
-  const objectiveRows = objectiveRowsFromPayload(input.objectives);
-  const userContext = typeof input.userContext === "object" && input.userContext !== null
-    ? input.userContext as UserContextData
-    : {};
-  const topObjectives = objectiveRows.length > 0
-    ? objectiveRows
-    : asObjectives(userContext.topObjectives);
-  const firstObjective = primaryObjective(topObjectives);
-  const sectors = asSectors(userContext.preferredSectors).map((sector) => text(sector.name)).filter(Boolean);
-  const journeyType = text(userContext.journeyType);
-  const english = wantsEnglish(input.locale);
-
-  if (input.kind === "today") {
-    if (firstObjective) {
-      const percent = progress(firstObjective.progress);
-      if (english) {
-        return `Today I would start with one concrete step on "${text(firstObjective.text)}"${percent ? `, now at ${percent}%` : ""}. Do 25 minutes of focused work, update the progress, then choose one thing to postpone.`;
-      }
-      return `Oggi partirei da un passo concreto su "${text(firstObjective.text)}"${percent ? `, che ora e al ${percent}%` : ""}. Fai 25 minuti di lavoro concentrato, aggiorna il progresso e poi scegli una sola cosa da rimandare.`;
-    }
-    if (english) {
-      return "Today I would choose one priority action: complete or update the test, create one small objective, then ask me to turn it into a 25-minute plan.";
-    }
-    return "Oggi sceglierei una sola azione prioritaria: completa o aggiorna il test, crea un obiettivo piccolo e chiedimi subito di trasformarlo in un piano da 25 minuti.";
-  }
-
-  if (input.kind === "progress") {
-    if (topObjectives.length > 0) {
-      if (english) {
-        return `I see ${topObjectives.length} open objectives. The most useful signal is to focus on "${text(firstObjective?.text)}": move it forward by one micro-step and use progress as evidence, not as a feeling.`;
-      }
-      return `Vedo ${topObjectives.length} obiettivi aperti. Il segnale piu utile e concentrarti su "${text(firstObjective?.text)}": avanzalo di un micro-step e usa il progresso come prova, non come sensazione.`;
-    }
-    if (english) {
-      return "I do not see open objectives to analyze. The first move is to create one measurable objective, then Wendy can read progress, blockers, and priorities.";
-    }
-    return "Non vedo obiettivi aperti da analizzare. La prima mossa e creare un obiettivo misurabile, poi Wendy potra leggere avanzamento, blocchi e priorita.";
-  }
-
-  if (input.kind === "profile") {
-    if (english) {
-      const profileHint = journeyType ? `Your current profile is "${journeyType}". ` : "";
-      const objectiveHint = firstObjective ? `The next move should connect to "${text(firstObjective.text)}". ` : "";
-      return `${profileHint}${objectiveHint}The next move is one verifiable decision: a sector to explore for 30 minutes, a skill to validate, and one objective to update today.`;
-    }
-    const profileHint = journeyType ? `Il tuo profilo attuale e "${journeyType}". ` : "";
-    const objectiveHint = firstObjective ? `La prossima mossa dovrebbe collegarsi a "${text(firstObjective.text)}". ` : "";
-    return `${profileHint}${objectiveHint}La prossima mossa e una decisione verificabile: un settore da esplorare per 30 minuti, una competenza da validare e un obiettivo da aggiornare entro oggi.`;
-  }
-
-  if (input.kind === "complete") {
-    if (firstObjective) {
-      if (english) {
-        return `I can mark "${text(firstObjective.text)}" as completed by moving its progress to 100%. Confirm the update, then I will treat the progress as updated and prepare the next step.`;
-      }
-      return `Posso segnare "${text(firstObjective.text)}" come completata portando i progressi al 100%. Conferma l'aggiornamento, poi considero i progressi aggiornati e preparo il prossimo passo.`;
-    }
-    if (english) {
-      return "I understand: this activity is completed. To update progress for real I need a linked objective or the action card confirmation; after that the progress is updated and I can choose the next step.";
-    }
-    return "Capito: questa attivita e completata. Per aggiornare davvero i progressi mi serve un obiettivo collegato o la conferma sulla action card; poi i progressi risultano aggiornati e passo al prossimo step.";
-  }
-
-  if (sectors.length > 0) {
-    if (english) {
-      return `I would start from the sectors you already signaled: ${sectors.slice(0, 3).join(", ")}. Compare them by personal fit, work mode, indicative compensation, and AI impact; then open the one with the best balance, not the loudest one.`;
-    }
-    return `Partirei dai settori adatti che hai gia segnalato: ${sectors.slice(0, 3).join(", ")}. Confrontali per fit personale, competenze, modalita di lavoro, compenso indicativo e impatto AI; poi apri quello con il miglior equilibrio, non quello piu rumoroso.`;
-  }
-
-  if (journeyType || firstObjective) {
-    if (english) {
-      const profileHint = journeyType ? `For your "${journeyType}" profile` : "For your profile";
-      const objectiveHint = firstObjective ? ` and the objective "${text(firstObjective.text)}"` : "";
-      return `${profileHint}${objectiveHint}, I would build a shortlist of 3 sectors and compare them on personal fit, work mode, indicative compensation, and AI impact. Open first the one that makes it easiest to produce concrete proof within 7 days.`;
-    }
-    const profileHint = journeyType ? `Per il tuo profilo "${journeyType}"` : "Per il tuo profilo";
-    const objectiveHint = firstObjective ? ` e l'obiettivo "${text(firstObjective.text)}"` : "";
-    return `${profileHint}${objectiveHint}, sceglierei una shortlist di 3 settori adatti e li confronterei su fit personale, competenze, modalita di lavoro, compenso indicativo e impatto AI. Apri prima quello che rende piu facile produrre una prova concreta entro 7 giorni.`;
-  }
-
-  if (english) {
-    return "To identify the best-fit sectors, I need your personal fit first: if you have a recent test I will use it, otherwise take the test and then compare the first sectors by interests, skills, work mode, and AI impact.";
-  }
-  return "Per capire i settori piu adatti serve prima il fit personale: se hai un test recente uso quello, altrimenti fai il test e poi confronta i primi settori per interessi, competenze, modalita di lavoro e impatto AI.";
 }

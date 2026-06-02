@@ -5,6 +5,8 @@ const getLLMForRouteMock = vi.hoisted(() => vi.fn());
 const chatWithToolsMock = vi.hoisted(() => vi.fn());
 const chatOnceMock = vi.hoisted(() => vi.fn());
 const fallbackToolExecutor = vi.hoisted(() => vi.fn());
+const getToolsForIntentMock = vi.hoisted(() => vi.fn(() => [] as unknown[]));
+const toolsToOpenAIFormatMock = vi.hoisted(() => vi.fn(() => [] as unknown[]));
 
 vi.mock("../llm/client", () => ({
   getLLMForRoute: getLLMForRouteMock,
@@ -74,8 +76,8 @@ vi.mock("./ui-tools", () => ({
 }));
 
 vi.mock("../wendy-router/tool-registry", () => ({
-  getToolsForIntent: () => [],
-  toolsToOpenAIFormat: () => [],
+  getToolsForIntent: getToolsForIntentMock,
+  toolsToOpenAIFormat: toolsToOpenAIFormatMock,
 }));
 
 vi.mock("../wendy-router/tool-handlers", () => ({
@@ -148,7 +150,7 @@ vi.mock("../model-router", () => ({
 vi.mock("../config/wendy", () => ({
   wendyConfig: {
     specialist: { temperatureLow: 0.2, temperatureHigh: 0.7 },
-    agent: { maxTokensLow: 100, maxTokensHigh: 200, followUpMaxTokens: 80, chunkSize: 100 },
+    agent: { maxTokensLow: 100, maxTokensHigh: 200, followUpMaxTokens: 80, chunkSize: 100, maxToolTurns: 3 },
     brain: { maxContextNodes: 3 },
   },
 }));
@@ -172,6 +174,8 @@ function baseOptions(executeExternalTool: GrowthAgentToolExecutor): GrowthAgentO
 describe("runGrowthAgent tool dispatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getToolsForIntentMock.mockReturnValue([]);
+    toolsToOpenAIFormatMock.mockReturnValue([]);
     fallbackToolExecutor.mockResolvedValue({ ok: true, data: { fallback: true } });
     getLLMForRouteMock.mockReturnValue({
       chatWithTools: chatWithToolsMock,
@@ -211,5 +215,72 @@ describe("runGrowthAgent tool dispatch", () => {
       "host_search",
       "host_save",
     ]);
+  });
+
+  it("chains tool calls across multiple turns and synthesizes a final answer", async () => {
+    getToolsForIntentMock.mockReturnValue([{ name: "get_market_trend" }]);
+    toolsToOpenAIFormatMock.mockReturnValue([
+      {
+        type: "function",
+        function: { name: "get_market_trend", description: "trend", parameters: { type: "object", properties: {}, required: [] } },
+      },
+    ]);
+
+    const { runGrowthAgent } = await import("./agent");
+    const executeExternalTool = vi.fn(async (name: string, args: Record<string, unknown>, userId: number) => ({
+      ok: true as const,
+      data: { name, args, userId },
+    }));
+
+    // Turn 0 → ask for a tool; Turn 1 → ask for a second tool based on the first
+    // result; Turn 2 (final, tools stripped) → produce the textual answer.
+    chatWithToolsMock
+      .mockResolvedValueOnce({
+        content: "",
+        finishReason: "tool_calls",
+        toolCalls: [{ id: "c1", name: "get_market_trend", arguments: { role: "alpha" } }],
+      })
+      .mockResolvedValueOnce({
+        content: "",
+        finishReason: "tool_calls",
+        toolCalls: [{ id: "c2", name: "get_market_trend", arguments: { role: "beta" } }],
+      })
+      .mockResolvedValueOnce({
+        content: "Sintesi finale fondata sui dati di mercato.",
+        finishReason: "stop",
+        toolCalls: [],
+      });
+
+    const options: GrowthAgentOptions = {
+      userId: 9,
+      userContext: { name: "Ada" },
+      history: [],
+      userMessage: "trend del mercato per due ruoli",
+      wendyIntent: "deep_analysis",
+      executeExternalTool,
+    };
+
+    const events = [];
+    for await (const event of runGrowthAgent(options)) {
+      events.push(event);
+    }
+
+    // Three LLM turns: two tool rounds + one synthesis round.
+    expect(chatWithToolsMock).toHaveBeenCalledTimes(3);
+    // Last turn must be called WITHOUT tools (forced synthesis).
+    expect(chatWithToolsMock.mock.calls[2]?.[1]).toEqual([]);
+    // The second tool call was decided AFTER observing the first result.
+    expect(executeExternalTool).toHaveBeenCalledTimes(2);
+    expect(executeExternalTool).toHaveBeenNthCalledWith(1, "get_market_trend", { role: "alpha" }, 9);
+    expect(executeExternalTool).toHaveBeenNthCalledWith(2, "get_market_trend", { role: "beta" }, 9);
+    expect(events.filter((event) => event.type === "tool_call").map((event) => event.name)).toEqual([
+      "get_market_trend",
+      "get_market_trend",
+    ]);
+    const finalText = events
+      .filter((event) => event.type === "token")
+      .map((event) => (event as { value: string }).value)
+      .join("");
+    expect(finalText).toContain("Sintesi finale fondata sui dati");
   });
 });
