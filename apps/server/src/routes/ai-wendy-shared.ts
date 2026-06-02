@@ -17,7 +17,10 @@ export type WendyContextSource =
   | "openhuman"
   | "graphify"
   | "wendy-brain"
-  | "semantic-memory";
+  | "semantic-memory"
+  | "growth-library"
+  | "search-index"
+  | "keyword-fallback";
 
 const APP_DATA_TOOLS = new Set([
   "get_sector_detail",
@@ -38,6 +41,7 @@ export function buildWendyContextSources(input: {
   toolsUsed: string[];
   ragChunksRetrieved: number;
   brainChunksRetrieved?: number;
+  searchModeUsed?: "semantic" | "keyword" | "none";
 }): WendyContextSource[] {
   const sources = new Set<WendyContextSource>();
   for (const source of input.personalSources) sources.add(source);
@@ -52,6 +56,14 @@ export function buildWendyContextSources(input: {
     input.toolsUsed.includes("search_brain")
   ) {
     sources.add("wendy-brain");
+  }
+  if (input.toolsUsed.includes("get_growth_articles")) {
+    sources.add("growth-library");
+  }
+  if (input.searchModeUsed === "semantic") {
+    sources.add("search-index");
+  } else if (input.searchModeUsed === "keyword") {
+    sources.add("keyword-fallback");
   }
   if (input.toolsUsed.some((tool) => APP_DATA_TOOLS.has(tool))) {
     sources.add("app-data");

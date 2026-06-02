@@ -34,6 +34,26 @@ describe("buildWendyContextSources", () => {
       }),
     ).toEqual(["wendy-brain"]);
   });
+
+  it("emits discovery-oriented provenance for growth and search sources", () => {
+    expect(
+      buildWendyContextSources({
+        personalSources: [],
+        toolsUsed: ["get_growth_articles", "search_rag"],
+        ragChunksRetrieved: 0,
+        searchModeUsed: "keyword",
+      }),
+    ).toEqual(["rag", "growth-library", "keyword-fallback", "app-data"]);
+
+    expect(
+      buildWendyContextSources({
+        personalSources: [],
+        toolsUsed: ["search_rag"],
+        ragChunksRetrieved: 2,
+        searchModeUsed: "semantic",
+      }),
+    ).toEqual(["rag", "search-index"]);
+  });
 });
 
 describe("WendyRequestSchema", () => {

@@ -31,7 +31,16 @@ describe("parseWendySseEvent", () => {
         JSON.stringify({
           type: "done",
           requestId: "req-1",
-          contextSources: ["rag", "openhuman", "graphify", "unknown"],
+          contextSources: [
+            "rag",
+            "openhuman",
+            "graphify",
+            "growth-library",
+            "search-index",
+            "keyword-fallback",
+            "growth-library",
+            "unknown",
+          ],
           answerMode: "local-fast-path",
           recovery: { reason: "test" },
           adaptiveReasoning: {
@@ -52,7 +61,7 @@ describe("parseWendySseEvent", () => {
     ).toEqual({
       type: "done",
       requestId: "req-1",
-      contextSources: ["rag", "openhuman", "graphify"],
+      contextSources: ["rag", "openhuman", "graphify", "growth-library", "search-index", "keyword-fallback"],
       answerMode: "local-fast-path",
       recovery: { reason: "test" },
       adaptiveReasoning: {

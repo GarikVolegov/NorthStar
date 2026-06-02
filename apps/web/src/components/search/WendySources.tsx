@@ -1,6 +1,6 @@
 import type { ChatMessage as WendyMessage } from "@/hooks/useWendyChat";
 
-const SOURCE_LABELS = {
+const SOURCE_LABELS: Record<string, string> = {
   "app-data":       "Il tuo profilo",
   rag:              "Knowledge base",
   openhuman:        "Database mercato",
@@ -12,16 +12,16 @@ const SOURCE_LABELS = {
   "growth-library": "Biblioteca crescita",
   "search-index":   "Indice NorthStar",
   "keyword-fallback": "Ricerca keyword",
-} as const;
+};
 
-const ANSWER_MODE_LABELS = {
+const ANSWER_MODE_LABELS: Record<string, string> = {
   "local-fast-path":    "Risposta rapida",
   "local-quick-action": "Azione rapida",
   "llm-fast-path":      "Modello AI",
   "llm-full-path":      "Analisi completa",
   "recovery-fallback":  "Recupero sicuro",
   unconfigured:         "Modello non configurato",
-} as const;
+};
 
 const REASONING_DEPTH_LABELS: Record<string, string> = {
   instant:    "Ragionamento immediato",
@@ -57,7 +57,7 @@ export function WendySources({ message }: { message: WendyMessage }) {
           className="rounded-full border border-primary/25 bg-primary/10 px-2 py-1 text-[10px] font-semibold text-primary"
           title={message.recovery ? "Wendy ha usato una risposta di recupero per evitare un'interruzione." : undefined}
         >
-          {ANSWER_MODE_LABELS[message.answerMode as keyof typeof ANSWER_MODE_LABELS]}
+          {ANSWER_MODE_LABELS[message.answerMode] ?? message.answerMode}
         </span>
       )}
       {adaptiveReasoning && (
@@ -83,7 +83,7 @@ export function WendySources({ message }: { message: WendyMessage }) {
           key={`${message.id}-${source}`}
           className="rounded-full border border-border bg-muted px-2 py-1 text-[10px] font-medium text-muted-foreground"
         >
-          {SOURCE_LABELS[source as keyof typeof SOURCE_LABELS] ?? source}
+          {SOURCE_LABELS[source] ?? source}
         </span>
       ))}
       {message.citations?.slice(0, 4).map((source) => (

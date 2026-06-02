@@ -14,7 +14,10 @@ export type WendyContextSource =
   | 'wendy-brain'
   | 'semantic-memory'
   | 'admin'
-  | 'printing-press';
+  | 'printing-press'
+  | 'growth-library'
+  | 'search-index'
+  | 'keyword-fallback';
 
 export type WendyAnswerMode =
   | 'local-fast-path'
@@ -112,7 +115,10 @@ function isWendyContextSource(value: unknown): value is WendyContextSource {
     || value === 'wendy-brain'
     || value === 'admin'
     || value === 'printing-press'
-    || value === 'semantic-memory';
+    || value === 'semantic-memory'
+    || value === 'growth-library'
+    || value === 'search-index'
+    || value === 'keyword-fallback';
 }
 
 function parseContextSources(value: unknown): WendyContextSource[] {

@@ -315,6 +315,7 @@ router.post(
         personalSources: personalContext.sources,
         toolsUsed: toolsUsedInRequest,
         ragChunksRetrieved,
+        searchModeUsed,
       }),
       ...(neuralContext ? { activationSummary: neuralContext.activationSummary } : {}),
       ...(adaptiveDecisionForDone
