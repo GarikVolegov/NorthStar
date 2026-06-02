@@ -1,3 +1,4 @@
+import type { DiscoveryPersonalization } from "@/components/discovery/DiscoveryMeta";
 import { getJson, postJson } from "@/lib/apiClient";
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -30,7 +31,7 @@ export interface SearchResult {
   metadata?: Record<string, unknown>;
   source?: "index" | "live" | "library" | "fallback" | "wendy";
   sourceLabel?: string;
-  personalization?: "profile" | "journey" | "generic" | "private";
+  personalization?: DiscoveryPersonalization;
   reasonLabels?: string[];
   matchSignals?: string[];
   actionLabel?: string;

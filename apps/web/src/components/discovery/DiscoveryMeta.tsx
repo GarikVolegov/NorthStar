@@ -1,15 +1,17 @@
 import { cn } from "@/lib/utils";
 
+export type DiscoveryPersonalization = "profile" | "journey" | "generic" | "private";
+
 const PERSONALIZATION_LABELS = {
   profile: "Personalizzato",
   journey: "Percorso",
   generic: "Generale",
   private: "Privato",
-} as const;
+} satisfies Record<DiscoveryPersonalization, string>;
 
 export interface DiscoveryMetaProps {
   sourceLabel?: string;
-  personalization?: keyof typeof PERSONALIZATION_LABELS;
+  personalization?: DiscoveryPersonalization;
   reasonLabels?: string[];
   className?: string;
 }
