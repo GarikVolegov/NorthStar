@@ -5,9 +5,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardIndecisoTools } from "./DashboardIndecisoTools";
 
 const apiFetchMock = vi.hoisted(() => vi.fn());
+const useDynamicTranslationMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api-fetch", () => ({
   apiFetch: apiFetchMock,
+}));
+
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: useDynamicTranslationMock,
+}));
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    i18n: {
+      language: "it",
+      resolvedLanguage: "en-US",
+    },
+  }),
 }));
 
 vi.mock("wouter", () => ({
@@ -32,6 +46,10 @@ function renderWithClient(
 describe("DashboardIndecisoTools", () => {
   beforeEach(() => {
     apiFetchMock.mockReset();
+    useDynamicTranslationMock.mockReset();
+    useDynamicTranslationMock.mockImplementation(({ key, source }: { key?: string; source: string }) =>
+      key ? `dynamic:${key}` : source,
+    );
     apiFetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -57,8 +75,9 @@ describe("DashboardIndecisoTools", () => {
 
     renderWithClient(client);
 
-    expect(screen.getByText(/prontezza non disponibile/i)).toBeInTheDocument();
-    expect(screen.getByText("La Bussola")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.readiness.error.title")).toBeInTheDocument();
+    expect(screen.queryByText(/prontezza non disponibile/i)).not.toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.journeyTools.tools.compass.title")).toBeInTheDocument();
   });
 
   it("promotes the path selection tool when the adaptive phase is choose_path", () => {
@@ -83,8 +102,8 @@ describe("DashboardIndecisoTools", () => {
       adaptivePhase: "choose_path",
     });
 
-    const choosePath = screen.getByText("Scegli percorso");
-    const diary = screen.getByText("Il mio Diario");
+    const choosePath = screen.getByText("dynamic:dashboard.journeyTools.tools.choosePath.title");
+    const diary = screen.getByText("dynamic:dashboard.journeyTools.tools.diary.title");
     expect(choosePath.compareDocumentPosition(diary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -98,8 +117,8 @@ describe("DashboardIndecisoTools", () => {
       adaptivePhase: "start_test",
     });
 
-    const test = screen.getByText(/test di personalit/i);
-    const diary = screen.getByText("Il mio Diario");
+    const test = screen.getByText("dynamic:dashboard.journeyTools.tools.personalityTest.title");
+    const diary = screen.getByText("dynamic:dashboard.journeyTools.tools.diary.title");
     expect(test.compareDocumentPosition(diary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
@@ -125,8 +144,8 @@ describe("DashboardIndecisoTools", () => {
       adaptivePhase: "explore_sectors",
     });
 
-    const sectors = screen.getByText("Scegli settore e ruolo");
-    const diary = screen.getByText("Il mio Diario");
+    const sectors = screen.getByText("dynamic:dashboard.journeyTools.tools.exploreSectors.title");
+    const diary = screen.getByText("dynamic:dashboard.journeyTools.tools.diary.title");
     expect(sectors.compareDocumentPosition(diary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

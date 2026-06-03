@@ -1,15 +1,43 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import request from "supertest";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const limitMock = vi.hoisted(() => vi.fn());
+
+function queryChain() {
+  return {
+    from: vi.fn(() => ({
+      where: vi.fn(() => ({
+        limit: limitMock,
+      })),
+    })),
+  };
+}
 
 vi.mock("../lib/jwt-secret", () => ({
   JWT_SECRET: "test-secret",
 }));
 
 vi.mock("@workspace/db", () => ({
-  db: {},
-  usersTable: { clerkId: "users.clerk_id" },
+  db: {
+    select: vi.fn(() => queryChain()),
+  },
+  usersTable: {
+    id: "users.id",
+    name: "users.name",
+    email: "users.email",
+    role: "users.role",
+    stripeSubscriptionId: "users.stripe_subscription_id",
+    journeyType: "users.journey_type",
+    journeyDecidedAt: "users.journey_decided_at",
+    journeyDecisionSource: "users.journey_decision_source",
+    testSessionId: "users.test_session_id",
+    onboardingCompleted: "users.onboarding_completed",
+    deletedAt: "users.deleted_at",
+    purgedAt: "users.purged_at",
+    clerkId: "users.clerk_id",
+  },
 }));
 
 import discoveryReadinessRouter from "./discovery-readiness";
@@ -38,6 +66,26 @@ function app() {
 }
 
 describe("discovery readiness route", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    limitMock.mockResolvedValue([
+      {
+        id: 42,
+        name: "Ada",
+        email: "ada@example.com",
+        role: "user",
+        stripeSubscriptionId: null,
+        journeyType: "indeciso",
+        journeyDecidedAt: null,
+        journeyDecisionSource: null,
+        testSessionId: 7,
+        onboardingCompleted: true,
+        deletedAt: null,
+        purgedAt: null,
+      },
+    ]);
+  });
+
   it("requires authentication", async () => {
     await request(app()).get("/api/discovery/readiness").expect(401);
   });
@@ -65,5 +113,12 @@ describe("discovery readiness route", () => {
     });
     expect(response.body.score).toBeGreaterThanOrEqual(0);
     expect(response.body.score).toBeLessThanOrEqual(100);
+    expect([
+      "selfKnowledge",
+      "exploration",
+      "reflection",
+      "emotion",
+      "commitment",
+    ]).toContain(response.body.nextNudge.component);
   });
 });

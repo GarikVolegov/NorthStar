@@ -51,6 +51,33 @@ describe("JourneyToolsSection", () => {
     expect(screen.queryByText("dynamic:dashboard.journeyTools.tools.newsWork.title")).not.toBeInTheDocument();
   });
 
+  it("keeps practical descriptions in compact card accessible names", () => {
+    render(
+      <JourneyToolsSection
+        journeyType="indeciso"
+        adaptivePhase="explore_sectors"
+        presentation={{ priority: "compact", gated: false }}
+      />,
+    );
+
+    expect(screen.getByRole("link", {
+      name: /dynamic:dashboard\.journeyTools\.tools\.exploreSectors\.title.*dynamic:dashboard\.journeyTools\.tools\.exploreSectors\.description/i,
+    })).toHaveAttribute("href", "/settori");
+    expect(screen.queryByText("dynamic:dashboard.journeyTools.tools.exploreSectors.description")).not.toBeInTheDocument();
+  });
+
+  it("uses practical fallback copy instead of app-centric feature labels", () => {
+    const { rerender } = render(<JourneyToolsSection journeyType="indeciso" readinessBand="mid" />);
+    rerender(<JourneyToolsSection journeyType="autonomo" />);
+    rerender(<JourneyToolsSection journeyType="investitore" />);
+
+    const sources = useDynamicTranslationMock.mock.calls
+      .map(([input]) => (input as { source?: string }).source ?? "")
+      .join("\n");
+
+    expect(sources).not.toMatch(/La Bussola|Il tuo hub|Sessione Socratica|Score AI|Mappa delle conoscenze/i);
+  });
+
   it("marks the phase tool as the emphasized card when presentation is primary", () => {
     render(
       <JourneyToolsSection

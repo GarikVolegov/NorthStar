@@ -101,7 +101,7 @@ describe("Percorso save reliability", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.personas\.dipendente\.label/i }));
 
-    expect(screen.getByText("dynamic:percorso.selection.prefix")).toBeInTheDocument();
+    expect(await screen.findByText(/dynamic:percorso\.selection\.prefix/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /dynamic:percorso\.cta\.start/i })).toBeInTheDocument();
     expect(screen.queryByText("Il tuo percorso personale")).not.toBeInTheDocument();
     expect(screen.queryByText("Ancora in esplorazione")).not.toBeInTheDocument();
@@ -117,8 +117,8 @@ describe("Percorso save reliability", () => {
 
     render(<Percorso />);
 
-    await userEvent.click(screen.getByRole("button", { name: /dipendente che vuole crescere/i }));
-    await userEvent.click(screen.getByRole("button", { name: /inizia il tuo percorso/i }));
+    await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.personas\.dipendente\.label/i }));
+    await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.cta\.start/i }));
 
     expect(apiFetchMock).toHaveBeenCalledWith(
       "/api/journey-type/me/journey-type",
@@ -131,7 +131,7 @@ describe("Percorso save reliability", () => {
     expect(authState.login).not.toHaveBeenCalled();
     expect(routerState.navigate).not.toHaveBeenCalled();
     expect(toastMock).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "Salvataggio non riuscito", variant: "destructive" }),
+      expect.objectContaining({ title: "dynamic:percorso.toast.saveFailure.title", variant: "destructive" }),
     );
   });
 
@@ -149,8 +149,8 @@ describe("Percorso save reliability", () => {
 
     render(<Percorso />);
 
-    await userEvent.click(screen.getByRole("button", { name: /dipendente che vuole crescere/i }));
-    await userEvent.click(screen.getByRole("button", { name: /inizia il tuo percorso/i }));
+    await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.personas\.dipendente\.label/i }));
+    await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.cta\.start/i }));
 
     expect(authState.login).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -176,11 +176,11 @@ describe("Percorso save reliability", () => {
 
     render(<Percorso />);
 
-    expect(screen.getByText(/percorso confermato/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/dipendente che vuole crescere/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/prossimo passo: pannello attivita/i)).toBeInTheDocument();
+    expect(screen.getByText("dynamic:percorso.status.confirmed.title")).toBeInTheDocument();
+    expect(screen.getAllByText(/dynamic:percorso\.personas\.dipendente\.label/i).length).toBeGreaterThan(0);
+    expect(screen.getByText("dynamic:percorso.status.nextAction.activity")).toBeInTheDocument();
     expect(screen.queryByText(/mission board/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /continua in dashboard/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /dynamic:percorso\.cta\.continueDashboard/i })).toBeInTheDocument();
   });
 
   it("continues from an already confirmed journey without saving it again", async () => {
@@ -195,7 +195,7 @@ describe("Percorso save reliability", () => {
 
     render(<Percorso />);
 
-    await userEvent.click(screen.getByRole("button", { name: /continua in dashboard/i }));
+    await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.cta\.continueDashboard/i }));
 
     expect(apiFetchMock).not.toHaveBeenCalled();
     expect(authState.login).not.toHaveBeenCalled();
@@ -214,12 +214,12 @@ describe("Percorso save reliability", () => {
 
     render(<Percorso />);
 
-    expect(screen.getByText(/ancora in esplorazione/i)).toBeInTheDocument();
-    expect(screen.getByText(/prossimo passo: test di chiarezza/i)).toBeInTheDocument();
+    expect(screen.getByText("dynamic:percorso.status.exploring.title")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:percorso.status.nextAction.clarity")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /^indeciso/i }));
+    await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.personas\.indeciso\.label/i }));
 
-    expect(screen.getByRole("button", { name: /continua la mappa/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /dynamic:percorso\.cta\.continueMap/i })).toBeInTheDocument();
   });
 
   it("clears a previous save error when the user picks another journey", async () => {
@@ -231,11 +231,11 @@ describe("Percorso save reliability", () => {
 
     render(<Percorso />);
 
-    await userEvent.click(screen.getByRole("button", { name: /dipendente che vuole crescere/i }));
-    await userEvent.click(screen.getByRole("button", { name: /inizia il tuo percorso/i }));
+    await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.personas\.dipendente\.label/i }));
+    await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.cta\.start/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Scelta non valida");
 
-    await userEvent.click(screen.getByRole("button", { name: /^investitore/i }));
+    await userEvent.click(screen.getByRole("button", { name: /dynamic:percorso\.personas\.investitore\.label/i }));
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

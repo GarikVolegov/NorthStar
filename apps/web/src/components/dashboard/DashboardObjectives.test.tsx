@@ -3,6 +3,20 @@ import { describe, expect, it, vi } from "vitest";
 
 import { DashboardDiaryBookCard } from "./DashboardObjectives";
 
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: ({ key, source }: { key?: string; source: string }) =>
+    key ? `dynamic:${key}` : source,
+}));
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    i18n: {
+      language: "en-US",
+      resolvedLanguage: "en-US",
+    },
+  }),
+}));
+
 vi.mock("wouter", () => ({
   Link: ({
     href,
@@ -55,13 +69,14 @@ describe("DashboardObjectives", () => {
     );
 
     expect(
-      screen.getByRole("link", { name: /apri diario e obiettivi/i }),
+      screen.getByRole("link", { name: /dynamic:dashboard\.objectivesCard\.ariaLabel/i }),
     ).toHaveAttribute("href", "/diario?tab=objectives");
-    expect(screen.getByText("Diario")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.objectivesCard.title")).toBeInTheDocument();
     expect(screen.getByTestId("diary-book-cover")).toBeInTheDocument();
-    expect(screen.getByText("Avanzamento medio")).toBeInTheDocument();
-    expect(screen.getByText("Prossimo focus")).toBeInTheDocument();
-    expect(screen.getByText("5 attivi")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.objectivesCard.progressLabel")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.objectivesCard.nextFocus")).toBeInTheDocument();
+    expect(screen.getByText("5 dynamic:dashboard.objectivesCard.activePlural")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.objectivesCard.macroAreas.professional.label")).toBeInTheDocument();
     expect(screen.getByText("Diventare UX Researcher")).toBeInTheDocument();
     expect(
       screen.queryByText("Mappare aziende target"),
@@ -70,6 +85,26 @@ describe("DashboardObjectives", () => {
     expect(screen.queryByText("Mensile")).not.toBeInTheDocument();
     expect(screen.queryByText("Trimestrale")).not.toBeInTheDocument();
     expect(screen.queryByText("Annuale")).not.toBeInTheDocument();
+  });
+
+  it("shows practical empty guidance when no strategic objectives exist", () => {
+    render(
+      <DashboardDiaryBookCard
+        objectives={[{
+          ...baseObjective,
+          id: 2,
+          text: "Test landing page idea",
+          category: "idea_validation",
+          progress: 100,
+        }]}
+      />,
+    );
+
+    expect(screen.getByText("dynamic:dashboard.objectivesCard.empty.title")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.objectivesCard.empty.copy")).toBeInTheDocument();
+    expect(screen.queryByText("0 / 0 completati")).not.toBeInTheDocument();
+    expect(screen.queryByText("0 attivi")).not.toBeInTheDocument();
+    expect(screen.queryByText("Test landing page idea")).not.toBeInTheDocument();
   });
 
   it("keeps idea validation tasks out of the dashboard gauge and path", () => {

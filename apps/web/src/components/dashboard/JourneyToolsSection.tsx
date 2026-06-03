@@ -52,7 +52,7 @@ function JourneyToolCard({
   });
 
   return (
-    <Link href={href}>
+    <Link href={href} aria-label={`${title}. ${desc}`}>
       <div
         className={cn(
           "group rounded-2xl border border-border bg-card p-5 flex flex-col gap-3 hover:border-primary/30 hover:shadow-md hover:shadow-black/10 transition-all duration-200 cursor-pointer h-full",
@@ -106,8 +106,8 @@ export function JourneyToolsSection({
     id: "diary",
     href: "/diario",
     icon: BookOpen,
-    title: "Il mio Diario",
-    desc: "Riflessioni, idee e crescita personale",
+    title: "Annota i segnali utili",
+    desc: "Salva riflessioni, energie e dubbi per riconoscere cosa funziona davvero per te",
   };
   const choosePathTool: ToolItem = {
     id: "choosePath",
@@ -134,10 +134,10 @@ export function JourneyToolsSection({
   };
 
   const INDECISO_FULL: ToolItem[] = [
-    { id: "compass", href: "/bussola", icon: Compass, title: "La Bussola", desc: "Il tuo hub: scopri cosa ti muove e avanza verso una direzione", badge: "Inizia qui" },
+    { id: "compass", href: "/bussola", icon: Compass, title: "Trova la tua direzione", desc: "Capisci cosa ti muove e scegli il prossimo passo concreto", badge: "Inizia qui" },
     { id: "moodCheckIn", href: "/mood", icon: HeartHandshake, title: "Mood check-in", desc: "60s: dimmi come stai, ti suggerisco UNA cosa da fare", badge: "60s" },
-    { id: "cluesDiary", href: "/diario?mode=indizi", icon: Sparkles, title: "Diario degli Indizi", desc: "Annota un momento di energia o curiosità", badge: "Nuovo" },
-    { id: "socraticSession", href: "/coach?mode=socratic", icon: BrainCircuit, title: "Sessione Socratica", desc: "4 step strutturati per fare chiarezza con Wendy", badge: "AI" },
+    { id: "cluesDiary", href: "/diario?mode=indizi", icon: Sparkles, title: "Segna un indizio", desc: "Annota un momento di energia o curiosita da confrontare con il tuo percorso", badge: "Nuovo" },
+    { id: "socraticSession", href: "/coach?mode=socratic", icon: BrainCircuit, title: "Fai chiarezza con Wendy", desc: "Rispondi a 4 domande guidate e trasformale in una decisione osservabile", badge: "AI" },
     { id: "personalityTest", href: "/test", icon: Zap, title: "Test di personalità", desc: "Mappa la tua personalità professionale", badge: "Gratuito" },
     { id: "exploreSectors", href: "/settori", icon: Target, title: "Scegli settore e ruolo", desc: "Scegli l'area, il ruolo target e poi passa ai lavori reali" },
     { id: "newsWork", href: "/news", icon: Newspaper, title: "Notizie lavoro", desc: "Ultime notizie dal mercato del lavoro" },
@@ -159,10 +159,10 @@ export function JourneyToolsSection({
       { id: "applications", href: "/candidature", icon: Briefcase, title: "Le mie candidature", desc: "Gestisci le tue richieste e traccia i progressi" },
     ],
     autonomo: [
-      { id: "ideaValidator", href: "/validatore-idea", icon: Rocket, title: "Valida la tua idea", desc: "Score AI + analisi su 12 dimensioni + incubatori", badge: "AI" },
+      { id: "ideaValidator", href: "/validatore-idea", icon: Rocket, title: "Valida la tua idea", desc: "Controlla punti forti, rischi e prossima prova prima di investire tempo", badge: "AI" },
       { id: "businessCoach", href: "/coach", icon: BrainCircuit, title: "Consulente per la tua attività", desc: "Consigli strategici per far crescere la tua attività", badge: "AI" },
       { id: "growthMarkets", href: "/settori", icon: TrendingUp, title: "Mercati in crescita", desc: "Scopri i settori più profittevoli in Italia" },
-      { id: "knowledgeMap", href: "/grafo", icon: Network, title: "Mappa delle conoscenze", desc: "Mappa le connessioni tra settori e competenze" },
+      { id: "knowledgeMap", href: "/grafo", icon: Network, title: "Collega settori e competenze", desc: "Vedi quali competenze aprono piu opportunita tra aree vicine" },
     ],
     azienda: [
       { id: "personalityProfiles", href: "/settori", icon: Building2, title: "Profili personalità", desc: "Esplora i profili psicologici per ogni settore" },
@@ -174,7 +174,7 @@ export function JourneyToolsSection({
       { id: "growthAreas", href: "/settori", icon: BarChart3, title: "Aree in crescita", desc: "Analisi approfondita dei settori più dinamici" },
       { id: "marketNews", href: "/news", icon: Newspaper, title: "Notizie mercati", desc: "Ultime notizie economia, finanza e mercati" },
       { id: "sectorGrowth", href: "/crescita", icon: TrendingUp, title: "Crescita di settore", desc: "Dati e analisi per decisioni di investimento" },
-      { id: "knowledgeMap", href: "/grafo", icon: Network, title: "Mappa delle conoscenze", desc: "Rete di connessioni tra settori e competenze" },
+      { id: "knowledgeMap", href: "/grafo", icon: Network, title: "Collega settori e competenze", desc: "Individua relazioni utili tra mercati, competenze e opportunita" },
     ],
   };
 

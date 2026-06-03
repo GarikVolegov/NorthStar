@@ -1,4 +1,6 @@
 import { useOptionalWendy } from "@/contexts/WendyProvider";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
+import { cn } from "@/lib/utils";
 import {
   BrainCircuit,
   Compass,
@@ -10,9 +12,9 @@ import {
   Target,
   type LucideIcon,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { AdaptiveDashboardPhase } from "./dashboard-adaptive-flow";
 import type { AdaptiveSectionPresentation } from "./dashboard-adaptive-flow";
-import { cn } from "@/lib/utils";
 
 interface WendyPrompt {
   Icon: LucideIcon;
@@ -88,12 +90,59 @@ const PHASE_PROMPTS: Partial<Record<AdaptiveDashboardPhase, WendyPrompt>> = {
     message:
       "Preparami alla scelta del percorso: aiutami a decidere quale direzione attivare e quali segnali devo controllare prima di confermare.",
   },
+  active_journey: {
+    Icon: Target,
+    id: "active_journey",
+    label: "Pianifica il prossimo passo",
+    message:
+      "Aiutami a scegliere la prossima azione pratica del mio percorso attivo: cosa faccio oggi, cosa tengo d'occhio e quale risultato mi dice che sto avanzando.",
+  },
 };
 
 function getPrompts(adaptivePhase?: AdaptiveDashboardPhase): WendyPrompt[] {
   const phasePrompt = adaptivePhase ? PHASE_PROMPTS[adaptivePhase] : undefined;
   if (!phasePrompt) return PROMPTS_INDECISO;
-  return [phasePrompt, ...PROMPTS_INDECISO.filter((prompt) => prompt.label !== phasePrompt.label)];
+  return [phasePrompt, ...PROMPTS_INDECISO.filter((prompt) => prompt.id !== phasePrompt.id)];
+}
+
+function useDashboardLocale(): string {
+  const { i18n } = useTranslation();
+  return (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
+}
+
+function WendyPromptButton({
+  prompt,
+  locale,
+  onAsk,
+}: {
+  prompt: WendyPrompt;
+  locale: string;
+  onAsk: (message: string) => void;
+}) {
+  const { Icon } = prompt;
+  const label = useDynamicTranslation({
+    locale,
+    key: `dashboard.wendyPrompts.prompts.${prompt.id}.label`,
+    source: prompt.label,
+    context: "Dashboard Wendy prompt button label",
+  });
+  const message = useDynamicTranslation({
+    locale,
+    key: `dashboard.wendyPrompts.prompts.${prompt.id}.message`,
+    source: prompt.message,
+    context: "Prompt sent to Wendy from the dashboard quick prompt button. Keep it written as the user asking Wendy directly.",
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={() => onAsk(message)}
+      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-2 text-xs font-medium text-foreground transition-all hover:border-primary/40 hover:bg-primary/8 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-95"
+    >
+      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+      {label}
+    </button>
+  );
 }
 
 export function DashboardWendyPrompts({
@@ -103,13 +152,32 @@ export function DashboardWendyPrompts({
   adaptivePhase?: AdaptiveDashboardPhase | undefined;
   presentation?: AdaptiveSectionPresentation | undefined;
 }) {
+  const locale = useDashboardLocale();
   const wendy = useOptionalWendy();
   const prompts = getPrompts(adaptivePhase);
   const visiblePrompts = presentation?.priority === "compact" ? prompts.slice(0, 3) : prompts;
+  const kicker = useDynamicTranslation({
+    locale,
+    key: "dashboard.wendyPrompts.kicker",
+    source: "Chiedi a Wendy",
+    context: "Dashboard Wendy quick prompts widget kicker",
+  });
+  const subtitle = useDynamicTranslation({
+    locale,
+    key: "dashboard.wendyPrompts.subtitle",
+    source: "La tua coach AI per l'orientamento",
+    context: "Dashboard Wendy quick prompts widget subtitle",
+  });
+  const freeQuestionLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.wendyPrompts.freeQuestion",
+    source: "Fai una domanda libera...",
+    context: "Dashboard Wendy quick prompts free question button",
+  });
 
-  function handlePrompt(prompt: WendyPrompt) {
+  function handlePrompt(message: string) {
     if (!wendy) return;
-    wendy.ask(prompt.message);
+    wendy.ask(message);
     wendy.open();
   }
 
@@ -127,23 +195,20 @@ export function DashboardWendyPrompts({
         </div>
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Chiedi a Wendy
+            {kicker}
           </p>
-          <p className="text-xs text-muted-foreground/70">La tua coach AI per l&apos;orientamento</p>
+          <p className="text-xs text-muted-foreground/70">{subtitle}</p>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {visiblePrompts.map(({ Icon, ...prompt }) => (
-          <button
-            key={prompt.label}
-            type="button"
-            onClick={() => handlePrompt({ Icon, ...prompt })}
-            className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/30 px-3 py-2 text-xs font-medium text-foreground transition-all hover:border-primary/40 hover:bg-primary/8 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-95"
-          >
-            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-            {prompt.label}
-          </button>
+        {visiblePrompts.map((prompt) => (
+          <WendyPromptButton
+            key={prompt.id}
+            prompt={prompt}
+            locale={locale}
+            onAsk={handlePrompt}
+          />
         ))}
 
         <button
@@ -152,7 +217,7 @@ export function DashboardWendyPrompts({
           className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-primary/30 bg-primary/5 px-3 py-2 text-xs font-medium text-primary transition-all hover:border-primary/50 hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 active:scale-95"
         >
           <MessageCircle className="h-3.5 w-3.5" />
-          Fai una domanda libera...
+          {freeQuestionLabel}
         </button>
       </div>
     </div>

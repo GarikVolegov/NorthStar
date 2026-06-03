@@ -11,6 +11,17 @@ vi.mock("wouter", () => ({
   ),
 }));
 
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    i18n: { language: "en-US", resolvedLanguage: "en-US" },
+  }),
+}));
+
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: ({ key, source }: { key?: string; source: string }) =>
+    key ? `dynamic:${key}` : source,
+}));
+
 describe("DashboardClarityPath", () => {
   it("shows adaptive phase, completion count, and next action", () => {
     render(
@@ -22,9 +33,9 @@ describe("DashboardClarityPath", () => {
       />,
     );
 
-    expect(screen.getByText(/mappa della chiarezza/i)).toBeInTheDocument();
-    expect(screen.getByText("1 / 4 step completati")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Scegli settore e ruolo" })).toHaveAttribute("href", "/settori");
+    expect(screen.getByText("dynamic:dashboard.clarityPath.kicker")).toBeInTheDocument();
+    expect(screen.getByText("1 / 4 dynamic:dashboard.clarityPath.completedCount")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "dynamic:dashboard.clarityPath.steps.explore.cta" })).toHaveAttribute("href", "/settori");
   });
 
   it("uses the adaptive phase to mark the decision step as current", () => {
@@ -39,7 +50,23 @@ describe("DashboardClarityPath", () => {
       />,
     );
 
-    expect(screen.getAllByLabelText(/decidi.*step attivo/i).length).toBeGreaterThan(0);
-    expect(screen.queryAllByLabelText(/confronta.*step attivo/i)).toHaveLength(0);
+    expect(screen.getAllByLabelText(/dynamic:dashboard\.clarityPath\.steps\.decide\.label.*dynamic:dashboard\.clarityPath\.activeStepAria/i).length).toBeGreaterThan(0);
+    expect(screen.queryAllByLabelText(/dynamic:dashboard\.clarityPath\.steps\.compare\.label.*dynamic:dashboard\.clarityPath\.activeStepAria/i)).toHaveLength(0);
+  });
+
+  it("uses the active journey next action after a path has been chosen", () => {
+    render(
+      <DashboardClarityPath
+        hasSession
+        savedSectorsCount={3}
+        hasDecided
+        adaptivePhase="active_journey"
+        currentPhaseLabel="Percorso attivo"
+        nextAction={{ label: "Apri prossima routine", href: "/dashboard" }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "dynamic:dashboard.clarityPath.nextAction.active_journey" })).toHaveAttribute("href", "/dashboard");
+    expect(screen.queryAllByLabelText(/dynamic:dashboard\.clarityPath\.steps\.discover\.label.*dynamic:dashboard\.clarityPath\.activeStepAria/i)).toHaveLength(0);
   });
 });

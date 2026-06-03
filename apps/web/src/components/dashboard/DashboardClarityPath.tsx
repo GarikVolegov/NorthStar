@@ -1,9 +1,14 @@
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { cn } from "@/lib/utils";
 import { Check, Compass, Scale, Sparkles, Target } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 import type { AdaptiveDashboardPhase } from "./dashboard-adaptive-flow";
 
-interface ClarityStep {
+type ClarityStepKey = "discover" | "explore" | "compare" | "decide";
+
+interface ClarityStepSource {
+  key: ClarityStepKey;
   icon: React.ElementType;
   label: string;
   desc: string;
@@ -13,9 +18,39 @@ interface ClarityStep {
   active: boolean;
 }
 
+type ClarityStep = ClarityStepSource;
+
 interface ClarityPathNextAction {
   label: string;
   href: string;
+}
+
+function useDashboardLocale(): string {
+  const { i18n } = useTranslation();
+  return (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
+}
+
+function useClarityStep(locale: string, step: ClarityStepSource): ClarityStep {
+  const label = useDynamicTranslation({
+    locale,
+    key: `dashboard.clarityPath.steps.${step.key}.label`,
+    source: step.label,
+    context: "Dashboard clarity path step label",
+  });
+  const desc = useDynamicTranslation({
+    locale,
+    key: `dashboard.clarityPath.steps.${step.key}.desc`,
+    source: step.desc,
+    context: "Dashboard clarity path step description",
+  });
+  const cta = useDynamicTranslation({
+    locale,
+    key: `dashboard.clarityPath.steps.${step.key}.cta`,
+    source: step.cta,
+    context: "Dashboard clarity path step call to action",
+  });
+
+  return { ...step, label, desc, cta };
 }
 
 export function DashboardClarityPath({
@@ -37,8 +72,15 @@ export function DashboardClarityPath({
   priority?: "primary" | "supporting" | "compact" | undefined;
   compact?: boolean;
 }) {
-  const rawSteps: ClarityStep[] = [
+  const locale = useDashboardLocale();
+  const rawSteps: [
+    ClarityStepSource,
+    ClarityStepSource,
+    ClarityStepSource,
+    ClarityStepSource,
+  ] = [
     {
+      key: "discover",
       icon: Compass,
       label: "Scopri chi sei",
       desc: hasSession ? "Profilo RIASEC completato" : "Fai il test per capire il tuo tipo",
@@ -48,6 +90,7 @@ export function DashboardClarityPath({
       active: !hasSession,
     },
     {
+      key: "explore",
       icon: Target,
       label: "Scegli settore e ruolo",
       desc: savedSectorsCount > 0
@@ -59,6 +102,7 @@ export function DashboardClarityPath({
       active: hasSession && savedSectorsCount < 3,
     },
     {
+      key: "compare",
       icon: Scale,
       label: "Confronta scelte",
       desc: savedSectorsCount >= 3
@@ -70,6 +114,7 @@ export function DashboardClarityPath({
       active: savedSectorsCount >= 3 && !hasDecided,
     },
     {
+      key: "decide",
       icon: Sparkles,
       label: "Decidi",
       desc: hasDecided ? "Percorso scelto: ora costruisci!" : "Scegli il tuo percorso e parti",
@@ -79,14 +124,21 @@ export function DashboardClarityPath({
       active: savedSectorsCount >= 3,
     },
   ];
+  const translatedSteps = [
+    useClarityStep(locale, rawSteps[0]),
+    useClarityStep(locale, rawSteps[1]),
+    useClarityStep(locale, rawSteps[2]),
+    useClarityStep(locale, rawSteps[3]),
+  ];
   const phaseStepIndex: Partial<Record<AdaptiveDashboardPhase, number>> = {
     start_test: 0,
     explore_sectors: 1,
     compare_options: 2,
     choose_path: 3,
+    active_journey: 3,
   };
   const currentPhaseStep = adaptivePhase ? phaseStepIndex[adaptivePhase] : undefined;
-  const steps = rawSteps.map((step, index) => ({
+  const steps = translatedSteps.map((step, index) => ({
     ...step,
     active: currentPhaseStep !== undefined ? index === currentPhaseStep : step.active,
   }));
@@ -94,7 +146,42 @@ export function DashboardClarityPath({
   const currentStep = steps.findIndex((s) => s.active && !s.done);
   const completedCount = steps.filter((step) => step.done).length;
   const activeStep = currentStep >= 0 ? steps[currentStep] : steps[steps.length - 1];
-  const activeAction = nextAction ?? (activeStep ? { label: activeStep.cta, href: activeStep.href } : undefined);
+  const translatedNextActionLabel = useDynamicTranslation({
+    locale,
+    key: `dashboard.clarityPath.nextAction.${adaptivePhase ?? "custom"}`,
+    source: nextAction?.label ?? "",
+    context: "Dashboard clarity path next action label supplied by the adaptive dashboard state",
+  });
+  const activeAction = nextAction
+    ? { label: translatedNextActionLabel, href: nextAction.href }
+    : activeStep
+      ? { label: activeStep.cta, href: activeStep.href }
+      : undefined;
+  const kicker = useDynamicTranslation({
+    locale,
+    key: "dashboard.clarityPath.kicker",
+    source: "Mappa della chiarezza",
+    context: "Dashboard clarity path widget kicker",
+  });
+  const fallbackPhaseLabel = activeStep?.label ?? "Prossimo passo";
+  const phaseLabel = useDynamicTranslation({
+    locale,
+    key: `dashboard.clarityPath.phaseLabel.${adaptivePhase ?? "fallback"}`,
+    source: currentPhaseLabel ?? fallbackPhaseLabel,
+    context: "Dashboard clarity path current phase label",
+  });
+  const completedCountLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.clarityPath.completedCount",
+    source: "step completati",
+    context: "Dashboard clarity path completed steps count suffix",
+  });
+  const activeStepAria = useDynamicTranslation({
+    locale,
+    key: "dashboard.clarityPath.activeStepAria",
+    source: "step attivo",
+    context: "ARIA suffix for the active dashboard clarity path step",
+  });
 
   return (
     <div
@@ -111,13 +198,13 @@ export function DashboardClarityPath({
           </div>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Mappa della chiarezza
+              {kicker}
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">
-              {currentPhaseLabel ?? activeStep?.label ?? "Prossimo passo"}
+              {phaseLabel}
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              {completedCount} / {steps.length} step completati
+              {completedCount} / {steps.length} {completedCountLabel}
             </p>
           </div>
         </div>
@@ -139,7 +226,7 @@ export function DashboardClarityPath({
             <div
               key={step.label}
               aria-current={isCurrent ? "step" : undefined}
-              aria-label={`${step.label}${isCurrent ? " step attivo" : ""}`}
+              aria-label={`${step.label}${isCurrent ? ` ${activeStepAria}` : ""}`}
               className={cn(
                 "flex items-center gap-3 rounded-xl border p-3 transition-colors",
                 step.done && "border-primary/20 bg-primary/5",
@@ -179,7 +266,7 @@ export function DashboardClarityPath({
               <div
                 key={step.label}
                 aria-current={isCurrent ? "step" : undefined}
-                aria-label={`${step.label}${isCurrent ? " step attivo" : ""}`}
+                aria-label={`${step.label}${isCurrent ? ` ${activeStepAria}` : ""}`}
                 className="flex flex-col items-center gap-2 text-center"
               >
                 <div

@@ -4,8 +4,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { DashboardKpiStrip } from "./DashboardKpiStrip";
 import { DashboardWeekTimeline } from "./DashboardWeekTimeline";
 
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: ({ key, source }: { key?: string; source: string }) =>
+    key ? `dynamic:${key}` : source,
+}));
+
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    i18n: {
+      language: "en-US",
+      resolvedLanguage: "en-US",
+    },
+  }),
+}));
+
 vi.mock("wouter", () => ({
-  Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
+  Link: ({ href, children, ...props }: { href?: string; children: React.ReactNode }) => <a href={href} {...props}>{children}</a>,
 }));
 
 describe("DashboardWeekTimeline", () => {
@@ -48,10 +62,26 @@ describe("DashboardWeekTimeline", () => {
       />,
     );
 
-    expect(screen.getByText("Timeline settimanale")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.weekTimeline.title")).toBeInTheDocument();
     expect(screen.getAllByText("Revisione CV").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Prossimo evento/i)).toBeInTheDocument();
-    expect(screen.getByText(/Attivita: Revisione CV/i)).toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.weekTimeline.nextLabel")).toBeInTheDocument();
+    expect(screen.getByText(/dynamic:dashboard\.weekTimeline\.categories\.task: Revisione CV/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Timeline settimanale|Prossimo evento|Attivita/i)).not.toBeInTheDocument();
+  });
+
+  it("shows an explicit empty state instead of preset events when there is no scheduled work", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-27T10:00:00.000Z"));
+
+    render(<DashboardWeekTimeline events={[]} objectives={[]} />);
+
+    expect(screen.getByText("dynamic:dashboard.weekTimeline.empty.title")).toBeInTheDocument();
+    expect(screen.getByText("dynamic:dashboard.weekTimeline.empty.copy")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /dynamic:dashboard\.weekTimeline\.empty\.cta/i })).toHaveAttribute("href", "/calendario");
+    expect(screen.queryByText("Revisione obiettivi")).not.toBeInTheDocument();
+    expect(screen.queryByText("Focus crescita")).not.toBeInTheDocument();
+    expect(screen.queryByText("Check progressi")).not.toBeInTheDocument();
+    expect(screen.queryByText("dynamic:dashboard.weekTimeline.nextLabel")).not.toBeInTheDocument();
   });
 
   it("starts the timeline from today and shows the next seven days, not the current calendar week", () => {
@@ -72,9 +102,9 @@ describe("DashboardWeekTimeline", () => {
 
     render(<DashboardWeekTimeline events={[]} />);
 
-    expect(screen.getByLabelText("Mer 27 maggio")).toBeInTheDocument();
-    expect(screen.getByLabelText("Gio 28 maggio")).toBeInTheDocument();
-    expect(screen.getByLabelText("Mar 2 giugno")).toBeInTheDocument();
+    expect(screen.getByLabelText("Wed 27 May")).toBeInTheDocument();
+    expect(screen.getByLabelText("Thu 28 May")).toBeInTheDocument();
+    expect(screen.getByLabelText("Tue 2 June")).toBeInTheDocument();
   });
 
   it("organizes objectives inside the rolling timeline", () => {
@@ -99,6 +129,6 @@ describe("DashboardWeekTimeline", () => {
     );
 
     expect(screen.getAllByText("Preparare portfolio").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Obiettivo: Preparare portfolio/i)).toBeInTheDocument();
+    expect(screen.getByText(/dynamic:dashboard\.weekTimeline\.categories\.objective: Preparare portfolio/i)).toBeInTheDocument();
   });
 });

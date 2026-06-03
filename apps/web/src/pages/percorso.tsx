@@ -2,6 +2,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWendy } from "@/contexts/WendyProvider";
 import { toast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api-fetch";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -15,6 +16,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLocation } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -104,6 +106,10 @@ const JOURNEY_DESTINATION: Record<JourneyType, string> = {
   investitore: "/settori",
 };
 
+const PERSONA_BY_ID = Object.fromEntries(
+  PERSONAS.map((persona) => [persona.id, persona]),
+) as Record<JourneyType, Persona>;
+
 interface JourneySaveResponse {
   success: boolean;
   journeyType: JourneyType;
@@ -121,17 +127,188 @@ function isJourneyType(value: unknown): value is JourneyType {
   );
 }
 
-function getConfirmCopy(
+function usePersonaLabels(locale: string): Record<JourneyType, string> {
+  const indeciso = useDynamicTranslation({
+    locale,
+    key: "percorso.personas.indeciso.label",
+    source: PERSONA_BY_ID.indeciso.label,
+    context: "Journey persona label for undecided users",
+  });
+  const dipendente = useDynamicTranslation({
+    locale,
+    key: "percorso.personas.dipendente.label",
+    source: PERSONA_BY_ID.dipendente.label,
+    context: "Journey persona label for employees who want to grow",
+  });
+  const autonomo = useDynamicTranslation({
+    locale,
+    key: "percorso.personas.autonomo.label",
+    source: PERSONA_BY_ID.autonomo.label,
+    context: "Journey persona label for self-employed users",
+  });
+  const azienda = useDynamicTranslation({
+    locale,
+    key: "percorso.personas.azienda.label",
+    source: PERSONA_BY_ID.azienda.label,
+    context: "Journey persona label for companies looking for talent",
+  });
+  const investitore = useDynamicTranslation({
+    locale,
+    key: "percorso.personas.investitore.label",
+    source: PERSONA_BY_ID.investitore.label,
+    context: "Journey persona label for investors",
+  });
+
+  return { indeciso, dipendente, autonomo, azienda, investitore };
+}
+
+function PersonaCard({
+  persona,
+  index,
+  isSelected,
+  locale,
+  onSelect,
+}: {
+  persona: Persona;
+  index: number;
+  isSelected: boolean;
+  locale: string;
+  onSelect: (persona: JourneyType) => void;
+}) {
+  const Icon = persona.icon;
+  const label = useDynamicTranslation({
+    locale,
+    key: `percorso.personas.${persona.id}.label`,
+    source: persona.label,
+    context: "Journey persona card label",
+  });
+  const tagline = useDynamicTranslation({
+    locale,
+    key: `percorso.personas.${persona.id}.tagline`,
+    source: persona.tagline,
+    context: "Journey persona card short tagline",
+  });
+  const description = useDynamicTranslation({
+    locale,
+    key: `percorso.personas.${persona.id}.description`,
+    source: persona.description,
+    context: "Journey persona card description",
+  });
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.07, duration: 0.4 }}
+      onClick={() => onSelect(persona.id)}
+      className={`text-left p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer group relative overflow-hidden ${
+        isSelected
+          ? `${persona.border} bg-gradient-to-br ${persona.color} shadow-lg shadow-black/30`
+          : "border-border bg-card hover:border-primary/30 hover:bg-card/80"
+      }`}
+    >
+      {isSelected && (
+        <div className="absolute top-3 right-3">
+          <CheckCircle2 className="w-5 h-5 text-primary" />
+        </div>
+      )}
+
+      <div
+        className={`w-11 h-11 rounded-xl flex items-center justify-center mb-4 ${
+          isSelected
+            ? "bg-white/15"
+            : "bg-primary/10 group-hover:bg-primary/15"
+        } transition-colors`}
+      >
+        <Icon
+          className={`w-5 h-5 ${
+            isSelected ? persona.accent : "text-primary"
+          } transition-colors`}
+        />
+      </div>
+
+      <h3
+        className={`font-bold text-base mb-1 ${
+          isSelected ? "text-white" : "text-foreground"
+        }`}
+      >
+        {label}
+      </h3>
+      <p
+        className={`text-xs font-semibold mb-3 ${
+          isSelected ? persona.accent : "text-primary"
+        }`}
+      >
+        {tagline}
+      </p>
+      <p
+        className={`text-sm leading-relaxed mb-4 ${
+          isSelected ? "text-white/80" : "text-muted-foreground"
+        }`}
+      >
+        {description}
+      </p>
+
+      <div className="flex flex-wrap gap-1.5">
+        {persona.tools.map((tool, toolIndex) => (
+          <PersonaTool
+            key={`${persona.id}-${tool}`}
+            personaId={persona.id}
+            index={toolIndex}
+            source={tool}
+            locale={locale}
+            selected={isSelected}
+          />
+        ))}
+      </div>
+    </motion.button>
+  );
+}
+
+function PersonaTool({
+  personaId,
+  index,
+  source,
+  locale,
+  selected,
+}: {
+  personaId: JourneyType;
+  index: number;
+  source: string;
+  locale: string;
+  selected: boolean;
+}) {
+  const label = useDynamicTranslation({
+    locale,
+    key: `percorso.personas.${personaId}.tools.${index}`,
+    source,
+    context: "Journey persona card tool chip",
+  });
+
+  return (
+    <span
+      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+        selected
+          ? "bg-white/15 text-white/90"
+          : "bg-muted text-muted-foreground"
+      }`}
+    >
+      {label}
+    </span>
+  );
+}
+
+function getConfirmCopyInput(
   selected: JourneyType,
   saving: boolean,
   isCurrentConfirmedSelection: boolean,
-) {
-  if (saving) return "Salvataggio...";
-  if (selected === "indeciso") return "Continua la mappa";
-  if (isCurrentConfirmedSelection && selected === "dipendente") return "Continua in dashboard";
-  if (isCurrentConfirmedSelection && selected === "autonomo") return "Apri Wendy";
-  if (isCurrentConfirmedSelection) return "Vai ai settori";
-  return "Inizia il tuo percorso";
+): { key: string; source: string; context: string } {
+  if (saving) return { key: "percorso.cta.saving", source: "Salvataggio...", context: "Journey CTA while saving" };
+  if (selected === "indeciso") return { key: "percorso.cta.continueMap", source: "Continua la mappa", context: "Journey CTA for undecided users" };
+  if (isCurrentConfirmedSelection && selected === "dipendente") return { key: "percorso.cta.continueDashboard", source: "Continua in dashboard", context: "Journey CTA for confirmed employee users" };
+  if (isCurrentConfirmedSelection && selected === "autonomo") return { key: "percorso.cta.openWendy", source: "Apri Wendy", context: "Journey CTA for confirmed self-employed users" };
+  if (isCurrentConfirmedSelection) return { key: "percorso.cta.goSectors", source: "Vai ai settori", context: "Journey CTA for confirmed market-facing users" };
+  return { key: "percorso.cta.start", source: "Inizia il tuo percorso", context: "Journey CTA to start and save the selected path" };
 }
 
 async function readJourneySaveError(response: Response): Promise<string> {
@@ -158,6 +335,8 @@ async function readJourneySaveError(response: Response): Promise<string> {
 }
 
 export default function Percorso() {
+  const { i18n } = useTranslation();
+  const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
   const { user, login, token } = useAuth();
   const [, setLocation] = useLocation();
   const wendy = useWendy();
@@ -167,6 +346,67 @@ export default function Percorso() {
   );
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const heroBadge = useDynamicTranslation({
+    locale,
+    key: "percorso.hero.badge",
+    source: "Il tuo percorso personale",
+    context: "Badge above the personal journey selection page hero",
+  });
+  const heroTitlePrefix = useDynamicTranslation({
+    locale,
+    key: "percorso.hero.titlePrefix",
+    source: "Chi sei e cosa",
+    context: "First part of the personal journey selection page heading",
+  });
+  const heroTitleAccent = useDynamicTranslation({
+    locale,
+    key: "percorso.hero.titleAccent",
+    source: "vuoi raggiungere?",
+    context: "Highlighted second part of the personal journey selection page heading",
+  });
+  const heroDescription = useDynamicTranslation({
+    locale,
+    key: "percorso.hero.description",
+    source: "Seleziona il profilo che ti rappresenta di piu. NorthStar personalizzera gli strumenti e i consigli in base al tuo percorso.",
+    context: "Description below the personal journey selection page heading",
+  });
+  const statusAriaLabel = useDynamicTranslation({
+    locale,
+    key: "percorso.status.ariaLabel",
+    source: "Stato del percorso",
+    context: "ARIA label for the personal journey status panel",
+  });
+  const selectedPrefix = useDynamicTranslation({
+    locale,
+    key: "percorso.selection.prefix",
+    source: "Hai scelto:",
+    context: "Prefix before the selected journey persona label",
+  });
+  const selectedSuffix = useDynamicTranslation({
+    locale,
+    key: "percorso.selection.suffix",
+    source: "Puoi cambiarlo in qualsiasi momento dal tuo profilo.",
+    context: "Helper text after the selected journey persona label",
+  });
+  const saveSuccessTitle = useDynamicTranslation({
+    locale,
+    key: "percorso.toast.saveSuccess.title",
+    source: "Piano salvato!",
+    context: "Toast title shown after saving the personal journey",
+  });
+  const saveFailureTitle = useDynamicTranslation({
+    locale,
+    key: "percorso.toast.saveFailure.title",
+    source: "Salvataggio non riuscito",
+    context: "Toast title shown when saving the personal journey fails",
+  });
+  const genericSaveError = useDynamicTranslation({
+    locale,
+    key: "percorso.errors.genericSave",
+    source: "Non sono riuscito a salvare il percorso. Riprova tra poco.",
+    context: "Fallback error when saving the personal journey fails unexpectedly",
+  });
+  const personaLabels = usePersonaLabels(locale);
 
   async function handleConfirm() {
     if (!selected) return;
@@ -200,14 +440,14 @@ export default function Percorso() {
           journeyDecidedAt: saved.journeyDecidedAt,
           journeyDecisionSource: saved.journeyDecisionSource,
         }, token);
-        toast({ title: "Piano salvato!", description: `Hai scelto: ${PERSONAS.find((p) => p.id === selected)?.label}` });
+        toast({ title: saveSuccessTitle, description: `${selectedPrefix} ${personaLabels[selected]}` });
       } catch (error) {
         const message =
           error instanceof Error
             ? error.message
-            : "Non sono riuscito a salvare il percorso. Riprova tra poco.";
+            : genericSaveError;
         setSaveError(message);
-        toast({ title: "Salvataggio non riuscito", description: message, variant: "destructive" });
+        toast({ title: saveFailureTitle, description: message, variant: "destructive" });
         return;
       } finally {
         setSaving(false);
@@ -223,27 +463,55 @@ export default function Percorso() {
   }
 
   const selectedPersona = PERSONAS.find((p) => p.id === selected);
-  const currentPersona = PERSONAS.find((p) => p.id === userJourneyType);
+  const selectedPersonaLabel = selected ? personaLabels[selected] : null;
+  const currentPersonaLabel = userJourneyType ? personaLabels[userJourneyType] : null;
   const hasConfirmedJourney =
     Boolean(user?.journeyDecidedAt) && userJourneyType !== null && userJourneyType !== "indeciso";
   const hasSelectedJourney = userJourneyType !== null && userJourneyType !== "indeciso";
-  const statusTitle = hasConfirmedJourney
-    ? "Percorso confermato"
-    : hasSelectedJourney
-      ? "Percorso selezionato"
-      : "Ancora in esplorazione";
-  const statusCopy = hasConfirmedJourney
-    ? `${currentPersona?.label ?? "Il tuo percorso"} e' attivo nel tuo pannello attivita. Il prossimo passo resta sempre in alto.`
-    : hasSelectedJourney
-      ? `${currentPersona?.label ?? "Il tuo percorso"} e' pronto: confermalo per salvare lo stato decisionale.`
-      : "Puoi restare indeciso e usare la mappa di chiarezza: NorthStar ti terra' nel flusso reale, senza schermate morte.";
-  const statusNextAction = hasSelectedJourney
-    ? "Prossimo passo: pannello attivita"
-    : "Prossimo passo: test di chiarezza";
   const isCurrentConfirmedSelection = hasConfirmedJourney && selected === userJourneyType;
-  const confirmCopy = selected
-    ? getConfirmCopy(selected, saving, isCurrentConfirmedSelection)
-    : null;
+  const statusTitle = useDynamicTranslation({
+    locale,
+    key: hasConfirmedJourney
+      ? "percorso.status.confirmed.title"
+      : hasSelectedJourney
+        ? "percorso.status.selected.title"
+        : "percorso.status.exploring.title",
+    source: hasConfirmedJourney
+      ? "Percorso confermato"
+      : hasSelectedJourney
+        ? "Percorso selezionato"
+        : "Ancora in esplorazione",
+    context: "Title for the personal journey status panel",
+  });
+  const statusCopy = useDynamicTranslation({
+    locale,
+    key: hasConfirmedJourney
+      ? "percorso.status.confirmed.copy"
+      : hasSelectedJourney
+        ? "percorso.status.selected.copy"
+        : "percorso.status.exploring.copy",
+    source: hasConfirmedJourney
+      ? `${currentPersonaLabel ?? "Il tuo percorso"} e' attivo nel tuo pannello attivita. Il prossimo passo resta sempre in alto.`
+      : hasSelectedJourney
+        ? `${currentPersonaLabel ?? "Il tuo percorso"} e' pronto: confermalo per salvare lo stato decisionale.`
+        : "Puoi restare indeciso e usare la mappa di chiarezza: NorthStar ti terra' nel flusso reale, senza schermate morte.",
+    context: "Body copy for the personal journey status panel. Preserve the journey label when present.",
+  });
+  const statusNextAction = useDynamicTranslation({
+    locale,
+    key: hasSelectedJourney
+      ? "percorso.status.nextAction.activity"
+      : "percorso.status.nextAction.clarity",
+    source: hasSelectedJourney
+      ? "Prossimo passo: pannello attivita"
+      : "Prossimo passo: test di chiarezza",
+    context: "Next action badge in the personal journey status panel",
+  });
+  const confirmCopyInput = selected
+    ? getConfirmCopyInput(selected, saving, isCurrentConfirmedSelection)
+    : { key: "percorso.cta.empty", source: "", context: "Empty journey selection CTA placeholder" };
+  const confirmCopyText = useDynamicTranslation({ locale, ...confirmCopyInput });
+  const confirmCopy = selected ? confirmCopyText : null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -257,15 +525,14 @@ export default function Percorso() {
         >
           <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-full px-3.5 py-1.5 mb-4 text-xs font-semibold text-primary">
             <Star className="w-3 h-3" />
-            Il tuo percorso personale
+            {heroBadge}
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-3 leading-tight">
-            Chi sei e cosa
-            <span className="text-italic-serif text-primary"> vuoi raggiungere?</span>
+            {heroTitlePrefix}{" "}
+            <span className="text-italic-serif text-primary">{heroTitleAccent}</span>
           </h1>
           <p className="text-sm sm:text-base text-white/65 max-w-xl mx-auto">
-            Seleziona il profilo che ti rappresenta di più. NorthStar personalizzerà gli strumenti
-            e i consigli in base al tuo percorso.
+            {heroDescription}
           </p>
         </motion.div>
       </div>
@@ -273,7 +540,7 @@ export default function Percorso() {
       {/* Persona grid */}
       <div className="max-w-5xl mx-auto px-4 py-12">
         <section
-          aria-label="Stato del percorso"
+          aria-label={statusAriaLabel}
           className="mb-8 grid gap-4 rounded-xl border border-border bg-card p-4 shadow-sm md:grid-cols-[1fr_auto] md:items-center md:p-5"
         >
           <div className="flex items-start gap-3">
@@ -299,85 +566,19 @@ export default function Percorso() {
         </section>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {PERSONAS.map((persona, i) => {
-            const Icon = persona.icon;
-            const isSelected = selected === persona.id;
-
-            return (
-              <motion.button
-                key={persona.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.07, duration: 0.4 }}
-                onClick={() => {
-                  setSelected(persona.id);
-                  setSaveError(null);
-                }}
-                className={`text-left p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer group relative overflow-hidden ${
-                  isSelected
-                    ? `${persona.border} bg-gradient-to-br ${persona.color} shadow-lg shadow-black/30`
-                    : "border-border bg-card hover:border-primary/30 hover:bg-card/80"
-                }`}
-              >
-                {isSelected && (
-                  <div className="absolute top-3 right-3">
-                    <CheckCircle2 className="w-5 h-5 text-primary" />
-                  </div>
-                )}
-
-                <div
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center mb-4 ${
-                    isSelected
-                      ? "bg-white/15"
-                      : "bg-primary/10 group-hover:bg-primary/15"
-                  } transition-colors`}
-                >
-                  <Icon
-                    className={`w-5 h-5 ${
-                      isSelected ? persona.accent : "text-primary"
-                    } transition-colors`}
-                  />
-                </div>
-
-                <h3
-                  className={`font-bold text-base mb-1 ${
-                    isSelected ? "text-white" : "text-foreground"
-                  }`}
-                >
-                  {persona.label}
-                </h3>
-                <p
-                  className={`text-xs font-semibold mb-3 ${
-                    isSelected ? persona.accent : "text-primary"
-                  }`}
-                >
-                  {persona.tagline}
-                </p>
-                <p
-                  className={`text-sm leading-relaxed mb-4 ${
-                    isSelected ? "text-white/80" : "text-muted-foreground"
-                  }`}
-                >
-                  {persona.description}
-                </p>
-
-                <div className="flex flex-wrap gap-1.5">
-                  {persona.tools.map((tool) => (
-                    <span
-                      key={tool}
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        isSelected
-                          ? "bg-white/15 text-white/90"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {tool}
-                    </span>
-                  ))}
-                </div>
-              </motion.button>
-            );
-          })}
+          {PERSONAS.map((persona, i) => (
+            <PersonaCard
+              key={persona.id}
+              persona={persona}
+              index={i}
+              isSelected={selected === persona.id}
+              locale={locale}
+              onSelect={(personaId) => {
+                setSelected(personaId);
+                setSaveError(null);
+              }}
+            />
+          ))}
         </div>
 
         {/* Confirm CTA */}
@@ -389,11 +590,11 @@ export default function Percorso() {
             className="mt-10 flex flex-col items-center gap-3"
           >
             <p className="text-muted-foreground text-sm text-center max-w-sm">
-              Hai scelto:{" "}
+              {selectedPrefix}{" "}
               <span className="font-semibold text-foreground">
-                {selectedPersona?.label}
+                {selectedPersonaLabel ?? selectedPersona?.label}
               </span>
-              . Puoi cambiarlo in qualsiasi momento dal tuo profilo.
+              . {selectedSuffix}
             </p>
             {saveError && (
               <div

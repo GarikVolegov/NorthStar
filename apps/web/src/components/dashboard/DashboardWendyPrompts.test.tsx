@@ -22,6 +22,11 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
+vi.mock("@/lib/dynamic-translation", () => ({
+  useDynamicTranslation: ({ key, source }: { key?: string; source: string }) =>
+    key ? `dynamic:${key}` : source,
+}));
+
 function getFirstPromptButton(): HTMLElement {
   const firstPrompt = screen.getAllByRole("button")[0];
   if (!firstPrompt) throw new Error("Expected at least one Wendy prompt button");
@@ -39,13 +44,12 @@ describe("DashboardWendyPrompts", () => {
     render(<DashboardWendyPrompts adaptivePhase="explore_sectors" />);
 
     const firstPrompt = getFirstPromptButton();
-    expect(firstPrompt).toHaveTextContent(/scegli settore e ruolo/i);
+    expect(firstPrompt).toHaveTextContent("dynamic:dashboard.wendyPrompts.prompts.explore_sectors.label");
 
     fireEvent.click(firstPrompt);
 
     await waitFor(() => {
-      expect(wendyMock.ask).toHaveBeenCalledWith(expect.stringMatching(/settore/i));
-      expect(wendyMock.ask).toHaveBeenCalledWith(expect.stringMatching(/ruolo/i));
+      expect(wendyMock.ask).toHaveBeenCalledWith("dynamic:dashboard.wendyPrompts.prompts.explore_sectors.message");
       expect(wendyMock.open).toHaveBeenCalled();
     });
   });
@@ -53,10 +57,19 @@ describe("DashboardWendyPrompts", () => {
   it("promotes a path choice prompt when the user is ready to choose", () => {
     render(<DashboardWendyPrompts adaptivePhase="choose_path" />);
 
-    expect(getFirstPromptButton()).toHaveTextContent(/prepara la scelta/i);
+    expect(getFirstPromptButton()).toHaveTextContent("dynamic:dashboard.wendyPrompts.prompts.choose_path.label");
   });
 
-  it("sends the source prompt message to Wendy without dynamic translation", async () => {
+  it("promotes an active journey prompt after the user has chosen a path", () => {
+    render(<DashboardWendyPrompts adaptivePhase="active_journey" />);
+
+    const firstPrompt = getFirstPromptButton();
+
+    expect(firstPrompt).toHaveTextContent("dynamic:dashboard.wendyPrompts.prompts.active_journey.label");
+    expect(firstPrompt).not.toHaveTextContent(/notte della fondazione/i);
+  });
+
+  it("sends the dynamically translated prompt message to Wendy", async () => {
     i18nState.language = "en-US";
     i18nState.resolvedLanguage = "en-US";
     render(<DashboardWendyPrompts adaptivePhase="explore_sectors" />);
@@ -64,7 +77,7 @@ describe("DashboardWendyPrompts", () => {
     fireEvent.click(getFirstPromptButton());
 
     await waitFor(() => {
-      expect(wendyMock.ask).toHaveBeenCalledWith(expect.stringMatching(/settore e ruolo/i));
+      expect(wendyMock.ask).toHaveBeenCalledWith("dynamic:dashboard.wendyPrompts.prompts.explore_sectors.message");
     });
   });
 });

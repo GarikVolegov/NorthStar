@@ -5,10 +5,19 @@ import { Briefcase, User } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 
+function clampPercent(value: number): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
 function ProfileRing({ percent }: { percent: number }) {
+  const safePercent = clampPercent(percent);
   const r = 16;
   const circ = 2 * Math.PI * r;
-  const dash = (percent / 100) * circ;
+  const dash = (safePercent / 100) * circ;
   return (
     <svg width="40" height="40" className="-rotate-90">
       <circle cx="20" cy="20" r={r} fill="none" stroke="hsl(var(--primary)/0.12)" strokeWidth="3.5" />
@@ -38,7 +47,10 @@ export function DashboardKpiStrip({
 }) {
   const { i18n } = useTranslation();
   const activeLanguage = i18n.resolvedLanguage?.slice(0, 2) || i18n.language?.slice(0, 2) || "it";
-  const profileComplete = profilePercent >= 100;
+  const safeProfilePercent = clampPercent(profilePercent);
+  const profileMissingPercent = 100 - safeProfilePercent;
+  const profileComplete = safeProfilePercent >= 100;
+  const safeConfirmedSectorName = confirmedSectorName?.trim() || null;
   const profileLabel = useDynamicTranslation({
     locale: activeLanguage,
     source: "Completamento profilo",
@@ -53,9 +65,9 @@ export function DashboardKpiStrip({
   });
   const profileMissingLabel = useDynamicTranslation({
     locale: activeLanguage,
-    source: `${100 - profilePercent}% mancante`,
+    source: "mancante",
     key: "dashboard.kpi.profile.missing",
-    context: "Dashboard KPI missing profile percentage; keep the percentage unchanged",
+    context: "Dashboard KPI profile missing label; the numeric percentage is rendered separately",
   });
   const sectorLabel = useDynamicTranslation({
     locale: activeLanguage,
@@ -87,10 +99,10 @@ export function DashboardKpiStrip({
       id: "profile",
       icon: null,
       label: profileLabel,
-      value: `${profilePercent}%`,
-      sub: profilePercent >= 100 ? profileCompleteLabel : profileMissingLabel,
+      value: `${safeProfilePercent}%`,
+      sub: profileComplete ? profileCompleteLabel : `${profileMissingPercent}% ${profileMissingLabel}`,
       href: "/profilo",
-      highlight: profilePercent >= 100,
+      highlight: profileComplete,
       ring: true,
       hideWhenComplete: true,
     },
@@ -98,10 +110,10 @@ export function DashboardKpiStrip({
       id: "sector",
       icon: Briefcase,
       label: sectorLabel,
-      value: confirmedSectorName ?? chooseSectorLabel,
-      sub: confirmedSectorName ? sectorConfirmedLabel : completeTestLabel,
+      value: safeConfirmedSectorName ?? chooseSectorLabel,
+      sub: safeConfirmedSectorName ? sectorConfirmedLabel : completeTestLabel,
       href: sessionId ? `/risultati/${sessionId}` : "/test",
-      highlight: !!confirmedSectorName,
+      highlight: !!safeConfirmedSectorName,
       ring: false,
       hideWhenComplete: true,
     },
@@ -125,7 +137,7 @@ export function DashboardKpiStrip({
               <p className="text-xs font-medium text-muted-foreground leading-snug">{card.label}</p>
               {card.ring ? (
                 <div className="relative shrink-0">
-                  <ProfileRing percent={profilePercent} />
+                  <ProfileRing percent={safeProfilePercent} />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <User className="w-3.5 h-3.5 text-primary" />
                   </div>
@@ -145,7 +157,13 @@ export function DashboardKpiStrip({
         );
 
         return card.href ? (
-          <Link key={card.id} href={card.href} className="block h-full">{inner}</Link>
+          <Link
+            key={card.id}
+            href={card.href}
+            className="block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
+          >
+            {inner}
+          </Link>
         ) : (
           <div key={card.id}>{inner}</div>
         );

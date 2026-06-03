@@ -1,4 +1,5 @@
 import type { DashboardObjective } from "@/hooks/useDashboardData";
+import { useDynamicTranslation } from "@/lib/dynamic-translation";
 import {
   getObjectiveMacroArea,
   getStrategicProgressPercent,
@@ -7,6 +8,7 @@ import {
 } from "@/lib/objectives-presentation";
 import { cn } from "@/lib/utils";
 import { ArrowRight, BookOpen, Check, Circle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Link } from "wouter";
 
 export function ObjectiveProgressGauge({
@@ -87,11 +89,17 @@ function getPathSteps(objectives: DashboardObjective[]) {
   }));
 }
 
+function useDashboardLocale(): string {
+  const { i18n } = useTranslation();
+  return i18n.resolvedLanguage || i18n.language || "it";
+}
+
 export function DashboardDiaryBookCard({
   objectives,
 }: {
   objectives: DashboardObjective[];
 }) {
+  const locale = useDashboardLocale();
   const strategicObjectives = objectives.filter(isStrategicObjective);
   const sortedObjectives = sortObjectivesByImportance(strategicObjectives);
   const progress = getStrategicProgressPercent(strategicObjectives);
@@ -104,11 +112,90 @@ export function DashboardDiaryBookCard({
     (objective) => objective.completed || objective.progress >= 100,
   ).length;
   const activeCount = strategicObjectives.length - completedCount;
+  const hasStrategicObjectives = strategicObjectives.length > 0;
+  const ariaLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.ariaLabel",
+    source: "Apri diario e obiettivi",
+    context: "Accessible label for the dashboard diary and objectives card link",
+  });
+  const eyebrow = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.eyebrow",
+    source: "Diario personale",
+    context: "Dashboard objectives card eyebrow",
+  });
+  const title = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.title",
+    source: "Diario",
+    context: "Dashboard objectives card title",
+  });
+  const fallbackDescription = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.description",
+    source: "Riflessioni, idee e obiettivi in un unico spazio",
+    context: "Dashboard objectives card fallback description",
+  });
+  const macroAreaLabel = useDynamicTranslation({
+    locale,
+    key: `dashboard.objectivesCard.macroAreas.${leadingMacroArea?.key ?? "personal"}.label`,
+    source: leadingMacroArea?.label ?? fallbackDescription,
+    context: "Dashboard objectives card macro-area label. Keep it user-facing and practical.",
+  });
+  const progressLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.progressLabel",
+    source: "Avanzamento medio",
+    context: "Dashboard objectives card progress label",
+  });
+  const completedLabel = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.completedLabel",
+    source: "completati",
+    context: "Dashboard objectives card completed objectives count suffix",
+  });
+  const nextFocus = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.nextFocus",
+    source: "Prossimo focus",
+    context: "Dashboard objectives card next focus label",
+  });
+  const activeSingular = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.activeSingular",
+    source: "attivo",
+    context: "Dashboard objectives card active objectives singular suffix",
+  });
+  const activePlural = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.activePlural",
+    source: "attivi",
+    context: "Dashboard objectives card active objectives plural suffix",
+  });
+  const emptyTitle = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.empty.title",
+    source: "Scegli il primo obiettivo strategico",
+    context: "Dashboard objectives card empty state title",
+  });
+  const emptyCopy = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.empty.copy",
+    source: "Trasforma una direzione in un traguardo concreto: cosa vuoi ottenere e quale prossimo passo puoi verificare?",
+    context: "Dashboard objectives card empty state practical guidance",
+  });
+  const progressAria = useDynamicTranslation({
+    locale,
+    key: "dashboard.objectivesCard.progressAria",
+    source: `Progresso obiettivi ${progress}%`,
+    context: "Dashboard objectives card progress bar accessible label. Keep the percentage unchanged.",
+  });
 
   return (
     <Link
       href="/diario?tab=objectives"
-      aria-label="Apri diario e obiettivi"
+      aria-label={ariaLabel}
       className="group relative block overflow-hidden rounded-lg border border-border bg-card p-4 text-left shadow-sm transition duration-200 hover:border-primary/35 hover:bg-muted/20 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
     >
       <div className="flex items-start gap-4">
@@ -130,15 +217,13 @@ export function DashboardDiaryBookCard({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase leading-none text-muted-foreground">
-                Diario personale
+                {eyebrow}
               </p>
               <h3 className="mt-1 text-lg font-semibold leading-tight text-foreground">
-                Diario
+                {title}
               </h3>
               <p className="mt-1 line-clamp-1 text-sm text-muted-foreground">
-                {leadingMacroArea
-                  ? leadingMacroArea.label
-                  : "Riflessioni, idee e obiettivi in un unico spazio"}
+                {leadingMacroArea ? macroAreaLabel : fallbackDescription}
               </p>
             </div>
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition group-hover:bg-primary/10 group-hover:text-primary">
@@ -146,78 +231,87 @@ export function DashboardDiaryBookCard({
             </span>
           </div>
 
-          <div className="space-y-3">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase leading-none text-muted-foreground">
-                  Avanzamento medio
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {completedCount} / {strategicObjectives.length} completati
+          {hasStrategicObjectives ? (
+            <>
+              <div className="space-y-3">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase leading-none text-muted-foreground">
+                      {progressLabel}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {completedCount} / {strategicObjectives.length} {completedLabel}
+                    </p>
+                  </div>
+                  <p className="text-2xl font-bold leading-none tabular-nums text-foreground">
+                    {progress}%
+                  </p>
+                </div>
+                <div
+                  className="h-2 overflow-hidden rounded-full bg-muted"
+                  aria-label={progressAria}
+                  aria-valuemax={100}
+                  aria-valuemin={0}
+                  aria-valuenow={progress}
+                  role="progressbar"
+                >
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width] duration-500"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold uppercase leading-none text-muted-foreground">
+                    {nextFocus}
+                  </p>
+                  <p className="mt-1 line-clamp-1 text-sm font-medium text-foreground">
+                    {leadingObjective?.text ?? emptyTitle}
+                  </p>
+                </div>
+                <p className="text-xs font-medium text-muted-foreground sm:text-right">
+                  {activeCount} {activeCount === 1 ? activeSingular : activePlural}
                 </p>
               </div>
-              <p className="text-2xl font-bold leading-none tabular-nums text-foreground">
-                {progress}%
-              </p>
-            </div>
-            <div
-              className="h-2 overflow-hidden rounded-full bg-muted"
-              aria-label={`Progresso obiettivi ${progress}%`}
-              aria-valuemax={100}
-              aria-valuemin={0}
-              aria-valuenow={progress}
-              role="progressbar"
-            >
-              <div
-                className="h-full rounded-full bg-primary transition-[width] duration-500"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
 
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase leading-none text-muted-foreground">
-                Prossimo focus
-              </p>
-              <p className="mt-1 line-clamp-1 text-sm font-medium text-foreground">
-                {leadingObjective?.text ?? "Crea il primo obiettivo strategico"}
-              </p>
-            </div>
-            <p className="text-xs font-medium text-muted-foreground sm:text-right">
-              {activeCount} {activeCount === 1 ? "attivo" : "attivi"}
-            </p>
-          </div>
-
-          <div className="relative">
-            <div
-              className="absolute left-4 right-4 top-3.5 h-px bg-border"
-              aria-hidden="true"
-            />
-            <div className="relative grid grid-cols-4 gap-2">
-              {steps.map((step, index) => (
-                <div key={`${step.label}-${index}`} className="min-w-0">
-                  <span
-                    aria-label={step.label}
-                    className={cn(
-                      "mx-auto flex h-7 w-7 items-center justify-center rounded-full border bg-card text-muted-foreground",
-                      step.done &&
-                        "border-primary/30 bg-primary text-primary-foreground",
-                      index === 0 &&
-                        !step.done &&
-                        "border-primary/40 text-primary",
-                    )}
-                  >
-                    {step.done ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Circle className="h-3 w-3" />
-                    )}
-                  </span>
+              <div className="relative">
+                <div
+                  className="absolute left-4 right-4 top-3.5 h-px bg-border"
+                  aria-hidden="true"
+                />
+                <div className="relative grid grid-cols-4 gap-2">
+                  {steps.map((step, index) => (
+                    <div key={`${step.label}-${index}`} className="min-w-0">
+                      <span
+                        aria-label={step.label}
+                        className={cn(
+                          "mx-auto flex h-7 w-7 items-center justify-center rounded-full border bg-card text-muted-foreground",
+                          step.done &&
+                            "border-primary/30 bg-primary text-primary-foreground",
+                          index === 0 &&
+                            !step.done &&
+                            "border-primary/40 text-primary",
+                        )}
+                      >
+                        {step.done ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Circle className="h-3 w-3" />
+                        )}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-md border border-dashed bg-muted/20 p-3">
+              <p className="text-sm font-semibold text-foreground">{emptyTitle}</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{emptyCopy}</p>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </Link>

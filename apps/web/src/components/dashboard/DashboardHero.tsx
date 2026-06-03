@@ -35,6 +35,65 @@ const JOURNEY_META: Record<JourneyId, JourneyMeta> = {
   investitore: { icon: BarChart3,   headline: "Analizza le opportunità",  subline: "Aree, trend e dati di mercato",        color: "text-primary",      bgColor: "bg-primary/10",      borderColor: "border-primary/30" },
 };
 
+const JOURNEY_LABEL_SOURCE: Record<JourneyId, string> = {
+  indeciso: "Percorso esplorazione",
+  dipendente: "Percorso carriera",
+  autonomo: "Percorso autonomo",
+  azienda: "Percorso azienda",
+  investitore: "Percorso investitore",
+};
+
+function isJourneyId(value: string | null | undefined): value is JourneyId {
+  return value === "indeciso"
+    || value === "dipendente"
+    || value === "autonomo"
+    || value === "azienda"
+    || value === "investitore";
+}
+
+function clampPercent(value: number | undefined): number {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(value ?? 0)));
+}
+
+function useJourneyLabels(locale: string): Record<JourneyId, string> {
+  return {
+    indeciso: useDynamicTranslation({
+      locale,
+      key: "dashboard.hero.journey.indeciso",
+      source: JOURNEY_LABEL_SOURCE.indeciso,
+      context: "Dashboard hero selected journey pill label",
+    }),
+    dipendente: useDynamicTranslation({
+      locale,
+      key: "dashboard.hero.journey.dipendente",
+      source: JOURNEY_LABEL_SOURCE.dipendente,
+      context: "Dashboard hero selected journey pill label",
+    }),
+    autonomo: useDynamicTranslation({
+      locale,
+      key: "dashboard.hero.journey.autonomo",
+      source: JOURNEY_LABEL_SOURCE.autonomo,
+      context: "Dashboard hero selected journey pill label",
+    }),
+    azienda: useDynamicTranslation({
+      locale,
+      key: "dashboard.hero.journey.azienda",
+      source: JOURNEY_LABEL_SOURCE.azienda,
+      context: "Dashboard hero selected journey pill label",
+    }),
+    investitore: useDynamicTranslation({
+      locale,
+      key: "dashboard.hero.journey.investitore",
+      source: JOURNEY_LABEL_SOURCE.investitore,
+      context: "Dashboard hero selected journey pill label",
+    }),
+  };
+}
+
 function ClarityScoreRing({ score, label }: { score: number; label: string }) {
   const clamped = Math.max(0, Math.min(100, score));
   const radius = 20;
@@ -89,28 +148,30 @@ export function DashboardHero({
 }) {
   const { i18n } = useTranslation();
   const locale = (i18n.resolvedLanguage ?? i18n.language ?? "it").slice(0, 2);
-  const journeyId = journeyType as JourneyId | undefined;
+  const journeyId = isJourneyId(journeyType) ? journeyType : null;
   const meta = journeyId ? JOURNEY_META[journeyId] : null;
   const Icon = meta?.icon ?? HelpCircle;
-  const isIndeciso = journeyType === "indeciso";
+  const isIndeciso = journeyId === "indeciso";
 
   const hour = new Date().getHours();
   const greetingKey = hour < 12 ? "morning" : hour < 18 ? "afternoon" : "evening";
   const greetingSource = hour < 12 ? "Buongiorno" : hour < 18 ? "Buon pomeriggio" : "Buonasera";
-  const firstName = userName?.split(" ")[0] ?? "";
-  const profileComplete = (profilePercent ?? 0) >= 100;
+  const firstName = userName?.trim().split(/\s+/)[0] ?? "";
+  const profileComplete = clampPercent(profilePercent) >= 100;
+  const safeConfirmedSectorName = confirmedSectorName?.trim() || null;
   const sectorHref = sessionId ? `/risultati/${sessionId}` : "/test";
   const heroKey = meta && journeyId ? journeyId : "default";
+  const journeyLabels = useJourneyLabels(locale);
   const headline = useDynamicTranslation({
     locale,
     key: `dashboard.hero.${heroKey}.headline`,
-    source: meta?.headline ?? "Il tuo pannello di controllo",
+    source: meta?.headline ?? "Il tuo prossimo passo",
     context: "Dashboard hero headline for the user's journey type",
   });
   const subline = useDynamicTranslation({
     locale,
     key: `dashboard.hero.${heroKey}.subline`,
-    source: meta?.subline ?? "Organizza percorso, profilo e prossimi passi in un unico spazio.",
+    source: meta?.subline ?? "Scegli il percorso piu adatto a te e riprendi da dove eri rimasto.",
     context: "Dashboard hero supporting copy for the user's journey type",
   });
   const greeting = useDynamicTranslation({
@@ -198,7 +259,7 @@ export function DashboardHero({
               )}
 
               <div className="flex flex-wrap gap-2">
-                {!journeyType ? (
+                {!journeyId ? (
                   <Link
                     href="/percorso"
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
@@ -211,7 +272,7 @@ export function DashboardHero({
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white/70 transition-colors hover:border-white/35 hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                   >
                     <MapPin className="h-3.5 w-3.5" />
-                    <span className="capitalize">{journeyType}</span>
+                    <span>{journeyLabels[journeyId]}</span>
                   </Link>
                 )}
                 {isIndeciso && session ? (
@@ -233,16 +294,16 @@ export function DashboardHero({
             </div>
           </div>
 
-          {((profileComplete && confirmedSectorName) || isPremium) && (
+          {((profileComplete && safeConfirmedSectorName) || isPremium) && (
             <div className="flex flex-wrap items-center gap-2 border-t border-white/10 pt-4">
-              {confirmedSectorName && (
+              {safeConfirmedSectorName && (
                 <Link
                   href={sectorHref}
                   className="inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 transition-colors hover:border-white/35 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
                 >
                   <Briefcase className="h-3.5 w-3.5 shrink-0" />
                   <span className="text-white/50">{sectorLabel}</span>
-                  <span className="truncate">{confirmedSectorName}</span>
+                  <span className="truncate">{safeConfirmedSectorName}</span>
                 </Link>
               )}
               {isPremium && (
