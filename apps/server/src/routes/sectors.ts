@@ -1,8 +1,12 @@
 import { Router } from "express";
 import { and, eq, count } from "drizzle-orm";
 import { db, pool, sectorsTable, professionsTable, testSessionsTable } from "@workspace/db";
+import { cached } from "../lib/redis";
 
 const router = Router();
+
+// /:id/stats aggrega l'intera test_sessions (jsonb_array_elements) → cache 5 min.
+const SECTOR_STATS_TTL_SECONDS = 300;
 
 /* ─── GET /api/sectors  —  lista settori dal DB (public) ─── */
 router.get("/", async (req, res) => {
@@ -32,46 +36,50 @@ router.get("/:id/stats", async (req, res) => {
       .limit(1);
     if (!sector) { res.status(404).json({ error: "Settore non trovato" }); return; }
 
-    const [rolesCount] = await db.select({ cnt: count() }).from(professionsTable).where(eq(professionsTable.sectorId, id));
+    const stats = await cached(`sectors:stats:${id}`, SECTOR_STATS_TTL_SECONDS, async () => {
+      const [rolesCount] = await db.select({ cnt: count() }).from(professionsTable).where(eq(professionsTable.sectorId, id));
 
-    // timesPicked = utenti che hanno confermato questo settore
-    const [pickedRow] = await db
-      .select({ cnt: count() })
-      .from(testSessionsTable)
-      .where(eq(testSessionsTable.confirmedSectorId, id));
+      // timesPicked = utenti che hanno confermato questo settore
+      const [pickedRow] = await db
+        .select({ cnt: count() })
+        .from(testSessionsTable)
+        .where(eq(testSessionsTable.confirmedSectorId, id));
 
-    // avgMatchScore = media dei matchScore nelle raccomandazioni
-    const { rows: avgRows } = await pool.query<{ avg: string }>(`
-      SELECT coalesce(avg((r->>'matchScore')::numeric), 0) AS avg
-      FROM test_sessions,
-      jsonb_array_elements(
-        CASE WHEN jsonb_typeof(recommendations::jsonb) = 'array'
-             THEN recommendations::jsonb ELSE '[]'::jsonb END
-      ) AS r
-      WHERE (r->>'sectorId')::int = $1
-    `, [id]);
+      // avgMatchScore = media dei matchScore nelle raccomandazioni
+      const { rows: avgRows } = await pool.query<{ avg: string }>(`
+        SELECT coalesce(avg((r->>'matchScore')::numeric), 0) AS avg
+        FROM test_sessions,
+        jsonb_array_elements(
+          CASE WHEN jsonb_typeof(recommendations::jsonb) = 'array'
+               THEN recommendations::jsonb ELSE '[]'::jsonb END
+        ) AS r
+        WHERE (r->>'sectorId')::int = $1
+      `, [id]);
 
-    const gr = sector.growthRate ?? 5;
-    const timesPicked   = Number(pickedRow?.cnt ?? 0);
-    const avgMatchScore = Math.round(Number(avgRows[0]?.avg ?? 0));
+      const gr = sector.growthRate ?? 5;
+      const timesPicked   = Number(pickedRow?.cnt ?? 0);
+      const avgMatchScore = Math.round(Number(avgRows[0]?.avg ?? 0));
 
-    res.json({
-      growthRate:     gr,
-      automationRisk: sector.automationRisk,
-      scalability:    sector.scalability,
-      trend:          sector.trend,
-      avgSalaryMin:   sector.avgSalaryMin,
-      avgSalaryMax:   sector.avgSalaryMax,
-      timeToAutonomy: sector.timeToAutonomy,
-      rolesCount:     Number(rolesCount?.cnt ?? 0),
-      timesPicked,
-      avgMatchScore,
-      growthProjection: {
-        shortTerm: String(Math.round(gr * 1.0)),
-        midTerm:   String(Math.round(gr * 2.5)),
-        longTerm:  String(Math.round(gr * 5.0)),
-      },
+      return {
+        growthRate:     gr,
+        automationRisk: sector.automationRisk,
+        scalability:    sector.scalability,
+        trend:          sector.trend,
+        avgSalaryMin:   sector.avgSalaryMin,
+        avgSalaryMax:   sector.avgSalaryMax,
+        timeToAutonomy: sector.timeToAutonomy,
+        rolesCount:     Number(rolesCount?.cnt ?? 0),
+        timesPicked,
+        avgMatchScore,
+        growthProjection: {
+          shortTerm: String(Math.round(gr * 1.0)),
+          midTerm:   String(Math.round(gr * 2.5)),
+          longTerm:  String(Math.round(gr * 5.0)),
+        },
+      };
     });
+
+    res.json(stats);
   } catch (err) {
     req.log?.error?.({ err }, "sector stats error");
     res.status(500).json({ error: "Errore nel caricamento delle statistiche" });

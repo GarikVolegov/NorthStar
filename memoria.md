@@ -319,6 +319,7 @@ Aggiungi una riga ad ogni revisione significativa. Più recente in alto.
 
 | Data | Modello/AI | Cosa è cambiato |
 | --- | --- | --- |
+| 2026-06-15 | Opus 4.8 | **P1 scalabilità (parziale)** su branch `feature/p1-scalability` (da `main`): (B1) migrazione `0043_knowledge_nodes_embedding_index.sql` — indice `hnsw` parziale su `knowledge_nodes.embedding_vec` (eliminava il full-scan ad ogni turno Wendy); va applicato manualmente su Neon come le altre migrazioni vettoriali 0035–0042 (il journal Drizzle si ferma a idx 34 — debito noto). (B5) nuovo helper riusabile `cached(key,ttl,fn)` in `lib/redis.ts` applicato a `GET /api/stats/summary` e `GET /api/sectors/:id/stats` (TTL 5min) — erano aggregazioni full-table su `test_sessions` non cacheate e DDoS-abili su endpoint pubblici. Gate verde. Branch P0 sicurezza separato (`feature/p0-security-hardening`). |
 | 2026-06-01 | Opus 4.8 | Creazione iniziale di `memoria.md` tramite workflow agentico (4 agenti Explore: backend/DB, frontend/UX, AI/Wendy/RAG, stato/direzione) + verifica diretta di git, conteggi e posizioni file. Stato: Fase 2 mergiata, Fase 1 in chiusura, Fase 3 in arrivo. |
 
 ---
