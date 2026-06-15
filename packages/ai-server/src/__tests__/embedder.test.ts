@@ -10,7 +10,7 @@ vi.mock("openai", () => ({
   })),
 }));
 
-import { chunkText, embedBatch, embedText } from "../growth-agent/embedder";
+import { chunkText, clearEmbedCache, embedBatch, embedText } from "../growth-agent/embedder";
 
 describe("embedder", () => {
   it("chunks text with overlap", () => {
@@ -38,5 +38,18 @@ describe("embedder", () => {
       data: [{ embedding: [1] }, { embedding: [2] }],
     });
     await expect(embedBatch(["a", "b"])).resolves.toEqual([[1], [2]]);
+  });
+
+  it("caches identical embedText calls (one provider call)", async () => {
+    clearEmbedCache();
+    mockCreate.mockClear();
+    mockCreate.mockResolvedValueOnce({ data: [{ embedding: [0.5, 0.6, 0.7] }] });
+
+    const first = await embedText("ripeti questa identica query");
+    const second = await embedText("ripeti questa identica query");
+
+    expect(first).toEqual([0.5, 0.6, 0.7]);
+    expect(second).toEqual([0.5, 0.6, 0.7]);
+    expect(mockCreate).toHaveBeenCalledTimes(1); // 2ª chiamata servita dalla cache
   });
 });
