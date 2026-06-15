@@ -10,12 +10,33 @@ const BYPASS_RATE_LIMIT_REDIS =
 let client: Redis | null = null;
 let connectPromise: Promise<Redis> | null = null;
 
+/**
+ * Fail-closed HARD: se true, `requireRateLimitRedis` risponde 503 quando Redis
+ * è giù. Resta gated SOLO sul flag esplicito — un blip di Redis non deve far
+ * cadere l'intera API a meno che l'operatore non lo voglia esplicitamente.
+ */
 export function isRateLimitRedisRequired(): boolean {
   if (BYPASS_RATE_LIMIT_REDIS) return false;
   return (
     process.env.RATE_LIMIT_REDIS_REQUIRED === "true" ||
     process.env.REDIS_REQUIRED === "true"
   );
+}
+
+/**
+ * Se usare lo store Redis (contatori CONDIVISI tra istanze) per il rate limit.
+ * Default in produzione quando Redis è configurato: senza, ogni replica conta
+ * da sola e i limiti effettivi diventano ×N inefficaci sotto scaling. In dev
+ * resta in-memory (nessun Redis richiesto). Disattivabile con
+ * RATE_LIMIT_REDIS_STORE=false. Lo store gira con `passOnStoreError: true`
+ * (vedi middleware/rate-limit.ts) → un errore Redis fa fail-OPEN sul singolo
+ * request invece di 500.
+ */
+export function shouldUseRedisRateLimitStore(): boolean {
+  if (BYPASS_RATE_LIMIT_REDIS) return false;
+  if (process.env.RATE_LIMIT_REDIS_STORE === "false") return false;
+  if (isRateLimitRedisRequired()) return true;
+  return process.env.NODE_ENV === "production" && resolveRedisUrl() !== null;
 }
 
 function createRateLimitClient(): Redis {
@@ -66,7 +87,7 @@ export function createRedisRateLimitStore(
   prefix: string,
 ): RedisStore | undefined {
   if (BYPASS_RATE_LIMIT_REDIS) return undefined;
-  if (!isRateLimitRedisRequired()) return undefined;
+  if (!shouldUseRedisRateLimitStore()) return undefined;
 
   return new RedisStore({
     prefix,
