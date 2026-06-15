@@ -9,7 +9,7 @@ import {
 } from "@workspace/db";
 import { userKeysTable, friendshipKeysTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
-import { getWss } from "../ws";
+import { emitToUser } from "../ws";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord } from "../lib/type-guards";
 
@@ -355,36 +355,21 @@ router.post("/messages", async (req, res) => {
       ? friendship.receiverId
       : friendship.requesterId;
 
-  const wss = getWss();
-  if (wss) {
-    wss.emit(receiverId, {
-      type: "friend:message",
-      payload: {
-        friendshipId,
-        message: {
-          id: saved.id,
-          senderId: userId,
-          encryptedContent: saved.encryptedContent,
-          iv: saved.iv,
-          createdAt: saved.createdAt.toISOString(),
-        },
+  const messageEvent = {
+    type: "friend:message" as const,
+    payload: {
+      friendshipId,
+      message: {
+        id: saved.id,
+        senderId: userId,
+        encryptedContent: saved.encryptedContent,
+        iv: saved.iv,
+        createdAt: saved.createdAt.toISOString(),
       },
-    });
-    // Invia anche al mittente (per conferma)
-    wss.emit(userId, {
-      type: "friend:message",
-      payload: {
-        friendshipId,
-        message: {
-          id: saved.id,
-          senderId: userId,
-          encryptedContent: saved.encryptedContent,
-          iv: saved.iv,
-          createdAt: saved.createdAt.toISOString(),
-        },
-      },
-    });
-  }
+    },
+  };
+  emitToUser(receiverId, messageEvent);
+  emitToUser(userId, messageEvent); // anche al mittente (conferma)
 
   res.status(201).json(saved);
 });
@@ -434,17 +419,14 @@ router.patch("/messages/:id/read", async (req, res) => {
     .where(eq(chatMessagesTable.id, messageId))
     .returning();
 
-  const wss = getWss();
-  if (wss) {
-    wss.emit(msg.senderId, {
-      type: "friend:message:read",
-      payload: {
-        friendshipId: msg.friendshipId,
-        messageId,
-        readAt: readAt.toISOString(),
-      },
-    });
-  }
+  emitToUser(msg.senderId, {
+    type: "friend:message:read",
+    payload: {
+      friendshipId: msg.friendshipId,
+      messageId,
+      readAt: readAt.toISOString(),
+    },
+  });
 
   res.json(updated);
 });
