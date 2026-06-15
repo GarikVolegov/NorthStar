@@ -92,6 +92,28 @@ export async function cacheSet(key: string, value: unknown, ttl = DEFAULT_TTL): 
   }
 }
 
+/**
+ * Get-or-compute con cache Redis. Se la chiave è in cache la restituisce,
+ * altrimenti esegue `compute`, ne salva il risultato (TTL in secondi) e lo
+ * ritorna. Best-effort: se Redis è giù, esegue sempre `compute` (nessun
+ * fallimento). Usare SOLO per dati non-utente/aggregati che tollerano una
+ * staleness pari al TTL. Nota: un risultato `null`/`undefined` non viene
+ * cachato (cacheGet→null è indistinguibile da un miss).
+ */
+export async function cached<T>(
+  key: string,
+  ttlSeconds: number,
+  compute: () => Promise<T>,
+): Promise<T> {
+  const hit = await cacheGet<T>(key);
+  if (hit !== null) return hit;
+  const value = await compute();
+  if (value !== null && value !== undefined) {
+    await cacheSet(key, value, ttlSeconds);
+  }
+  return value;
+}
+
 export async function cacheDel(key: string): Promise<void> {
   const activeClient = await getClient();
   if (!activeClient) return;
