@@ -127,7 +127,7 @@ type GrowthCandidate = {
   summary: string;
 };
 
-type GrowthArticlePayload = ReturnType<typeof buildGrowthResearchArticle>;
+export type GrowthArticlePayload = ReturnType<typeof buildGrowthResearchArticle>;
 
 function defaultGrowthTopics(body: Record<string, unknown>) {
   const topics = Array.isArray(body.topics) && body.topics.length
