@@ -194,6 +194,11 @@ jobs:
           API_URL: http://localhost:3001
           BASE_URL: http://localhost:5000
           CI: "true"
+          # The API (:3001) and web (:5000) servers are already started by the
+          # steps above, and the web dev server proxies /api → :3001. Tell
+          # Playwright to use them instead of spawning its own webServer (which
+          # would collide on the port: "localhost:5000 is already used").
+          PLAYWRIGHT_SKIP_WEBSERVER: "true"
 
       - name: Upload Playwright artifacts
         if: always()
