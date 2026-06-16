@@ -146,7 +146,9 @@ router.patch("/onboarding", requireAuth, async (req, res) => {
 router.get("/:userId/public", async (req, res) => {
   try {
     const targetId = readInteger(req.params.userId);
-    const viewerId = readInteger(req.query.viewerId);
+    // SICUREZZA: il viewer è SEMPRE l'utente autenticato (JWT), mai un
+    // `viewerId` fornito dal client — passarlo bypassava la privacy (IDOR).
+    const viewerId = req.user?.id ?? null;
     if (targetId === null) {
       res.status(400).json({ error: "ID utente non valido" });
       return;
@@ -276,9 +278,9 @@ router.get("/:userId/public", async (req, res) => {
     };
 
     if (canView) {
+      // PII: l'email NON viene esposta dal profilo pubblico (nemmeno agli amici).
       res.json({
         ...base,
-        email: user.email,
         avatarUrl: user.avatarUrl,
         workPreference: user.workPreference,
         bannerUrl: user.bannerUrl,

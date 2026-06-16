@@ -10,8 +10,8 @@
 > tiene sincronizzata. Le verità di dettaglio vivono nei file `*_RULES.md`, in `ARCHITECTURE.md`,
 > in `docs/` e nel cervello `.brain/`. Qui c'è la mappa e lo stato.
 
-- **Ultima revisione:** 2026-06-01 — *Opus 4.8 (analisi agentica iniziale: 4 agenti Explore + verifica)*
-- **Stato repo alla revisione:** `main @ 5e3545f` — Fase 2 (Cervello Runtime) mergiata (PR #5)
+- **Ultima revisione:** 2026-06-15 — *Opus 4.8 (audit sciame multi-agente + P0 security hardening)*
+- **Stato repo alla revisione:** branch `feature/p0-security-hardening` (non ancora mergiato) — chiude le falle critiche al confine identità (vedi §8 e changelog); gate verde (typecheck/lint 0, 15/15 test middleware)
 - **Numeri verificati:** 72 tabelle schema · 43 migrazioni · 79 file route · 72 pagine web
 
 ---
@@ -257,8 +257,9 @@ Note di fase: [`.brain/30_Process/GSD-Phases/`](.brain/30_Process/GSD-Phases/). 
 ### Prossimi passi
 
 - [ ] Chiudere **Fase 1 / Step 9** (test + security gate) e mergiare in `main`.
-- [ ] Avviare **Fase 3 — Wendy Neural Attention** una volta Fase 1 stabile.
+- [ ] Avviare **Fase 3 — Wendy Neural Attention** una volta Fase 1 stabile (job di decay `neural-edge-decay.ts` già presente, dietro `WENDY_NEURAL_ENABLED=false`).
 - [ ] Ripianare il debito noto (§8): allineare service layer ai bounded context, collegare i componenti Fase 2 staged, consolidare `route-paths.ts`.
+- [ ] Committare i fix di avvio in working tree (route-config.ts, schema/index.ts, wendyNeural.ts, neural-edge-decay job, fix lint/typecheck) — vedi changelog 2026-06-13.
 
 ### Pipeline interne (`.brain/20_Product/Pipelines/`)
 
@@ -280,6 +281,15 @@ Da riconciliare nel tempo. Quando ne risolvi una, rimuovila da qui.
 4. **EventBus sottoutilizzato** — pochi call-site; il messaging inter-pagina è più potenziale che reale.
 5. **Componenti Fase 2 staged** in knip-ignore: vanno **collegati** alle pagine, non cancellati (il gate dead-code può ingannare su feature read-only — vedi memoria `staged-wip-components-fase2` e `wendy-session-memory-restore`).
 6. **Numeri "vivi".** route/tabelle/pagine cambiano: la fonte di verità è il codice, non questo file. Aggiorna l'header quando rifai il conteggio.
+
+### 🗺️ Roadmap audit sciame (2026-06-15, Opus 4.8) — backlog prioritizzato
+
+Da un audit parallelo a 5 agenti. **P0 sicurezza implementato** (vedi changelog); restano:
+
+- **P0 residuo (sicurezza, fast-follow):** `metrics-protection.ts` usa `x-forwarded-for` spoofabile → usare `req.ip`; policy password min 6→≥10 (`auth.ts` register/reset); lockout per-account oltre al rate-limit IP; admin route che ritornano `String(err)` al client (53 occorrenze, principalmente `routes/admin/*`).
+- **P1 scalabilità (rompe a N utenti/istanze):** manca indice `hnsw` su `knowledge_nodes.embedding_vec` (full-scan ad ogni turno Wendy — *miglior impatto/sforzo*); cron in-process senza leader-lock (spesa LLM ×N replica); realtime WS/SSE legato a singola istanza (serve Redis pub/sub); rate-limit cade su store in-memory di default; endpoint pubblici `stats`/`sectors` con aggregazioni full-table non cacheate.
+- **P2 riuso/efficienza (doppi colpi):** global error handler "smart" + `asyncHandler` (oggi 17/24 `.parse()` ritornano 500 invece di 400); `lib/sse.ts` con abort-on-disconnect (7 stream SSE bruciano token dopo disconnessione); cache LRU embedding query (stessa query embeddata 5-6×/turn); `<AsyncBoundary>`/`<EmptyState>`/`<ErrorState>` FE (73 spinner inline).
+- **P3 punti ciechi/feature:** `API_ENDPOINTS` fittizio/stale (rigenerare da route reali + lint gate); raw `fetch` senza JWT in `useWendyOpenAITTS.ts`; nessuna virtualizzazione liste (feed collassano a migliaia di item); `agent.ts` ignora il model-router (chiamata costosa sempre su OpenAI) + cost-guard cieco alla spesa via `recordLlmUsage`; eval Wendy non in CI; nome utente (PII) nel prompt in chiaro; streaming ottimistico del supervisor (latenza percepita).
 
 ---
 
@@ -319,7 +329,8 @@ Aggiungi una riga ad ogni revisione significativa. Più recente in alto.
 
 | Data | Modello/AI | Cosa è cambiato |
 | --- | --- | --- |
-| 2026-06-01 | Opus 4.8 | Creazione iniziale di `memoria.md` tramite workflow agentico (4 agenti Explore: backend/DB, frontend/UX, AI/Wendy/RAG, stato/direzione) + verifica diretta di git, conteggi e posizioni file. Stato: Fase 2 mergiata, Fase 1 in chiusura, Fase 3 in arrivo. |
+| 2026-06-15 | Opus 4.8 | **Audit sciame multi-agente** (5 agenti paralleli: security, scalabilità, backend-reuse, frontend-reuse, AI) → roadmap prioritizzata P0–P3 (vedi §8). **Implementato P0 sicurezza** su branch `feature/p0-security-hardening`: (C1) verifica crittografica Google ID token in `lib/google-auth.ts` (era account-takeover via payload base64 non verificato); (C2) Clerk con `issuer` pinnato + rimosso auto-upsert/link-by-email dal middleware (provisioning resta nella route dedicata `auth-clerk-sync.ts`); (C3) `optionalAuth` non si fida più del claim `userId`, risolve solo via `clerkId`; (C4) nuovo middleware riusabile `requireOwnership` (sostituisce 5 check copia-incollati in `profile.ts`), `users/:id/public` prende il viewer dal JWT (era IDOR via `?viewerId=`), email rimossa da profilo pubblico + esposta solo a owner/admin in `profile/:id`; (H1) rate-limit + scope-by-email su `verify-email`/`verify-2fa`/`resend-verification` (era OTP a 6 cifre brute-forzabile). (H2) `metrics-protection.ts` usa `req.ip` invece dell'header `x-forwarded-for` grezzo (spoofabile → bypass IP allowlist su `/api/metrics`) + test. Nuove env fail-closed: `GOOGLE_CLIENT_ID`, `CLERK_ISSUER`. Gate verde. |
+| 2026-06-13 | Sonnet 4.6 | App resa avviabile end-to-end: rimossi import/export rotti in `route-config.ts` (6 route) e `schema/index.ts` (7 schema), aggiunto `wendyNeural.ts` (tabelle Fase 3 già presenti su Neon) e job `neural-edge-decay.ts` + export in `ai-server`. Verificato boot completo (server `ok`, DB/pgvector live, web su 5173, 247 test ai-server pass). Risolti poi **tutti** gli errori lint (34→0) e typecheck (`pnpm run check` ora a 0 errori: aggiunto project reference a `api-client-react`, fix `override` su classi Error, vari cast `as unknown as X` su `expect.any/objectContaining/stringContaining`, tipizzazione mock `pipelines.test.ts`). Test ai-server (247) e server (142) tutti pass. Fix cross-platform `scripts/kill-port.mjs` per task VSCode. |
 
 ---
 
