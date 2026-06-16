@@ -41,7 +41,10 @@ export default defineConfig(async ({ command }) => ({
   plugins: [
     react(),
     tailwindcss(),
-    command === "serve" && basicSsl(),
+    // basicSsl serves the dev server over HTTPS for local PWA/service-worker
+    // testing. In CI the e2e health check and Playwright use http://, so a
+    // self-signed HTTPS server would make every request fail ("empty reply").
+    command === "serve" && !process.env.CI && basicSsl(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "hero.png", "robots.txt"],
@@ -213,7 +216,7 @@ export default defineConfig(async ({ command }) => ({
         "./src/pages/home.tsx",
         "./src/pages/test.tsx",
         "./src/pages/results.tsx",
-        "./src/components/layout/navbar.tsx",
+        "./src/components/layout/Navbar.tsx",
       ],
     },
   },
