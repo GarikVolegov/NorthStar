@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useWendy } from "@/contexts/WendyProvider";
+import { useQueryClient } from "@tanstack/react-query";
 import { BrainCircuit, CheckCircle2, GraduationCap, Sparkles, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -20,6 +21,13 @@ function AnimatedCounter({ end, suffix = "" }: { end: number; suffix?: string })
 export default function PremiumSuccess() {
   const { t } = useTranslation();
   const wendy = useWendy();
+  const queryClient = useQueryClient();
+
+  // Il webhook Stripe aggiorna il piano lato server; invalidiamo la query
+  // così la UI riflette subito lo stato "Pro attivo".
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ["subscription"] });
+  }, [queryClient]);
 
   return (
     <>
