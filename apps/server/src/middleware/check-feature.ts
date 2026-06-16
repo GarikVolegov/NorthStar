@@ -9,6 +9,7 @@
 import { db, subscriptionsTable } from "@workspace/db";
 import { eq, and, desc, isNull } from "drizzle-orm";
 import type { Request, Response, NextFunction } from "express";
+import { cached, cacheDel } from "../lib/redis";
 
 // ── Feature gate definitions ──────────────────────────────────────────────────
 
@@ -43,39 +44,45 @@ export type FeatureKey = keyof typeof FEATURE_GATES;
 
 const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, team: 2 };
 
-// ── Subscription lookup (cached in-process per 60s) ───────────────────────────
+// ── Subscription lookup (cached in shared Redis per 60s) ──────────────────────
+//
+// Shared Redis cache (not in-process) so the effective plan is consistent across
+// replicas / serverless instances: after a webhook upgrade or cancellation,
+// invalidatePlanCache() clears it for every instance. Best-effort — if Redis is
+// down, cached() always recomputes from the DB (fail-open, never stale).
 
-const _cache = new Map<number, { plan: string; expiry: number }>();
+const PLAN_CACHE_TTL_SECONDS = 60;
+const planCacheKey = (userId: number): string => `plan:${userId}`;
 
 export async function getEffectivePlan(userId: number): Promise<"free" | "pro" | "team"> {
-  const now = Date.now();
-  const cached = _cache.get(userId);
-  if (cached && cached.expiry > now) return cached.plan as "free" | "pro" | "team";
+  return cached(planCacheKey(userId), PLAN_CACHE_TTL_SECONDS, async () => {
+    const [sub] = await db
+      .select({ plan: subscriptionsTable.plan, validUntil: subscriptionsTable.validUntil })
+      .from(subscriptionsTable)
+      .where(and(
+        eq(subscriptionsTable.userId, userId),
+        isNull(subscriptionsTable.cancelledAt),
+      ))
+      .orderBy(desc(subscriptionsTable.createdAt))
+      .limit(1);
 
-  const [sub] = await db
-    .select({ plan: subscriptionsTable.plan, validUntil: subscriptionsTable.validUntil })
-    .from(subscriptionsTable)
-    .where(and(
-      eq(subscriptionsTable.userId, userId),
-      isNull(subscriptionsTable.cancelledAt),
-    ))
-    .orderBy(desc(subscriptionsTable.createdAt))
-    .limit(1);
-
-  const plan     = sub?.plan ?? "free";
-  const expired  = sub?.validUntil ? sub.validUntil < new Date() : false;
-  const effective = expired ? "free" : plan;
-
-  _cache.set(userId, { plan: effective, expiry: now + 60_000 });
-  return effective;
+    const plan     = sub?.plan ?? "free";
+    const expired  = sub?.validUntil ? sub.validUntil < new Date() : false;
+    return (expired ? "free" : plan) as "free" | "pro" | "team";
+  });
 }
 
 export function planMeets(currentPlan: string, requiredPlan: "free" | "pro" | "team"): boolean {
   return (PLAN_RANK[currentPlan] ?? 0) >= (PLAN_RANK[requiredPlan] ?? 0);
 }
 
+/**
+ * Clear the cached plan for a user across all instances. Synchronous signature
+ * (fire-and-forget) so call sites — including the Stripe webhook — stay simple;
+ * the Redis delete is best-effort and the 60s TTL bounds any residual staleness.
+ */
 export function invalidatePlanCache(userId: number): void {
-  _cache.delete(userId);
+  void cacheDel(planCacheKey(userId));
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────

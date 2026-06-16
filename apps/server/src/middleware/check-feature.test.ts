@@ -5,6 +5,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const dbRows = vi.hoisted(() => ({ value: [] as Array<{ plan: string; validUntil: Date | null }> }));
 
+// In-memory stand-in for the shared Redis cache used by getEffectivePlan, so the
+// "caches across calls + invalidation" contract can be verified without a real
+// Redis. Mirrors the best-effort cached()/cacheDel() semantics of ../lib/redis.
+const redisStore = vi.hoisted(() => new Map<string, unknown>());
+
+vi.mock("../lib/redis", () => ({
+  cached: async <T>(key: string, _ttl: number, compute: () => Promise<T>): Promise<T> => {
+    if (redisStore.has(key)) return redisStore.get(key) as T;
+    const value = await compute();
+    if (value !== null && value !== undefined) redisStore.set(key, value);
+    return value;
+  },
+  cacheDel: async (key: string): Promise<void> => {
+    redisStore.delete(key);
+  },
+}));
+
 vi.mock("@workspace/db", () => ({
   subscriptionsTable: {
     userId: "userId",
@@ -50,6 +67,7 @@ function user(overrides: Partial<NonNullable<Express.Request["user"]>> = {}): No
 describe("check-feature middleware", () => {
   beforeEach(() => {
     dbRows.value = [];
+    redisStore.clear();
     invalidatePlanCache(1);
   });
 
