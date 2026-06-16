@@ -19,8 +19,8 @@ import { requireRateLimitRedis } from "./lib/rate-limit-redis";
 import { metricsProtection } from "./middleware/metrics-protection";
 import { record } from "./lib/monitor";
 import { maintenanceModeMiddleware } from "./lib/maintenance-mode";
-import { executionMonitor } from "./lib/execution-monitor";
 import { captureServerException, captureServerMessage } from "./sentry";
+import { globalErrorHandler } from "./lib/error-handler";
 import { registerPublicRoutes } from "./route-registry-public";
 import { registerAuthenticatedRoutes } from "./route-registry-authenticated";
 import { registerAdminRoutes } from "./route-registry-admin";
@@ -164,34 +164,6 @@ app.use("/api/*", (_req, res) => {
   });
 });
 
-app.use(
-  (
-    err: unknown,
-    req: express.Request,
-    res: express.Response,
-    _next: express.NextFunction,
-  ) => {
-    (req.log ?? rootLogger).error({ err }, "unhandled error");
-    captureServerException(err, {
-      method: req.method,
-      path: req.originalUrl ?? req.url,
-      requestId: req.requestId,
-      userId: req.user?.id,
-    });
-    // Step Foundation: cattura strutturata per /api/admin/error-report
-    try {
-      executionMonitor.capture(err, {
-        file: "app.ts",
-        function: `${req.method} ${req.originalUrl ?? req.url ?? "<unknown>"}`,
-      });
-    } catch {
-      /* fire-and-forget */
-    }
-    res.status(500).json({
-      error: "Internal Server Error",
-      message: "Something went wrong",
-    });
-  },
-);
+app.use(globalErrorHandler);
 
 export default app;
