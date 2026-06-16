@@ -1,25 +1,44 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
+import { useSubscription } from "@/hooks/useSubscription";
+import { getJson, postJson } from "@/lib/apiClient";
+import { API_ENDPOINTS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import { Bell, Brain, CheckCircle2, Clock, Network, Sparkles, Zap } from "lucide-react";
-import React, { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Brain, CheckCircle2, Loader2, Network, Sparkles, Zap } from "lucide-react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-
-const PLAN_MONTHLY_PRICE = 9;
-const PLAN_YEARLY_PRICE = 90;
+import { useLocation } from "wouter";
 
 type BillingInterval = "month" | "year";
 
+// Specchio del catalogo restituito da GET /api/subscription/plans.
+interface PlanOption {
+  plan: "pro" | "team";
+  interval: "monthly" | "yearly";
+  priceId: string | null;
+  amountEur: number;
+}
+
+interface PlansResponse {
+  plans: PlanOption[];
+}
+
+const TOGGLE_TO_API: Record<BillingInterval, PlanOption["interval"]> = {
+  month: "monthly",
+  year: "yearly",
+};
+
 export default function Premium() {
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const { isLoggedIn } = useAuth();
+  const { isPro } = useSubscription();
+  const [, navigate] = useLocation();
   const [billing, setBilling] = useState<BillingInterval>("month");
-  const [email, setEmail] = useState(user?.email ?? "");
-  const [joined, setJoined] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const features = [
     { icon: <Brain className="w-5 h-5 text-primary" />, title: t("premium.features.wiki.title"), description: t("premium.features.wiki.desc") },
@@ -37,14 +56,43 @@ export default function Premium() {
     t("premium.includes.goals"),
   ];
 
-  function handleWaitlist(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setJoined(true);
-  }
+  const { data: plansData, isLoading: plansLoading } = useQuery<PlansResponse>({
+    queryKey: ["subscription-plans"],
+    queryFn: () => getJson<PlansResponse>(API_ENDPOINTS.subscription.plans),
+    staleTime: 30 * 60 * 1000,
+  });
 
-  const price = billing === "month" ? PLAN_MONTHLY_PRICE : PLAN_YEARLY_PRICE;
-  const perMonth = billing === "year" ? (PLAN_YEARLY_PRICE / 12).toFixed(2) : null;
+  const apiInterval = TOGGLE_TO_API[billing];
+  const proPlan = plansData?.plans.find(
+    (p) => p.plan === "pro" && p.interval === apiInterval,
+  );
+  const price = proPlan?.amountEur ?? (billing === "month" ? 9 : 90);
+  const perMonth = billing === "year" ? (price / 12).toFixed(2) : null;
+
+  const upgrade = useMutation({
+    mutationFn: async () => {
+      const res = await postJson<{ url: string }>(API_ENDPOINTS.subscription.upgrade, {
+        plan: "pro",
+        interval: apiInterval,
+      });
+      return res.url;
+    },
+    onSuccess: (url) => {
+      window.location.href = url;
+    },
+    onError: (e) => {
+      setError(e instanceof Error ? e.message : "Errore nell'avvio del pagamento");
+    },
+  });
+
+  function handleUpgrade() {
+    setError(null);
+    if (!isLoggedIn) {
+      navigate("/login?redirect=/premium");
+      return;
+    }
+    upgrade.mutate();
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -143,32 +191,27 @@ export default function Premium() {
                 ))}
               </ul>
 
-              {joined ? (
+              {isPro ? (
                 <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-center">
                   <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
                   <p className="text-sm font-semibold text-emerald-800">{t("premium.joinedTitle")}</p>
-                  <p className="text-xs text-emerald-700 mt-1">{t("premium.joinedDesc")}</p>
+                  <p className="text-xs text-emerald-700 mt-1">{t("premium.planAccess")}</p>
                 </div>
               ) : (
-                <div className="bg-muted/60 rounded-2xl p-5">
-                  <div className="flex items-center gap-2 justify-center mb-3">
-                    <Clock className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm font-medium text-foreground">{t("premium.waitlistTitle")}</p>
-                  </div>
-                  <p className="text-xs text-muted-foreground mb-4 leading-relaxed">{t("premium.waitlistDesc")}</p>
-                  <form onSubmit={handleWaitlist} className="flex flex-col gap-2">
-                    <Input
-                      type="email"
-                      placeholder={t("premium.waitlistEmail")}
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="rounded-xl text-sm h-9"
-                    />
-                    <Button type="submit" className="w-full rounded-xl h-10">
-                      <Bell className="w-4 h-4 mr-2" /> {t("premium.notifyMe")}
-                    </Button>
-                  </form>
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleUpgrade}
+                    disabled={upgrade.isPending || plansLoading}
+                    className="w-full rounded-xl h-11"
+                  >
+                    {upgrade.isPending ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t("premium.exploreNow")}</>
+                    ) : (
+                      <><Zap className="w-4 h-4 mr-2" /> {t("premium.planName")} · €{price}</>
+                    )}
+                  </Button>
+                  {error && <p className="text-xs text-destructive mt-1">{error}</p>}
                 </div>
               )}
             </CardContent>

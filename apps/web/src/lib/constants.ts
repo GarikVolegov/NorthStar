@@ -267,10 +267,12 @@ export const API_ENDPOINTS = {
     roles: "/api/sectors/:id/roles",
   },
   subscription: {
-    current: "/api/subscription/current",
+    current: "/api/subscription",
+    plans: "/api/subscription/plans",
     upgrade: "/api/subscription/upgrade",
     cancel: "/api/subscription/cancel",
-    webhooks: "/api/subscription/webhooks",
+    billingPortal: "/api/subscription/billing-portal",
+    webhooks: "/api/subscription/webhook",
   },
   ai: {
     chat: "/api/ai/chat",

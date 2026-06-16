@@ -7,18 +7,23 @@ import { Button } from "@/components/ui/button";
 import type { AuthUser } from "@/contexts/AuthContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePageModule } from "@/hooks/usePageModule";
+import { useSubscription } from "@/hooks/useSubscription";
 import { useWendyPageContext } from "@/hooks/useWendyPageContext";
-import { deleteJson, getJson, patchJson } from "@/lib/apiClient";
-import { useQuery } from "@tanstack/react-query";
+import { deleteJson, getJson, patchJson, postJson } from "@/lib/apiClient";
+import { API_ENDPOINTS } from "@/lib/constants";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Calendar,
   Camera,
+  CreditCard,
+  Crown,
   Linkedin,
   Loader2,
   Mail,
   ShieldCheck,
   Trash2,
-  TrendingUp
+  TrendingUp,
+  XCircle
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -341,6 +346,133 @@ function ProfileHero({
   );
 }
 
+const PLAN_LABELS: Record<string, string> = {
+  free: "Free",
+  pro: "Pro",
+  team: "Team",
+};
+
+function BillingSection() {
+  const { plan, isPro, isLoading, validUntil } = useSubscription();
+  const queryClient = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+
+  const portal = useMutation({
+    mutationFn: () =>
+      getJson<{ url: string }>(API_ENDPOINTS.subscription.billingPortal),
+    onSuccess: ({ url }) => {
+      window.location.href = url;
+    },
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Errore nell'apertura del portale"),
+  });
+
+  const cancel = useMutation({
+    mutationFn: () =>
+      postJson<{ status: string }>(API_ENDPOINTS.subscription.cancel),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["subscription"] });
+    },
+    onError: (e) =>
+      setError(e instanceof Error ? e.message : "Errore nella disdetta"),
+  });
+
+  function handleCancel() {
+    setError(null);
+    if (
+      window.confirm(
+        "Vuoi disdire l'abbonamento? Manterrai l'accesso Premium fino alla fine del periodo già pagato.",
+      )
+    ) {
+      cancel.mutate();
+    }
+  }
+
+  const validUntilLabel = formatDate(validUntil ?? undefined);
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5">
+      <div className="mb-4 flex items-center gap-2">
+        <CreditCard className="h-4 w-4 text-primary" />
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-foreground">
+          Abbonamento
+        </h2>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Caricamento…
+        </div>
+      ) : (
+        <>
+          <div className="mb-4 flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Piano attuale</span>
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold ${
+                isPro
+                  ? "border border-primary/30 bg-primary/10 text-primary"
+                  : "border border-border text-muted-foreground"
+              }`}
+            >
+              {isPro && <Crown className="h-3.5 w-3.5" />}
+              {PLAN_LABELS[plan] ?? plan}
+            </span>
+          </div>
+
+          {isPro && validUntilLabel && (
+            <p className="mb-4 text-xs text-muted-foreground">
+              Rinnovo/scadenza: {validUntilLabel}
+            </p>
+          )}
+
+          {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
+
+          {isPro ? (
+            <div className="flex flex-col gap-2">
+              <Button
+                variant="outline"
+                className="min-h-11 w-full rounded-full gap-2"
+                onClick={() => {
+                  setError(null);
+                  portal.mutate();
+                }}
+                disabled={portal.isPending}
+              >
+                {portal.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CreditCard className="h-4 w-4" />
+                )}
+                Gestisci fatturazione
+              </Button>
+              <Button
+                variant="ghost"
+                className="min-h-11 w-full rounded-full gap-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={handleCancel}
+                disabled={cancel.isPending}
+              >
+                {cancel.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <XCircle className="h-4 w-4" />
+                )}
+                Disdici abbonamento
+              </Button>
+            </div>
+          ) : (
+            <Button asChild className="min-h-11 w-full rounded-full gap-2">
+              <Link href="/premium">
+                <Crown className="h-4 w-4" />
+                Passa a Premium
+              </Link>
+            </Button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Profilo() {
   const { t } = useTranslation();
   const { user, logout, isLoggedIn, updateUser } = useAuth();
@@ -422,6 +554,7 @@ export default function Profilo() {
             />
           </div>
           <BadgesAchievements completionData={completionData ?? null} />
+          <BillingSection />
           <OpenHumanAgentCard />
         </div>
 
