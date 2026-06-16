@@ -34,6 +34,9 @@ describe("health checks", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.NODE_ENV = "production";
+    // USE_MOCK_AI=true (impostato dal job CI) bypassa il check Redis in health.ts
+    // (REDIS_BYPASSED): qui testiamo il path STRETTO/produzione, quindi va rimosso.
+    delete process.env.USE_MOCK_AI;
     process.env.RATE_LIMIT_REDIS_REQUIRED = "true";
     process.env.AI_INTEGRATIONS_OPENAI_API_KEY = "test-key";
     delete process.env.HEALTH_REQUIRE_EMBED_OK;

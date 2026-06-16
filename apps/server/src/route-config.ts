@@ -2,17 +2,13 @@ import { Router, type Router as ExpressRouter } from "express";
 import objectivesRouter from "./routes/objectives";
 import calendarRouter from "./routes/calendar";
 import dashboardRouter from "./routes/dashboard";
-import dashboardLayoutRouter from "./routes/dashboard-layout";
 import coachRouter from "./routes/coach";
-import diaryRouter from "./routes/diary";
 import usersRouter from "./routes/users";
 import adminRouter from "./routes/admin";
 import friendsRouter from "./routes/friends";
 import socialRouter from "./routes/social";
 import profileRouter from "./routes/profile";
 import profileBackgroundRouter from "./routes/profile-background";
-import profileLogoRouter from "./routes/profile-logo";
-import profileNavigationLayoutRouter from "./routes/profile-navigation-layout";
 import profileVisionRouter from "./routes/profile-vision";
 import knowledgeRouter from "./routes/knowledge";
 import wikiRouter from "./routes/wiki";
@@ -57,7 +53,6 @@ import agentsRouter from "./routes/agents";
 import journeyScoreRouter from "./routes/journey-score";
 import cvRouter from "./routes/cv";
 import notificationsRouter from "./routes/notifications";
-import pushRouter from "./routes/push";
 import favoritesRouter from "./routes/favorites";
 import nftCertificatesRouter from "./routes/nft-certificates";
 import certificationsRouter from "./routes/certifications";
@@ -68,7 +63,6 @@ import openhumanRouter from "./routes/openhuman";
 import graphifyRouter from "./routes/graphify";
 import skillsGapRouter from "./routes/skills-gap";
 import aiImageRouter from "./routes/ai-image";
-import monthlyRitualRouter from "./routes/monthly-ritual";
 import { getHealthPayload } from "./lib/health";
 
 export type RouteAuthLevel = "public" | "authenticated" | "admin";
@@ -133,8 +127,6 @@ export const routeConfig: RouteConfig[] = [
 
   { path: "/api/profile", router: profileRouter, auth: "authenticated", description: "Profilo utente" },
   { path: "/api/profile", router: profileBackgroundRouter, auth: "authenticated", description: "Sfondo personalizzabile profilo" },
-  { path: "/api/profile", router: profileLogoRouter, auth: "authenticated", description: "Logo profilo" },
-  { path: "/api/profile", router: profileNavigationLayoutRouter, auth: "authenticated", description: "Layout navigazione profilo" },
   { path: "/api/profile-vision", router: profileVisionRouter, auth: "authenticated", description: "Analisi profilo con vision AI" },
   { path: "/api/users", router: usersRouter, auth: "authenticated", description: "Utenti" },
   { path: "/api/friends", router: friendsRouter, auth: "authenticated", description: "Amici e chat" },
@@ -142,8 +134,6 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/objectives", router: objectivesRouter, auth: "authenticated", description: "Obiettivi" },
   { path: "/api/calendar", router: calendarRouter, auth: "authenticated", description: "Calendario" },
   { path: "/api/dashboard", router: dashboardRouter, auth: "authenticated", description: "Dashboard" },
-  { path: "/api/dashboard/layout", router: dashboardLayoutRouter, auth: "authenticated", description: "Layout dashboard" },
-  { path: "/api/diary", router: diaryRouter, auth: "authenticated", description: "Diario personale" },
   { path: "/api/coach", router: coachRouter, auth: "authenticated", description: "Coach" },
   { path: "/api/knowledge", router: knowledgeRouter, auth: "authenticated", description: "Knowledge base" },
   { path: "/api/interview", router: interviewRouter, auth: "authenticated", description: "Interview" },
@@ -179,7 +169,6 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/journey-score", router: journeyScoreRouter, auth: "authenticated", description: "Journey score" },
   { path: "/api/cv", router: cvRouter, auth: "authenticated", description: "CV" },
   { path: "/api/notifications", router: notificationsRouter, auth: "authenticated", description: "Notifications" },
-  { path: "/api/push", router: pushRouter, auth: "authenticated", description: "Push notifications" },
   { path: "/api/favorites", router: favoritesRouter, auth: "authenticated", description: "Favorites" },
   { path: "/api/nft-certificates", router: nftCertificatesRouter, auth: "authenticated", description: "NFT certificates" },
   { path: "/api/certifications", router: certificationsRouter, auth: "authenticated", description: "Certifications" },
@@ -188,7 +177,6 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/openhuman", router: openhumanRouter, auth: "authenticated", description: "OpenHuman bridge" },
   { path: "/api/graphify", router: graphifyRouter, auth: "authenticated", description: "Graphify bridge" },
   { path: "/api/skills-gap", router: skillsGapRouter, auth: "authenticated", description: "Skills gap analysis" },
-  { path: "/api/monthly-ritual", router: monthlyRitualRouter, auth: "authenticated", description: "Rituale mensile" },
 
   { path: "/api/admin", router: adminRouter, auth: "admin", description: "Pannello admin" },
   { path: "/api/admin/rag", router: ragAdminRouter, auth: "admin", description: "Admin RAG" },

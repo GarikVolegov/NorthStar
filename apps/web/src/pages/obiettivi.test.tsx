@@ -24,7 +24,7 @@ vi.mock("@/lib/seo", () => ({
 
 vi.mock("@/lib/apiClient", () => ({
   deleteJson: vi.fn(),
-  getJson: (...args: unknown[]) => apiState.getJson(...args),
+  getJson: (...args: unknown[]): unknown => apiState.getJson(...args),
   patchJson: vi.fn(),
   postJson: vi.fn(),
 }));

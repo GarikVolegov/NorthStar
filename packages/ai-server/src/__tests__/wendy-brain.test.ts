@@ -127,7 +127,7 @@ describe("wendy-brain", () => {
       title: "Do Not Over-Explain!",
       normalizedTitle: "do not over explain",
       status: "candidate",
-      content: expect.not.stringContaining("mario.rossi@gmail.com"),
+      content: expect.not.stringContaining("mario.rossi@gmail.com") as unknown as string,
       sourceType: "admin_note",
       sourceRef: "note-1",
     }));
@@ -218,7 +218,7 @@ describe("wendy-brain", () => {
         domains: ["career"],
         intents: ["planning"],
         parameters: ["roleTitle", "geography"],
-      }),
+      }) as unknown as Record<string, unknown>,
     }));
   });
 });

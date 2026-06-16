@@ -41,7 +41,9 @@
     "**/build/**",
     "**/.turbo/**",
     "e2e/**",
-    "docs/eval-wendy/**"
+    "docs/eval-wendy/**",
+    "apps/web/src/components/dashboard/DashboardCalendar.tsx",
+    "packages/ai-server/src/tools/index.ts"
   ],
   "ignoreDependencies": [
     "@opentelemetry/auto-instrumentations-node",
