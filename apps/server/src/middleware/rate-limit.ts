@@ -27,7 +27,13 @@ export function buildOptions(
     },
   };
   const store = createRedisRateLimitStore(prefix);
-  if (store) base.store = store;
+  if (store) {
+    base.store = store;
+    // Fail-OPEN su errore dello store: un blip di Redis non deve trasformare
+    // il rate-limit in un 500 sul percorso request (il fail-closed HARD resta
+    // su requireRateLimitRedis, gated dal flag esplicito).
+    base.passOnStoreError = true;
+  }
   return { ...base, ...overrides };
 }
 

@@ -16,11 +16,19 @@ const wss = createWsServer(httpServer);
 import("./ws").then(({ setWss }) => setWss(wss));
 
 const { startAlertChecker } = await import("./lib/alerts");
-startAlertChecker();
-
 const { startCronJobs } = await import("./jobs/cron");
-startCronJobs();
+const { runWhenLeader } = await import("./lib/singleton-lock");
 
+// Scheduler di background (collector/enricher/briefing/weak-signal/alert): con
+// più istanze li esegue UN SOLO leader, altrimenti ogni replica duplica spesa
+// LLM e insert. Fail-open: single-instance / Redis giù → girano comunque.
+runWhenLeader("background-jobs", () => {
+  startAlertChecker();
+  startCronJobs();
+});
+
+// agentRegistry resta per-istanza: è una cache di sola lettura (muta solo Map
+// in-memory) che serve le API admin → il polling non ha side-effect duplicati.
 const { agentRegistry } = await import("./lib/agent-registry");
 agentRegistry.start();
 void agentRegistry.refresh().catch((err) => {
