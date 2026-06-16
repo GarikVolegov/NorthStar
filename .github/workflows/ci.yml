@@ -76,6 +76,9 @@ jobs:
           pnpm-version: ${{ env.PNPM_VERSION }}
 
       # Le suite di test girano su DB reale (regola progetto: niente mock DB).
+      - name: Enable pgvector extension (test DB)
+        run: PGPASSWORD=northstar psql -h localhost -U northstar -d northstar_test -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+
       - name: Run DB migrations (test)
         run: pnpm --filter @workspace/db exec drizzle-kit push
         env:
@@ -136,6 +139,9 @@ jobs:
 
       - name: Install Chromium
         run: pnpm exec playwright install chromium
+
+      - name: Enable pgvector extension (e2e DB)
+        run: PGPASSWORD=northstar psql -h localhost -U northstar -d northstar_e2e -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
       - name: Run DB migrations
         run: pnpm --filter @workspace/db exec drizzle-kit push
