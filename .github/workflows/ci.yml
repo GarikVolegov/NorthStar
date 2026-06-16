@@ -54,6 +54,19 @@ jobs:
       fail-fast: false
       matrix:
         node-version: ["22.13.x", "24.x"]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: northstar
+          POSTGRES_PASSWORD: northstar
+          POSTGRES_DB: northstar_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -62,12 +75,19 @@ jobs:
           node-version: ${{ matrix.node-version }}
           pnpm-version: ${{ env.PNPM_VERSION }}
 
+      # Le suite di test girano su DB reale (regola progetto: niente mock DB).
+      - name: Run DB migrations (test)
+        run: pnpm --filter @workspace/db exec drizzle-kit push
+        env:
+          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_test
+
       - name: Required quality gate
         run: pnpm run quality:required
         env:
           NODE_ENV: test
           JWT_SECRET: ci-jwt-secret-for-github-actions-32chars
           USE_MOCK_AI: "true"
+          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_test
 
       - name: Web production build
         run: pnpm --filter @northstar/web run build
