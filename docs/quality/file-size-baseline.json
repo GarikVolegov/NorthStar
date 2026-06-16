@@ -1,12 +1,62 @@
 {
   "version": 1,
-  "updatedAt": "2026-05-25T00:00:00.000Z",
+  "updatedAt": "2026-06-16T21:13:53.572Z",
   "limits": {
     "apps": 600,
     "packages": 400
   },
   "offenders": {
-    "apps": [],
-    "packages": []
+    "apps": [
+      {
+        "file": "apps/web/src/components/admin/console/AgentsSection.tsx",
+        "lines": 732
+      },
+      {
+        "file": "apps/server/src/routes/admin/agents.ts",
+        "lines": 685
+      },
+      {
+        "file": "apps/server/src/routes/ai-wendy.ts",
+        "lines": 665
+      },
+      {
+        "file": "apps/web/src/components/admin/console/types.ts",
+        "lines": 640
+      },
+      {
+        "file": "apps/web/src/hooks/useWendyChat.ts",
+        "lines": 625
+      },
+      {
+        "file": "apps/web/src/components/search/SearchDialog.tsx",
+        "lines": 604
+      }
+    ],
+    "packages": [
+      {
+        "file": "packages/ai-server/src/llm/client.ts",
+        "lines": 479
+      },
+      {
+        "file": "packages/ai-server/src/wendy-router/tool-registry.ts",
+        "lines": 478
+      },
+      {
+        "file": "packages/ai-server/src/growth-agent/agent.ts",
+        "lines": 463
+      },
+      {
+        "file": "packages/ai-server/src/growth-agent/memory-manager.ts",
+        "lines": 446
+      },
+      {
+        "file": "packages/ai-server/src/wendy-router/tool-handlers-rabbit.ts",
+        "lines": 431
+      },
+      {
+        "file": "packages/ai-server/src/model-router.ts",
+        "lines": 403
+      }
+    ]
   }
 }

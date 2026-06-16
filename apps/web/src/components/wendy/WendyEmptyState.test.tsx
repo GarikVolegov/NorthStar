@@ -21,8 +21,8 @@ describe('WendyEmptyState', () => {
         onPromptSelect={() => undefined}
       />,
     );
-    expect(screen.getByText('Conosco te')).toBeInTheDocument();
-    expect(screen.getByText('Conosco il mercato')).toBeInTheDocument();
+    expect(screen.getByText('Ti conosco')).toBeInTheDocument();
+    expect(screen.getByText('Mercato live')).toBeInTheDocument();
     expect(screen.getByText('Agisco per te')).toBeInTheDocument();
   });
 
@@ -54,7 +54,7 @@ describe('WendyEmptyState', () => {
     });
     fireEvent.click(dismiss);
     // Lo stato è dismissed → ri-render senza capability cards
-    expect(screen.queryByText('Conosco te')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ti conosco')).not.toBeInTheDocument();
 
     // Un nuovo render legge da localStorage e parte già dismissed
     rerender(
@@ -63,7 +63,7 @@ describe('WendyEmptyState', () => {
         onPromptSelect={() => undefined}
       />,
     );
-    expect(screen.queryByText('Conosco te')).not.toBeInTheDocument();
+    expect(screen.queryByText('Ti conosco')).not.toBeInTheDocument();
     // ma i starter prompts restano visibili
     expect(screen.getByRole('button', { name: /Prova/i })).toBeInTheDocument();
   });

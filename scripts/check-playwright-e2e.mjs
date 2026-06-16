@@ -26,19 +26,19 @@ function ensureCiAndVercelUseScopedLint() {
   const ci = read(".github/workflows/ci.yml");
   const nodeEngine = String(packageJson.engines?.node ?? "");
 
-  if (!nodeEngine.includes(">=20.10.0") || !nodeEngine.includes("<25")) {
+  if (!nodeEngine.includes(">=22.13.0") || !nodeEngine.includes("<25")) {
     failures.push(
-      "package.json: engines.node must support Node 24 with `>=20.10.0 <25`",
+      "package.json: engines.node must support Node 24 with `>=22.13.0 <25`",
     );
   }
 
   if (
-    !/matrix:[\s\S]*?node-version:[\s\S]*?\[\s*["']20\.10\.x["']\s*,\s*["']24\.x["']\s*\]/.test(
+    !/matrix:[\s\S]*?node-version:[\s\S]*?\[\s*["']22\.13\.x["']\s*,\s*["']24\.x["']\s*\]/.test(
       ci,
     )
   ) {
     failures.push(
-      ".github/workflows/ci.yml: quality job must run on Node 20.10.x and 24.x",
+      ".github/workflows/ci.yml: quality job must run on Node 22.13.x and 24.x",
     );
   }
 
