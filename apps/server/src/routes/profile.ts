@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable, userProfileSettingsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { requireOwnership } from "../middleware/require-ownership";
 import {
   isPersistenceSchemaError,
   sendPersistenceWriteError,
@@ -79,6 +80,15 @@ router.get("/:userId", async (req, res) => {
       return;
     }
 
+    // PII: l'email è esposta solo al proprietario o a un admin.
+    const isOwnerOrAdmin =
+      req.user?.id === user.id || req.user?.role === "admin";
+    if (!isOwnerOrAdmin) {
+      const { email: _email, ...safe } = user;
+      res.json(safe);
+      return;
+    }
+
     res.json(user);
   } catch (err) {
     req.log?.error?.({ err }, "profile get error");
@@ -87,13 +97,9 @@ router.get("/:userId", async (req, res) => {
 });
 
 /* ─── PATCH /api/profile/:userId/avatar  —  upload avatar ──────────── */
-router.patch("/:userId/avatar", requireAuth, async (req, res) => {
+router.patch("/:userId/avatar", requireAuth, requireOwnership(), async (req, res) => {
   try {
     const userId = parseInt(req.params.userId ?? "", 10);
-    if (userId !== req.user!.id) {
-      res.status(403).json({ error: "Accesso negato" });
-      return;
-    }
 
     const body = asPlainRecord(getRequestBody(req));
     const avatarDataUrl = body.avatarDataUrl;
@@ -125,13 +131,9 @@ router.patch("/:userId/avatar", requireAuth, async (req, res) => {
 });
 
 /* ─── DELETE /api/profile/:userId/avatar  —  rimuovi avatar ───────── */
-router.delete("/:userId/avatar", requireAuth, async (req, res) => {
+router.delete("/:userId/avatar", requireAuth, requireOwnership(), async (req, res) => {
   try {
     const userId = parseInt(req.params.userId ?? "", 10);
-    if (userId !== req.user!.id) {
-      res.status(403).json({ error: "Accesso negato" });
-      return;
-    }
 
     await db
       .update(usersTable)
@@ -145,13 +147,9 @@ router.delete("/:userId/avatar", requireAuth, async (req, res) => {
 });
 
 /* ─── PATCH /api/profile/:userId/banner  —  upload banner ──────────── */
-router.patch("/:userId/banner", requireAuth, async (req, res) => {
+router.patch("/:userId/banner", requireAuth, requireOwnership(), async (req, res) => {
   try {
     const userId = parseInt(req.params.userId ?? "", 10);
-    if (userId !== req.user!.id) {
-      res.status(403).json({ error: "Accesso negato" });
-      return;
-    }
 
     const body = asPlainRecord(getRequestBody(req));
     const bannerDataUrl = body.bannerDataUrl;
@@ -177,13 +175,9 @@ router.patch("/:userId/banner", requireAuth, async (req, res) => {
 });
 
 /* ─── DELETE /api/profile/:userId/banner  —  rimuovi banner ───────── */
-router.delete("/:userId/banner", requireAuth, async (req, res) => {
+router.delete("/:userId/banner", requireAuth, requireOwnership(), async (req, res) => {
   try {
     const userId = parseInt(req.params.userId ?? "", 10);
-    if (userId !== req.user!.id) {
-      res.status(403).json({ error: "Accesso negato" });
-      return;
-    }
 
     await upsertProfileSettings(userId, { bannerUrl: null });
 
@@ -197,13 +191,9 @@ router.delete("/:userId/banner", requireAuth, async (req, res) => {
 });
 
 /* ─── PATCH /api/profile/:userId/mode  —  aggiorna user mode ───────── */
-router.patch("/:userId/mode", requireAuth, async (req, res) => {
+router.patch("/:userId/mode", requireAuth, requireOwnership(), async (req, res) => {
   try {
     const userId = parseInt(req.params.userId ?? "", 10);
-    if (userId !== req.user!.id) {
-      res.status(403).json({ error: "Accesso negato" });
-      return;
-    }
 
     const body = asPlainRecord(getRequestBody(req));
     const mode = body.mode;
