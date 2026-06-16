@@ -319,6 +319,7 @@ Aggiungi una riga ad ogni revisione significativa. Più recente in alto.
 
 | Data | Modello/AI | Cosa è cambiato |
 | --- | --- | --- |
+| 2026-06-15 | Opus 4.8 | **P2 riuso** su branch `feature/p2-reuse` (da `main`): (1) cache embedding query in `growth-agent/embedder.ts` — la stessa query veniva embeddata 5-6× per turno (retriever ×3, memory-search, brain, supervisor); ora LRU in-process (sha256 di modello+testo, TTL 5min, max 500, fail-safe `EMBED_CACHE_DISABLED`), `clearEmbedCache()` + test. (2) **global error handler smart** estratto in `lib/error-handler.ts` (montato in `app.ts`): mappa `ZodError`→400, PG 23505→409, 23503→400, schema-drift→503 PRIMA del 500 generico — prima 17 dei 24 `.parse()` non gestiti cadevano nel 500 (bug di correttezza, API_RULES §7.1); additivo (route già gestite intatte), no Sentry-noise sui 4xx, + test isolato 5/5. Restano P2: `lib/sse.ts` abort-on-disconnect, `<AsyncBoundary>` FE (richiedono verifica con suite integrazione/app in esecuzione). |
 | 2026-06-01 | Opus 4.8 | Creazione iniziale di `memoria.md` tramite workflow agentico (4 agenti Explore: backend/DB, frontend/UX, AI/Wendy/RAG, stato/direzione) + verifica diretta di git, conteggi e posizioni file. Stato: Fase 2 mergiata, Fase 1 in chiusura, Fase 3 in arrivo. |
 
 ---
