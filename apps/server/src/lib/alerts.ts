@@ -92,12 +92,12 @@ async function checkLlmCostSpike(): Promise<void> {
     previousHourStart.setHours(previousHourStart.getHours() - 1);
 
     const [current] = await db
-      .select({ cost: sql<number>`COALESCE(SUM(cost), 0)` })
+      .select({ cost: sql<number>`COALESCE(SUM(estimated_cost_usd), 0)` })
       .from(llmUsageTable)
       .where(gte(llmUsageTable.createdAt, currentHourStart));
 
     const [previous] = await db
-      .select({ cost: sql<number>`COALESCE(SUM(cost), 0)` })
+      .select({ cost: sql<number>`COALESCE(SUM(estimated_cost_usd), 0)` })
       .from(llmUsageTable)
       .where(gte(llmUsageTable.createdAt, previousHourStart));
 
