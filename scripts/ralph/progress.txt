@@ -44,3 +44,13 @@ Started: 2026-06-17 (seeded by Opus 4.8 after Phase 0/1 monetization work)
   - CoverLetterDialog (US-007 UI) already exists and POSTs to /api/cover-letter/generate with { company, role, jobDescription }, expecting { text } or { error }. US-006 must create that exact route.
   - DB-REAL tests: no DATABASE_URL safe to use here (Neon = prod), and no existing supertest+real-DB pattern. Integration tests are deferred to a staging run (US-011/012/013). Do NOT mock the DB to fake a pass.
 ---
+
+## 2026-06-17 - US-009 (roadmap) + US-014 (deploy) + test status
+- US-014: docs/DEPLOY.md written (Railway vs Vercel, legal/Stripe-KYC, schema/journal reconciliation on staging, prod env, Stripe test->live, go-live, cost table).
+- US-009: replaced the roadmap.ts hardcoded stub with a real streaming SSE generate matching the FE contract (data:{content}/{done}); prompts gemini-flash-1.5 for the exact RoadmapData JSON from the sector + user CV. Server typecheck + lint green.
+- US-008 DESCOPED (FE regenerates on demand, no saved-roadmap load → table is write-only). US-010 already built (FE streams generate). US-011/012/013 DEFERRED to staging (no safe DATABASE_URL).
+- **Learnings for future iterations:**
+  - roadmap.tsx expects a DEEP RoadmapData JSON (paths[].phases[].resources[], salaryProgression, alternativeFormativePaths, fitScore, comparison, topRoles, keyTip). The generate streams it; the FE extracts the JSON via fullText.match(/\\{[\\s\\S]*\\}/). The LLM-output shape is the one part NOT verifiable without a live LLM — smoke-test it on staging.
+  - Pattern for the remaining stub career routes (jobs.ts etc.): check for an existing FE + table first; most FE is already built and only the backend is a stub.
+  - FINAL STATE this session: US-001..007, US-014 done (8). US-009 code done (LLM-shape live-smoke pending). US-005/010 functional via real backends. US-008 descoped. US-011/012/013 deferred to staging. Roadmap PRD ready for the Ralph loop (./scripts/ralph/ralph.sh --tool claude) to pick up the deferred items where a CLI + staging DB exist.
+---

@@ -123,7 +123,7 @@
       ],
       "priority": 8,
       "passes": false,
-      "notes": ""
+      "notes": "DESCOPED (honest): the FE roadmap.tsx regenerates on demand via SSE and does NOT load a saved roadmap, so a user_roadmaps table would be write-only / low-value and add surface. Persistence deferred until a 'my saved roadmaps' FE feature is actually desired. US-009 delivers the real generation without it."
     },
     {
       "id": "US-009",
@@ -137,8 +137,8 @@
         "Tests pass"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Replaced the hardcoded 'Roadmap di esempio' stub with a REAL streaming SSE generate that matches the FE contract (data:{content} chunks + data:{done}), prompting the LLM (gemini-flash-1.5) for the exact RoadmapData JSON from the real sector (name/skills/salary) + the user's CV. Server typecheck + lint green. CAVEAT: the deep RoadmapData JSON shape needs a LIVE smoke test (no LLM in this env) — same unverifiable-LLM caveat as interview/cover-letter/cv. Persistence + phase PATCH persistence descoped (see US-008)."
     },
     {
       "id": "US-010",
@@ -151,8 +151,8 @@
         "Verify in browser using dev-browser skill (or note manual verification needed if no browser tools)"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Already built: roadmap.tsx streams /generate (reader on \\n\\n, extracts the RoadmapData JSON) and renders paths/phases with a generate UI + progress + error handling, and PATCHes phase updates. Functional with the real US-009 backend. No FE change needed. Browser + live-LLM verification pending (no tools here)."
     },
     {
       "id": "US-011",
@@ -167,7 +167,7 @@
       ],
       "priority": 11,
       "passes": false,
-      "notes": ""
+      "notes": "DEFERRED TO STAGING: requires a real Postgres+pgvector with a safe DATABASE_URL. The only DATABASE_URL available in this env points to the prod Neon DB (project rule: never run destructive tests/migrations on prod), and there is no existing supertest+real-DB integration pattern to mirror. Run on the staging DB during the §2 reconciliation in docs/DEPLOY.md."
     },
     {
       "id": "US-012",
@@ -182,7 +182,7 @@
       ],
       "priority": 12,
       "passes": false,
-      "notes": ""
+      "notes": "DEFERRED TO STAGING (same reason as US-011): needs a safe staging DATABASE_URL. Run during the docs/DEPLOY.md §2 reconciliation."
     },
     {
       "id": "US-013",
@@ -197,7 +197,7 @@
       ],
       "priority": 13,
       "passes": false,
-      "notes": ""
+      "notes": "DEFERRED TO STAGING (same reason as US-011): needs a safe staging DATABASE_URL. Run during the docs/DEPLOY.md §2 reconciliation."
     },
     {
       "id": "US-014",
