@@ -1,6 +1,6 @@
 {
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm run quality:required && pnpm --filter @northstar/server exec node build.mjs && pnpm --filter @northstar/web run build",
+  "buildCommand": "pnpm --filter @northstar/server exec node build.mjs && pnpm --filter @northstar/web run build",
   "outputDirectory": "apps/web/dist/public",
   "framework": "vite",
   "rewrites": [

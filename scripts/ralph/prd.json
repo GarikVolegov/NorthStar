@@ -44,12 +44,12 @@
         "Modifica il buildCommand nel vercel.json DI ROOT togliendo SOLO il prefisso `pnpm run quality:required && `, cosi' diventa `pnpm --filter @northstar/server exec node build.mjs && pnpm --filter @northstar/web run build` (MANTIENI sia il build del server sia quello del web — il deploy Vercel serve l'API come serverless function via la rewrite /api)",
         "NON modificare outputDirectory, rewrites o headers (CSP) nel vercel.json",
         "In locale, sia `pnpm --filter @northstar/server exec node build.mjs` sia `pnpm --filter @northstar/web run build` vanno a buon fine; se uno dei due build fallisce di per se', e' un vero blocco al deploy: risolvilo e annotalo",
-        "Aggiungi una nota/commento che il quality gate completo resta applicato in CI (.github/workflows/ci.yml), non nel build Vercel",
+        "Documenta (nel commit + progress.txt, perche' il JSON non ammette commenti) che il quality gate completo resta applicato in CI (.github/workflows/ci.yml), non nel build Vercel",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": "Confermato dal log di build dell'ultimo deploy ERROR (commit 9958a96): lint + typecheck + i test ai/server/web (123 verdi) PASSANO su Vercel; il log e' troncato durante gli audit, quindi l'audit esatto che fallisce (file-size ratchet / dead-code knip / db-types / mojibake) non e' stato individuato — ma il fix architetturale (gate fuori dal build di deploy) risolve la fragilita' a prescindere. VERIFICA FINALE = il founder fa push e conferma che il deployment Vercel va READY (Ralph non puo' osservare Vercel). NOTA ulteriore per il founder (fuori da questo fix di codice): il dominio ainorthstar.vercel.app punta a un vecchio deploy CLI di feature/fase2-cervello-runtime con target:production; dopo questo fix va deciso lato Vercel se impostare il production branch su release/launch-candidate / promuovere i build GitHub a produzione."
+      "passes": true,
+      "notes": "FATTO. Rimosso `pnpm run quality:required && ` dal buildCommand del vercel.json di root; restano server build (node build.mjs) + web build. Verificato in locale: vercel.json JSON valido; SERVER build -> '✅ Build complete: api/index.js' (exit 0); WEB build -> OK (vite build verde, gia' confermato in US-001). Il JSON non ammette commenti, quindi la nota 'gate resta in CI' e' in questo commit + progress.txt. VERIFICA FINALE = il founder fa push e conferma che il deployment Vercel va READY (Ralph non osserva Vercel). NOTA per il founder: il dominio ainorthstar.vercel.app punta ancora a un vecchio deploy CLI di feature/fase2-cervello-runtime con target:production; dopo che i build GitHub tornano verdi, va deciso lato Vercel se impostare il production branch su release/launch-candidate o promuovere a produzione un deploy del branch corrente."
     }
   ]
 }

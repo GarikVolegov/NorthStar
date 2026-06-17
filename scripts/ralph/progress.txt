@@ -38,3 +38,12 @@ Started: 2026-06-17 (seeded by Opus 4.8 — sub-progetto A "stabilize-current-li
   - FOUNDER TODO (not code): set VITE_CLERK_PUBLISHABLE_KEY (or NEXT_PUBLIC_) in Vercel env, else prod login stays broken.
   - Bonus for US-003: standalone `vite build` (web) succeeds in ~3.5s — the web build itself is fine; only the quality:required wrapper breaks the Vercel deploy.
 ---
+
+## 2026-06-17 - US-003 (deploy) — DONE
+- Removed `pnpm run quality:required && ` from the ROOT vercel.json buildCommand. It now runs only the two real artifact builds: `pnpm --filter @northstar/server exec node build.mjs && pnpm --filter @northstar/web run build` (the Vercel deploy serves the API as serverless functions via the /api rewrite, so the server build must stay). outputDirectory / rewrites / CSP headers untouched.
+- Verified locally: vercel.json is valid JSON; SERVER build → "✅ Build complete: api/index.js" (exit 0); WEB build → green (confirmed in US-001). So the full Vercel buildCommand succeeds.
+- The full quality gate (lint + typecheck + 3 coverage suites + 9 audits) stays enforced in CI (.github/workflows/ci.yml), where Postgres+pgvector are provisioned — not in the Vercel sandbox which has no DB. JSON can't hold a comment, so this rationale lives in the commit + here.
+- **Learnings for future iterations:**
+  - Running quality gates inside the Vercel buildCommand is fragile: any gate step (ratchet/knip/db-types/test infra) aborts the production deploy. Keep CI and deploy concerns separate.
+  - FOUNDER TODO (not code): (1) push so a GitHub deploy of release/launch-candidate goes READY; (2) ainorthstar.vercel.app still points to the old 2026-06-02 CLI deploy (target:production) — decide in Vercel whether to set the production branch to release/launch-candidate or promote a current deploy; (3) set VITE_CLERK_PUBLISHABLE_KEY in Vercel env (US-001) or prod login stays broken.
+---
