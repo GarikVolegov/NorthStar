@@ -77,8 +77,8 @@
         "Verify in browser using dev-browser skill (or note manual verification needed if no browser tools)"
       ],
       "priority": 5,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Already built: apps/web/src/pages/applications.tsx is a full kanban (drag-drop status, add/edit/delete dialog, empty state, stats view) + features/applications/* . It was non-functional only because the backend was a stub. Now functional via the real US-004 CRUD. No FE change needed. Browser verification pending (no browser tools here)."
     },
     {
       "id": "US-006",
@@ -108,8 +108,8 @@
         "Verify in browser using dev-browser skill (or note manual verification needed if no browser tools)"
       ],
       "priority": 7,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "CoverLetterDialog already existed and surfaces the backend's {error}. Enhanced it: when the error is the Pro gate (contains 'Pro'), it now renders a 'Passa a Pro' Link to /premium instead of a plain error. Web typecheck + lint green."
     },
     {
       "id": "US-008",
