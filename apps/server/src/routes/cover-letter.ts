@@ -13,8 +13,7 @@ import { z } from "zod/v4";
 import { db, userProfileSettingsTable, jobApplicationsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { wendyLimiter } from "../middleware/rate-limit";
-import { getEffectivePlan, planMeets } from "../middleware/check-feature";
-import { cacheIncr } from "../lib/redis";
+import { checkMonthlyFreemium } from "../lib/freemium";
 import { getRequestBody } from "../lib/request-context";
 import { getLLM } from "@workspace/ai-server/llm/client";
 import { estimateTokens, recordLlmUsage } from "@workspace/ai-server";
@@ -25,7 +24,6 @@ const FREE_MONTHLY_COVERLETTER = parseInt(
   process.env.COVERLETTER_FREE_MONTHLY_LIMIT ?? "1",
   10,
 );
-const QUOTA_TTL_SECONDS = 35 * 24 * 60 * 60;
 
 const schema = z.object({
   company: z.string().min(1).max(200),
@@ -45,21 +43,14 @@ router.post("/generate", requireAuth, wendyLimiter, async (req, res) => {
   const { company, role, jobDescription, applicationId } = parsed.data;
 
   // ── Freemium gate: 1 lettera/mese gratis, poi Pro ───────────────────────────
-  const plan = await getEffectivePlan(userId);
-  if (!planMeets(plan, "pro")) {
-    const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-    const used = await cacheIncr(
-      `coverletter:month:${userId}:${month}`,
-      QUOTA_TTL_SECONDS,
-    );
-    if (used !== null && used > FREE_MONTHLY_COVERLETTER) {
-      // Soft gate: il dialog mostra il messaggio. La parola "Pro" attiva il link upgrade (US-007).
-      res.json({
-        error:
-          "Hai usato la tua lettera gratuita di questo mese. Passa a Pro per generarne quante vuoi.",
-      });
-      return;
-    }
+  // Soft gate: il dialog mostra il messaggio; "Pro" attiva il link upgrade.
+  const fm = await checkMonthlyFreemium(userId, "coverletter", FREE_MONTHLY_COVERLETTER);
+  if (fm.gated) {
+    res.json({
+      error:
+        "Hai usato la tua lettera gratuita di questo mese. Passa a Pro per generarne quante vuoi.",
+    });
+    return;
   }
 
   // Solo dati dell'utente al LLM (il proprio CV).

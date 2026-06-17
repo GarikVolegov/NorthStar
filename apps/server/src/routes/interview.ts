@@ -2,8 +2,7 @@ import { Router } from "express";
 import { z } from "zod/v4";
 import { requireAuth } from "../middleware/auth";
 import { wendyLimiter, wendyIpLimiter } from "../middleware/rate-limit";
-import { getEffectivePlan, planMeets } from "../middleware/check-feature";
-import { cacheIncr } from "../lib/redis";
+import { checkMonthlyFreemium } from "../lib/freemium";
 import { getRequestBody } from "../lib/request-context";
 
 const router = Router();
@@ -36,7 +35,6 @@ const FREE_MONTHLY_INTERVIEWS = parseInt(
   process.env.INTERVIEW_FREE_MONTHLY_LIMIT ?? "1",
   10,
 );
-const INTERVIEW_QUOTA_TTL_SECONDS = 35 * 24 * 60 * 60; // copre il mese (chiave per YYYY-MM)
 
 function parseEvaluation(content: string): Evaluation | null {
   try {
@@ -97,32 +95,28 @@ router.post(
 
         if (answeredCount === 0) {
           // ── Freemium gate: 1 colloquio di prova gratuito/mese, poi Pro ──────
-          // Conta una "sessione" all'avvio (prima domanda). cacheIncr è fail-open:
-          // se Redis è giù (null) non blocca, coerente col limite giornaliero di Wendy.
-          const plan = await getEffectivePlan(userId);
-          if (!planMeets(plan, "pro")) {
-            const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-            const used = await cacheIncr(
-              `interview:month:${userId}:${month}`,
-              INTERVIEW_QUOTA_TTL_SECONDS,
+          // Conta una "sessione" all'avvio (prima domanda). Helper fail-open.
+          const fm = await checkMonthlyFreemium(
+            userId,
+            "interview",
+            FREE_MONTHLY_INTERVIEWS,
+          );
+          if (fm.gated) {
+            res.write(
+              `data: ${JSON.stringify({
+                type: "gate",
+                feature: "interview_unlimited",
+                requiredPlan: "pro",
+                currentPlan: fm.plan,
+                used: fm.used,
+                limit: fm.limit,
+                message:
+                  "Hai già usato il tuo colloquio di prova gratuito di questo mese. Passa a Pro per colloqui illimitati.",
+              })}\n\n`,
             );
-            if (used !== null && used > FREE_MONTHLY_INTERVIEWS) {
-              res.write(
-                `data: ${JSON.stringify({
-                  type: "gate",
-                  feature: "interview_unlimited",
-                  requiredPlan: "pro",
-                  currentPlan: plan,
-                  used: used - 1,
-                  limit: FREE_MONTHLY_INTERVIEWS,
-                  message:
-                    "Hai già usato il tuo colloquio di prova gratuito di questo mese. Passa a Pro per colloqui illimitati.",
-                })}\n\n`,
-              );
-              res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
-              res.end();
-              return;
-            }
+            res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+            res.end();
+            return;
           }
 
           const questions = await generateQuestions(
