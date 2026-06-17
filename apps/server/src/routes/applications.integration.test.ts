@@ -1,9 +1,10 @@
 /**
  * applications.integration.test.ts — test DB-REALE (no mock DB) del CRUD candidature.
  *
- * Richiede un Postgres reale via DATABASE_URL; `describe.skipIf` lo salta quando
- * assente (run unit locali) e lo esegue in CI `quality` / staging / DB di testing.
- * Conforme a DB_RULES.md (DB reale, niente mock del DB).
+ * Opt-in: gira SOLO con `RUN_DB_INTEGRATION=1` + una DATABASE_URL di test SICURA
+ * (es. `RUN_DB_INTEGRATION=1 DATABASE_URL=<test-db> vitest run ...`). Saltato di
+ * default — il .env del repo fornisce sempre una DATABASE_URL (prod). Eseguilo in
+ * CI `quality` / staging. Conforme a DB_RULES.md (DB reale, niente mock del DB).
  */
 import express from "express";
 import jwt from "jsonwebtoken";
@@ -16,7 +17,10 @@ vi.mock("../lib/jwt-secret", () => ({ JWT_SECRET: "test-secret" }));
 import { db, usersTable, jobApplicationsTable } from "@workspace/db";
 import applicationsRouter from "./applications";
 
-const hasDb = !!process.env.DATABASE_URL;
+// Opt-in ESPLICITO: gira solo con RUN_DB_INTEGRATION=1 + una DATABASE_URL di test
+// SICURA. NON guardare solo su DATABASE_URL: il .env del repo fornisce sempre una
+// DATABASE_URL (prod), quindi un `pnpm test` distratto la eseguirebbe contro prod.
+const runIntegration = process.env.RUN_DB_INTEGRATION === "1";
 
 function token(userId: number, email: string): string {
   return jwt.sign(
@@ -50,7 +54,7 @@ interface ListBody {
   applications: AppBody[];
 }
 
-describe.skipIf(!hasDb)("applications CRUD (DB-real integration)", () => {
+describe.skipIf(!runIntegration)("applications CRUD (DB-real integration)", () => {
   let ownerId = 0;
   let otherId = 0;
 

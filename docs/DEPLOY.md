@@ -27,7 +27,7 @@ memoria §8: ci sono **44 file SQL** (`0000`–`0044`) ma il **journal Drizzle �
 
 - [ ] Creare un **DB di staging** (Neon branch o Postgres+pgvector separato). **MAI testare su prod.**
 - [ ] Allineare lo **schema Drizzle** (`packages/db/src/schema/**`) a ciò che le SQL raw 0035–0044 hanno creato, così `db:migrate`/`db:push` ricostruiscono un DB completo, e riconciliare il journal.
-- [ ] Verificare con `db:migrate:dry-run` (`scripts/.../check-migration-safety.mjs`) poi `db:migrate` su staging; far girare i **test d'integrazione DB-reale** (US-004/006/009 + US-011/012/013) contro lo staging.
+- [ ] Verificare con `db:migrate:dry-run` (`scripts/.../check-migration-safety.mjs`) poi `db:migrate` su staging; far girare i **test d'integrazione DB-reale** contro lo staging. Sono **opt-in** (per non colpire mai il DB prod del `.env`): `RUN_DB_INTEGRATION=1 DATABASE_URL=<staging> vitest run src/routes/*.integration.test.ts --root apps/server`. Già verdi su DB di testing: `applications.integration`, `market-intelligence.integration`.
 - [ ] Le migrazioni recenti (0035–0044) sono **SQL raw idempotenti** (`CREATE/ALTER ... IF NOT EXISTS`): è il pattern del progetto — mantenerlo.
 
 ## 3. Variabili d'ambiente di produzione

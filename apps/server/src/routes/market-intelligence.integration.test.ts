@@ -2,8 +2,9 @@
  * market-intelligence.integration.test.ts — test DB-REALE (no mock DB).
  *
  * Verifica: /overview (free) restituisce il radar settori; /signals è gated Pro
- * (402 per free via requireFeature('weak_signals'), dati per Pro). Richiede un
- * Postgres reale via DATABASE_URL; `describe.skipIf` lo salta quando assente.
+ * (402 per free via requireFeature('weak_signals'), dati per Pro).
+ * Opt-in: gira SOLO con `RUN_DB_INTEGRATION=1` + una DATABASE_URL di test SICURA.
+ * Saltato di default (il .env del repo punta a prod). Eseguilo in CI/staging.
  */
 import express from "express";
 import jwt from "jsonwebtoken";
@@ -16,7 +17,10 @@ vi.mock("../lib/jwt-secret", () => ({ JWT_SECRET: "test-secret" }));
 import { db, usersTable, sectorsTable, subscriptionsTable } from "@workspace/db";
 import marketRouter from "./market-intelligence";
 
-const hasDb = !!process.env.DATABASE_URL;
+// Opt-in ESPLICITO: gira solo con RUN_DB_INTEGRATION=1 + una DATABASE_URL di test
+// SICURA. Il .env del repo fornisce sempre una DATABASE_URL (prod): guardare solo
+// su DATABASE_URL eseguirebbe i test contro prod per errore.
+const runIntegration = process.env.RUN_DB_INTEGRATION === "1";
 
 function token(userId: number): string {
   return jwt.sign(
@@ -49,7 +53,7 @@ interface SignalsBody {
   emergingSkills: unknown[];
 }
 
-describe.skipIf(!hasDb)("market intelligence (DB-real integration)", () => {
+describe.skipIf(!runIntegration)("market intelligence (DB-real integration)", () => {
   let freeId = 0;
   let proId = 0;
   let sectorId = 0;
