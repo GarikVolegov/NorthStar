@@ -4,6 +4,8 @@ import { z } from "zod/v4";
 import { db, sectorsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { wendyLimiter } from "../middleware/rate-limit";
+import { getEffectivePlan, planMeets } from "../middleware/check-feature";
+import { cacheIncr } from "../lib/redis";
 import { getLLM } from "@workspace/ai-server/llm/client";
 import { estimateTokens, recordLlmUsage } from "@workspace/ai-server";
 
@@ -20,6 +22,13 @@ const LEVEL_LABELS: Record<string, string> = {
   mid: "Mid-level (2-5 anni di esperienza)",
   senior: "Senior (5+ anni di esperienza)",
 };
+
+// Freemium: 1 analisi skills-gap gratuita al mese, poi Pro (override via env).
+const FREE_MONTHLY_SKILLSGAP = parseInt(
+  process.env.SKILLSGAP_FREE_MONTHLY_LIMIT ?? "1",
+  10,
+);
+const SKILLSGAP_QUOTA_TTL_SECONDS = 35 * 24 * 60 * 60;
 
 router.post("/analyze", requireAuth, wendyLimiter, async (req, res) => {
   const userId = req.user!.id;
@@ -72,6 +81,35 @@ Sii diretto, motivante e specifico. Evita generalità.`;
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
+
+  // ── Freemium gate: 1 analisi/mese gratis, poi Pro ───────────────────────────
+  // Stesso pattern del colloquio (interview.ts): conteggio mensile su Redis,
+  // fail-open se Redis è giù. La UI intercetta type:"gate" e mostra l'upgrade.
+  const plan = await getEffectivePlan(userId);
+  if (!planMeets(plan, "pro")) {
+    const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const used = await cacheIncr(
+      `skillsgap:month:${userId}:${month}`,
+      SKILLSGAP_QUOTA_TTL_SECONDS,
+    );
+    if (used !== null && used > FREE_MONTHLY_SKILLSGAP) {
+      res.write(
+        `data: ${JSON.stringify({
+          type: "gate",
+          feature: "rag_search",
+          requiredPlan: "pro",
+          currentPlan: plan,
+          used: used - 1,
+          limit: FREE_MONTHLY_SKILLSGAP,
+          message:
+            "Hai usato la tua analisi skills-gap gratuita di questo mese. Passa a Pro per analisi illimitate.",
+        })}\n\n`,
+      );
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+      return;
+    }
+  }
 
   try {
     const llm = getLLM();

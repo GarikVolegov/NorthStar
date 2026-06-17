@@ -14,3 +14,12 @@ Started: 2026-06-17 (seeded by Opus 4.8 after Phase 0/1 monetization work)
 - Stripe is in TEST mode; do not add live keys. Stripe checkout/webhook already exist in apps/server/src/routes/subscription.ts.
 - Branch: work on ralph/launch-completion (descends from release/launch-candidate which holds Phase 0/1). Do NOT branch from main — it lacks the prerequisite work.
 ---
+
+## 2026-06-17 - US-001
+- Implemented the monthly freemium gate on POST /api/skills-gap/analyze (1 free analysis/month, then Pro).
+- Files: apps/server/src/routes/skills-gap.ts — added imports (getEffectivePlan/planMeets from ../middleware/check-feature, cacheIncr from ../lib/redis), constants FREE_MONTHLY_SKILLSGAP + SKILLSGAP_QUOTA_TTL_SECONDS, and a gate after the SSE headers that emits {type:'gate', feature:'rag_search', requiredPlan:'pro', ...} and ends the stream for free users over the limit (fail-open if Redis null).
+- **Learnings for future iterations:**
+  - Emit the gate AFTER res.setHeader SSE headers (already set) and BEFORE getLLM()/llm.chat.
+  - skills-gap.ts has NO unit test file — gate logic mirrors interview.ts. Verified via typecheck + lint only.
+  - US-002 (FE) must detect type==='gate' in the SSE reader loop in apps/web/src/pages/skills-gap.tsx and render an upgrade card (mirror the gate block in apps/web/src/pages/colloquio.tsx).
+---
