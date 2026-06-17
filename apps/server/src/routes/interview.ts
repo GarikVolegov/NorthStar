@@ -1,11 +1,9 @@
 import { Router } from "express";
 import { z } from "zod/v4";
 import { requireAuth } from "../middleware/auth";
-import {
-  wendyLimiter,
-  wendyIpLimiter,
-  planQuotaLimiter,
-} from "../middleware/rate-limit";
+import { wendyLimiter, wendyIpLimiter } from "../middleware/rate-limit";
+import { getEffectivePlan, planMeets } from "../middleware/check-feature";
+import { cacheIncr } from "../lib/redis";
 import { getRequestBody } from "../lib/request-context";
 
 const router = Router();
@@ -33,6 +31,12 @@ const evaluationSchema = z
 type Evaluation = z.infer<typeof evaluationSchema>;
 
 const MAX_TURNS = 5;
+// Freemium: 1 colloquio di prova gratuito al mese, poi Pro (override via env).
+const FREE_MONTHLY_INTERVIEWS = parseInt(
+  process.env.INTERVIEW_FREE_MONTHLY_LIMIT ?? "1",
+  10,
+);
+const INTERVIEW_QUOTA_TTL_SECONDS = 35 * 24 * 60 * 60; // copre il mese (chiave per YYYY-MM)
 
 function parseEvaluation(content: string): Evaluation | null {
   try {
@@ -50,14 +54,13 @@ router.post(
   requireAuth,
   wendyLimiter,
   wendyIpLimiter,
-  planQuotaLimiter,
   async (req, res) => {
     const userId = req.user!.id;
     const sectorId = parseInt(req.params.id ?? "", 10);
     const data = askSchema.parse(getRequestBody(req));
     const log = req.log;
 
-    const sectorName = `Settore ${sectorId}`;
+    let sectorName = `Settore ${sectorId}`;
 
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -67,7 +70,8 @@ router.post(
     try {
       const { generateQuestions, evaluateAnswer, adaptDifficulty } =
         await import("@workspace/ai-server");
-      const { db, userProfileSettingsTable } = await import("@workspace/db");
+      const { db, userProfileSettingsTable, sectorsTable } =
+        await import("@workspace/db");
       const { eq } = await import("drizzle-orm");
 
       const [userRow] = await db
@@ -75,6 +79,14 @@ router.post(
         .from(userProfileSettingsTable)
         .where(eq(userProfileSettingsTable.userId, userId))
         .limit(1);
+
+      // Nome reale del settore → domande pertinenti (prima era "Settore <id>").
+      const [sectorRow] = await db
+        .select({ name: sectorsTable.name })
+        .from(sectorsTable)
+        .where(eq(sectorsTable.id, sectorId))
+        .limit(1);
+      if (sectorRow?.name) sectorName = sectorRow.name;
 
       const history = data.history ?? [];
 
@@ -84,6 +96,35 @@ router.post(
         ).length;
 
         if (answeredCount === 0) {
+          // ── Freemium gate: 1 colloquio di prova gratuito/mese, poi Pro ──────
+          // Conta una "sessione" all'avvio (prima domanda). cacheIncr è fail-open:
+          // se Redis è giù (null) non blocca, coerente col limite giornaliero di Wendy.
+          const plan = await getEffectivePlan(userId);
+          if (!planMeets(plan, "pro")) {
+            const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+            const used = await cacheIncr(
+              `interview:month:${userId}:${month}`,
+              INTERVIEW_QUOTA_TTL_SECONDS,
+            );
+            if (used !== null && used > FREE_MONTHLY_INTERVIEWS) {
+              res.write(
+                `data: ${JSON.stringify({
+                  type: "gate",
+                  feature: "interview_unlimited",
+                  requiredPlan: "pro",
+                  currentPlan: plan,
+                  used: used - 1,
+                  limit: FREE_MONTHLY_INTERVIEWS,
+                  message:
+                    "Hai già usato il tuo colloquio di prova gratuito di questo mese. Passa a Pro per colloqui illimitati.",
+                })}\n\n`,
+              );
+              res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+              res.end();
+              return;
+            }
+          }
+
           const questions = await generateQuestions(
             sectorName,
             userRow?.cvText ?? undefined,
