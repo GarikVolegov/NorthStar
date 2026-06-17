@@ -1,0 +1,66 @@
+# Ralph Progress Log
+Started: 2026-06-17 (seeded by Opus 4.8 after Phase 0/1 monetization work)
+---
+
+## Codebase Patterns
+- READ FIRST each iteration: memoria.md (root) + the relevant *_RULES.md for the area you touch (API_RULES.md, DB_RULES.md, FRONTEND_RULES.md, AI_RULES.md). memoria.md §10 changelog has the latest state.
+- GATE (pnpm is NOT on PATH here): `export PATH="$HOME/.local/bin:$PATH"` first. Typecheck server: `cd apps/server && node --max-old-space-size=4096 ../../node_modules/typescript/bin/tsc --noEmit`. Typecheck web: `cd apps/web && node --max-old-space-size=4096 ../../node_modules/typescript/bin/tsc -p tsconfig.json --noEmit`. Lint: from repo root `./node_modules/.bin/eslint <files> --max-warnings=0` (do NOT prefix with `node`). Tests: `apps/server/node_modules/.bin/vitest run <file> --configLoader runner --root apps/server`.
+- FREEMIUM MONTHLY GATE pattern (copy from apps/server/src/routes/interview.ts): `getEffectivePlan(userId)` + `planMeets(plan,'pro')` from ../middleware/check-feature; for free users `cacheIncr(\`feature:month:${userId}:${YYYY-MM}\`, 35*24*60*60)` from ../lib/redis; if `used !== null && used > LIMIT` emit gate and stop; cacheIncr null => fail-open (don't block).
+- PER-PLAN SYNC GATE: `requireFeature('<key>', 'json'|'sse')` from apps/server/src/middleware/check-feature.ts; valid keys are in FEATURE_GATES there (e.g. rag_search, weak_signals, export_plan_pdf — all 'pro').
+- ROUTES: server routers mounted in apps/server/src/route-config.ts (import + entry with auth 'public'|'authenticated'|'admin'); web pages in apps/web/src/route-config.ts (guard 'public'|'protected', lazy import). A router mounted 'public' can still protect sub-paths with an internal guard (see /api/contact and /api/affiliazione: `router.use('/leads', requireAdminAccess)`).
+- SSE STREAMING (frontend): mirror apps/web/src/pages/skills-gap.tsx (apiFetch + res.body.getReader + decode + split on '\n' + parse `data: ` lines). The interview gate UI to copy is in apps/web/src/pages/colloquio.tsx.
+- SECURITY: userId ALWAYS from req.user.id (never the body) — prevents IDOR. The test-sessions assign-user endpoint is the reference (WHERE userId IS NULL OR userId = req.user.id). No secrets committed. Only the user's OWN data may go to the LLM (no third-party PII).
+- DB: Drizzle schema in packages/db/src/schema/<name>.ts, re-export from index.ts. `pnpm db:generate` creates the migration (here run via the node binary if pnpm missing). Tests use a REAL DB (no mock) per DB_RULES.md — needs DATABASE_URL/Postgres+pgvector; if absent, write the test and note it must run on staging. The Drizzle journal is at idx 34 while there are 44 SQL files (known drift, see memoria.md §8) — do NOT rely on db:migrate recreating a full schema until reconciled.
+- Stripe is in TEST mode; do not add live keys. Stripe checkout/webhook already exist in apps/server/src/routes/subscription.ts.
+- jobApplicationsTable ALREADY EXISTS in packages/db/src/schema/users.ts (table 'job_applications'), status enum = saved|applied|interviewing|offer|rejected|withdrawn (NOT wishlist/interview). Cols: company, role, url, status, notes, salary, location, jobPostingText, coverLetter, appliedAt, updatedAt, reminderSentAt, notesLog. Use it for applications CRUD/UI/cover-letter — do NOT create a new table. ALWAYS grep the schema before adding a table (several tables live inside users.ts, not their own file).
+- MIGRATIONS: project uses hand-written RAW idempotent SQL (CREATE/ALTER ... IF NOT EXISTS) named NNNN_name.sql in packages/db/drizzle/ (see 0035–0044). Do NOT run drizzle-kit generate — the journal is stale (idx 34) and generate would entangle the drift.
+- Branch: work on ralph/launch-completion (descends from release/launch-candidate which holds Phase 0/1). Do NOT branch from main — it lacks the prerequisite work.
+---
+
+## 2026-06-17 - US-001
+- Implemented the monthly freemium gate on POST /api/skills-gap/analyze (1 free analysis/month, then Pro).
+- Files: apps/server/src/routes/skills-gap.ts — added imports (getEffectivePlan/planMeets from ../middleware/check-feature, cacheIncr from ../lib/redis), constants FREE_MONTHLY_SKILLSGAP + SKILLSGAP_QUOTA_TTL_SECONDS, and a gate after the SSE headers that emits {type:'gate', feature:'rag_search', requiredPlan:'pro', ...} and ends the stream for free users over the limit (fail-open if Redis null).
+- **Learnings for future iterations:**
+  - Emit the gate AFTER res.setHeader SSE headers (already set) and BEFORE getLLM()/llm.chat.
+  - skills-gap.ts has NO unit test file — gate logic mirrors interview.ts. Verified via typecheck + lint only.
+  - US-002 (FE) must detect type==='gate' in the SSE reader loop in apps/web/src/pages/skills-gap.tsx and render an upgrade card (mirror the gate block in apps/web/src/pages/colloquio.tsx).
+---
+
+## 2026-06-17 - US-002
+- skills-gap.tsx now handles the Pro gate: a 'gate' SSE event sets step='gate' and renders an upgrade card (Lock icon + message + Link to /premium).
+- Files: apps/web/src/pages/skills-gap.tsx — added 'gate' to Step union, gateMsg state, Lock/Sparkles imports, gate detection in the reader loop (stops streaming + clears the progress interval), and a gate render branch before the Results block.
+- **Learnings for future iterations:**
+  - When returning early from the SSE reader loop, clear the progress interval and setIsStreaming(false) inline — the trailing cleanup after the try/catch is skipped on early return.
+  - The gate UI pattern (Lock + message + Link /premium) is now used in colloquio.tsx, mercato.tsx, and skills-gap.tsx — reuse it for cover-letter (US-007) too.
+  - Browser verification still pending (no dev-browser tools in this env) — manual check recommended.
+---
+
+## 2026-06-17 - US-003 / US-004 (applications backend)
+- US-003: job_applications table already existed in users.ts; added jobPostingText + coverLetter columns + raw idempotent migration 0044.
+- US-004: replaced the stub apps/server/src/routes/applications.ts with real owner-scoped CRUD on jobApplicationsTable. serialize() maps DB 'interviewing' -> FE 'interview'; writes map back. Server typecheck green.
+- **Learnings for future iterations:**
+  - The FE applications.tsx kanban + features/applications/* (ApplicationCard, StatsView, CoverLetterDialog, applicationTypes) ALREADY EXIST and call GET /api/applications/:userId, POST /api/applications, PATCH/DELETE /:id. So US-005 is essentially done by making the backend real.
+  - FE AppStatus is saved|applied|interview|offer|rejected (5) — map to/from DB enum which also has 'interviewing' and 'withdrawn'. ALWAYS check applicationTypes.ts for the FE contract.
+  - CoverLetterDialog (US-007 UI) already exists and POSTs to /api/cover-letter/generate with { company, role, jobDescription }, expecting { text } or { error }. US-006 must create that exact route.
+  - DB-REAL tests: no DATABASE_URL safe to use here (Neon = prod), and no existing supertest+real-DB pattern. Integration tests are deferred to a staging run (US-011/012/013). Do NOT mock the DB to fake a pass.
+---
+
+## 2026-06-17 - US-009 (roadmap) + US-014 (deploy) + test status
+- US-014: docs/DEPLOY.md written (Railway vs Vercel, legal/Stripe-KYC, schema/journal reconciliation on staging, prod env, Stripe test->live, go-live, cost table).
+- US-009: replaced the roadmap.ts hardcoded stub with a real streaming SSE generate matching the FE contract (data:{content}/{done}); prompts gemini-flash-1.5 for the exact RoadmapData JSON from the sector + user CV. Server typecheck + lint green.
+- US-008 DESCOPED (FE regenerates on demand, no saved-roadmap load → table is write-only). US-010 already built (FE streams generate). US-011/012/013 DEFERRED to staging (no safe DATABASE_URL).
+- **Learnings for future iterations:**
+  - roadmap.tsx expects a DEEP RoadmapData JSON (paths[].phases[].resources[], salaryProgression, alternativeFormativePaths, fitScore, comparison, topRoles, keyTip). The generate streams it; the FE extracts the JSON via fullText.match(/\\{[\\s\\S]*\\}/). The LLM-output shape is the one part NOT verifiable without a live LLM — smoke-test it on staging.
+  - Pattern for the remaining stub career routes (jobs.ts etc.): check for an existing FE + table first; most FE is already built and only the backend is a stub.
+  - FINAL STATE this session: US-001..007, US-014 done (8). US-009 code done (LLM-shape live-smoke pending). US-005/010 functional via real backends. US-008 descoped. US-011/012/013 deferred to staging. Roadmap PRD ready for the Ralph loop (./scripts/ralph/ralph.sh --tool claude) to pick up the deferred items where a CLI + staging DB exist.
+---
+
+## 2026-06-17 - DB-real integration tests (US-004, US-013) RUN GREEN
+- The user provided an EMPTY testing Neon DB. Built the full schema on it via `drizzle-kit push` (run directly with inline testing DATABASE_URL/_MIGRATOR, NOT via push.mjs which loads the repo .env=prod; pgvector enabled first; non-destructive on empty DB → no auto-confirm). 90 tables created.
+- US-004: applications.integration.test.ts → 2 tests GREEN against the testing DB (CRUD + owner-scoping + interview<->interviewing mapping).
+- US-013: market-intelligence.integration.test.ts → 3 tests GREEN (/overview radar free; /signals 402 free vs 200 Pro via a real subscriptions row).
+- **Learnings for future iterations / running DB-real tests:**
+  - Pattern: `vi.mock("../lib/jwt-secret", () => ({ JWT_SECRET: "test-secret" }))`; sign a NorthStar JWT with payload {userId,...}; requireAuth happy-path reads req.user.id with NO DB query. Seed real users (only name+email required) for FK; mount the router on a bare express app + supertest. Guard the suite with `describe.skipIf(!process.env.DATABASE_URL)` so it skips on no-DB runs and executes in CI `quality` / staging.
+  - SAFETY: run with `set -a; . ./.env.ralph-test; set +a` (gitignored testing URL) BEFORE vitest. The repo .env points to a DIFFERENT (prod) host; dotenv override:false keeps the pre-set testing URL. ALWAYS verify the resolved host before trusting a DB-real run.
+  - getEffectivePlan/cached() is fail-open without Redis (recomputes from DB) → plan gating is testable DB-only (US-013). The cacheIncr freemium quotas (interview/skills-gap/cover-letter) need Redis to actually gate (US-011), and LLM features (interview/cv/roadmap/cover-letter) need an AI provider (USE_MOCK_AI) — neither was available here.
+---

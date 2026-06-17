@@ -7,12 +7,13 @@
  * senza questo flag le ProtectedRoute resterebbero bloccate su uno spinner
  * infinito invece di mandare l'utente al /sign-in.
  */
-const env = import.meta.env as unknown as Record<string, unknown>;
+// Injected at build time by vite.config.ts `define` (sourced from the repo-root
+// VITE_CLERK_PUBLISHABLE_KEY or the legacy NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY).
+// Read the literal `import.meta.env.VITE_CLERK_PUBLISHABLE_KEY` expression so the
+// define replacement applies — same pattern as VITE_SENTRY_RELEASE in sentry.ts.
+const rawKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
-export const clerkPublishableKey =
-  typeof env.VITE_CLERK_PUBLISHABLE_KEY === "string"
-    ? env.VITE_CLERK_PUBLISHABLE_KEY
-    : "";
+export const clerkPublishableKey = typeof rawKey === "string" ? rawKey : "";
 
 /** Clerk è utilizzabile solo con una publishable key valida (`pk_...`). */
 export function isClerkConfigured(): boolean {

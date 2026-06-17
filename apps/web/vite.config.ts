@@ -1,4 +1,4 @@
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
@@ -7,6 +7,21 @@ import { VitePWA } from "vite-plugin-pwa";
 import { resolveWebPort } from "./src/lib/dev-port";
 
 const port = resolveWebPort(process.env);
+
+// Clerk publishable key for the client. The monorepo keeps env in the repo-root
+// .env, but the web app's Vite root is apps/web, so it would never read it.
+// Load every var from the repo root (loadEnv with no prefix filter) for local
+// dev, fall back to process.env for Vercel, and accept BOTH the canonical VITE_
+// name and the legacy NEXT_PUBLIC_ name. Injected into the client via `define`
+// below (only this single value — never spread the whole env object).
+const repoRoot = path.resolve(import.meta.dirname, "..", "..");
+const rootEnv = loadEnv(process.env.NODE_ENV ?? "development", repoRoot, "");
+const clerkPublishableKey =
+  process.env.VITE_CLERK_PUBLISHABLE_KEY ||
+  rootEnv.VITE_CLERK_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  rootEnv.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+  "";
 
 const basePath = process.env.BASE_PATH || "/";
 const commitSha = process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA;
@@ -37,6 +52,8 @@ export default defineConfig(async ({ command }) => ({
     "import.meta.env.VITE_COMMIT_SHA": JSON.stringify(
       process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GITHUB_SHA ?? "",
     ),
+    "import.meta.env.VITE_CLERK_PUBLISHABLE_KEY":
+      JSON.stringify(clerkPublishableKey),
   },
   plugins: [
     react(),

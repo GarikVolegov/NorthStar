@@ -1,218 +1,55 @@
 {
   "project": "NorthStar",
-  "branchName": "ralph/launch-completion",
-  "description": "Completamento monetizzazione + lancio NorthStar. Le Fasi 0 (revenue switch) e 1 (Interview Prep freemium, CV Builder+PDF, Market Intelligence) sono GIA' fatte e committate su release/launch-candidate (questo branch ne discende). Questo PRD copre il lavoro residuo: estendere il freemium ad altri gioielli, rendere reali i career tools stub (applications, roadmap) con persistenza DB, aggiungere il cover-letter generator, scrivere i test d'integrazione DB-reale per gli endpoint di Fase 1, e preparare il deploy. VINCOLI NON NEGOZIABILI (da memoria.md / *_RULES.md): (a) gate prima di OGNI commit — typecheck + lint + test (in questo ambiente pnpm non e' nel PATH: usa `export PATH=\"$HOME/.local/bin:$PATH\"` poi i binari diretti, es. typecheck server `cd apps/server && node --max-old-space-size=4096 ../../node_modules/typescript/bin/tsc --noEmit`, lint `./node_modules/.bin/eslint <files> --max-warnings=0`, test `apps/server/node_modules/.bin/vitest run <file> --configLoader runner --root apps/server`); (b) MAI committare segreti/API key; (c) MAI inviare PII al LLM in chiaro (solo dati dell'utente stesso sono ok); (d) test d'integrazione su DB REALE, NIENTE mock del DB (richiede DATABASE_URL/Postgres+pgvector; se assente nell'ambiente, scrivi comunque il test ma annota in progress.txt che va eseguito su staging); (e) userId SEMPRE da req.user.id (mai dal body) per evitare IDOR; (f) Stripe in TEST mode, niente chiavi live; (g) commit atomici, messaggio `feat: [US-ID] - [Title]`. PATTERN DI RIFERIMENTO gia' nel codice: il gating freemium mensile e' in apps/server/src/routes/interview.ts (getEffectivePlan + planMeets + cacheIncr Redis con chiave `feature:month:userId:YYYY-MM` + evento SSE `gate`); il gate per-piano sincrono e' requireFeature('<key>') in apps/server/src/middleware/check-feature.ts; le pagine AI streaming seguono apps/web/src/pages/skills-gap.tsx (apiFetch + reader SSE). Le route si montano in apps/server/src/route-config.ts; le pagine web in apps/web/src/route-config.ts. Prima di toccare un'area leggi il relativo *_RULES.md (API_RULES.md, DB_RULES.md, FRONTEND_RULES.md, AI_RULES.md).",
+  "branchName": "ralph/stabilize-current-line",
+  "description": "Sub-progetto A — STABILIZZARE la linea attuale. Contesto (diagnosi gia' fatta da Opus 4.8): il sito di produzione ainorthstar.vercel.app e' uno snapshot del 2026-06-02 del branch feature/fase2-cervello-runtime (commit 9c9a450), pubblicato a mano via CLI; da allora non si aggiorna perche' gli ultimi deploy GitHub falliscono. La linea di lavoro release/launch-candidate (62 commit avanti di main, contiene Stripe/monetizzazione/CI) ha due REGRESSIONI utente e una pipeline di deploy rotta. Questo PRD le ripara, SENZA toccare il lavoro recente. Il recupero delle pagine perse (routines, bussola-in-dashboard, diario, mood, chi-sono) e' un sub-progetto SEPARATO (B/C) — NON fa parte di questo run. BRANCH: lavora su ralph/stabilize-current-line, GIA' creato da release/launch-candidate. NON ricreare da main (perderesti tutto il lavoro recente). VINCOLI NON NEGOZIABILI (memoria.md / *_RULES.md): (a) gate prima di OGNI commit — typecheck + lint + test mirati (pnpm NON e' nel PATH: `export PATH=\"$HOME/.local/bin:$PATH\"` poi binari diretti, vedi progress.txt Codebase Patterns); (b) MAI committare segreti/API key; (c) MAI PII di terzi al LLM; (d) test su DB REALE, niente mock (serve DATABASE_URL/Postgres+pgvector; se assente scrivi il test e annota che va in CI/staging); (e) userId SEMPRE da req.user.id; (f) commit atomici `feat: [US-ID] - [Title]`; (g) leggi il *_RULES.md dell'area prima di toccarla (FRONTEND_RULES.md per le rotte web, API_RULES.md per news.ts). Prima di ogni iterazione leggi memoria.md e la sezione Codebase Patterns in progress.txt.",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Freemium quota for skills-gap (backend)",
-      "description": "As a free user, I get 1 skills-gap analysis per month, then a Pro gate, so the gem drives upgrades while staying tastable.",
+      "title": "Esponi la chiave Clerk al client Vite (sblocca il login)",
+      "description": "As a user, voglio poter accedere: il login era impossibile perche' l'auth frontend e' Clerk-only e la publishable key non arrivava mai al bundle Vite (salvata come NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY nel .env di root, ma Vite espone solo VITE_* e legge il .env in apps/web). Senza chiave isClerkConfigured()=false e /sign-in mostra un <SignIn> Clerk non inizializzato.",
       "acceptanceCriteria": [
-        "In apps/server/src/routes/skills-gap.ts, before running the LLM analysis, check plan via getEffectivePlan + planMeets('pro') (import from ../middleware/check-feature)",
-        "For non-Pro users, increment a monthly Redis counter via cacheIncr (key `skillsgap:month:${userId}:${YYYY-MM}`, TTL 35 days) mirroring the pattern in apps/server/src/routes/interview.ts",
-        "When a free user exceeds INTERVIEW-style limit (env SKILLSGAP_FREE_MONTHLY_LIMIT default 1), emit an SSE event `{ type: 'gate', feature: 'rag_search', requiredPlan: 'pro', currentPlan, message }` and end the stream WITHOUT calling the LLM",
-        "cacheIncr returning null (Redis down) must NOT block (fail-open), same as interview.ts",
-        "Pro/Team users are unlimited",
+        "vite.config.ts carica le var dal .env di root con loadEnv(...,'') e inietta import.meta.env.VITE_CLERK_PUBLISHABLE_KEY via define, accettando sia VITE_CLERK_PUBLISHABLE_KEY sia il nome legacy NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY (fallback su process.env per Vercel)",
+        "clerk-config.ts legge import.meta.env.VITE_CLERK_PUBLISHABLE_KEY come espressione letterale (pattern di sentry.ts) cosi' il define si applica",
+        ".env.example documenta VITE_CLERK_PUBLISHABLE_KEY (+ nota che va impostata anche su Vercel)",
+        "Il build del web inietta davvero la chiave nel bundle (verificato: pk_test_ presente in dist/public/assets)",
         "Typecheck passes",
-        "Tests pass"
+        "Lint passes (clerk-config.ts in scope; vite.config.ts fuori scope gate)"
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Done by Opus 4.8 (acting as Ralph executor). Monthly freemium gate via Redis cacheIncr + SSE gate event in skills-gap.ts. Verified typecheck+lint green. No unit test file exists for skills-gap (mirrors interview.ts which also lacks one)."
+      "notes": "FATTO. La premessa iniziale (rotte /sign-in orfane) era SBAGLIATA: App.tsx:145-172 gestisce gia' /sign-in e /sign-up in uno Switch wouter prima di delegare al route-config. La vera causa era la chiave Clerk non esposta a Vite. File: apps/web/vite.config.ts (loadEnv root + define), apps/web/src/lib/clerk-config.ts (lettura diretta), .env.example (doc). Verifica: typecheck web OK, lint clerk-config OK, build web OK con pk_test_ nel bundle. AZIONE FOUNDER: imposta VITE_CLERK_PUBLISHABLE_KEY (o NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) anche nelle Environment Variables di Vercel, altrimenti il login resta rotto in produzione. Scelta architetturale confermata dal founder: si resta su Clerk (non si ripristina il login JWT)."
     },
     {
       "id": "US-002",
-      "title": "Skills-gap UI handles the Pro gate event",
-      "description": "As a free user who hit the monthly limit, I see an upgrade prompt instead of a broken/empty analysis.",
+      "title": "Diagnostica e ripara la pagina News vuota",
+      "description": "As a user, voglio che la pagina /news mostri articoli: oggi e' vuota/non funziona. Causa probabile (da verificare): GET /api/news legge dalla tabella DB news_articles (apps/server/src/routes/news.ts e' DB-backed, nessun fetch live nel path GET) e la tabella e' vuota su un DB locale/fresco -> pagina bianca; in produzione la tabella e' popolata.",
       "acceptanceCriteria": [
-        "In apps/web/src/pages/skills-gap.tsx, while reading the SSE stream, detect an event with type === 'gate'",
-        "On a gate event, stop the analysis and render a clear upgrade card with the gate message and a Link to /premium (mirror the gate UI in apps/web/src/pages/colloquio.tsx)",
-        "Normal (non-gated) analysis behaviour is unchanged for Pro users and for a free user's first monthly use",
+        "PRIMA di qualunque fix: riproduci /news con il DB di sviluppo e annota la ROOT CAUSE in progress.txt (systematic-debugging: nessun fix senza causa radice)",
+        "Verifica l'ipotesi: controlla se news_articles ha righe e se esiste un job di ingestion (grep apps/server/src/jobs per news) e se richiede feed/LLM/API key non impostati in locale",
+        "Rendi /news mai-vuota: se la causa e' la tabella vuota, OPPURE popola/seed news_articles eseguendo l'ingestion, OPPURE aggiungi un fallback statico in news.ts quando non ci sono righe (ritorna un set d'esempio con source:'static') cosi' la UI rende sempre contenuto",
+        "GET /api/news?category=technology&limit=12 ritorna un array news non vuoto e /news rende le card senza errori runtime",
         "Typecheck passes",
-        "Verify in browser using dev-browser skill (or note manual verification needed if no browser tools)"
+        "Tests pass",
+        "Verify in browser using dev-browser skill"
       ],
       "priority": 2,
-      "passes": true,
-      "notes": "Done by Opus 4.8. skills-gap.tsx now detects type:'gate' in the SSE reader loop and renders an upgrade card (Lock + message + Link /premium), mirroring colloquio.tsx. Verified web typecheck + lint green."
+      "passes": false,
+      "notes": "news.ts (306 righe) seleziona da newsArticlesTable filtrando per PUBLIC_NEWS_SOURCES, paginazione keyset, cache Redis 60s. Esistono anche routes/news-subs.ts e pages/news-detail.tsx; entrambi i router sono montati 'public' in apps/server/src/route-config.ts. Il campo source:'live'|'static' sul frontend e' il source dell'articolo, NON un flag live-vs-fallback. Se popolare la tabella richiede infra non disponibile in locale, implementa il path di fallback statico e annota che l'ingestion reale gira su staging/prod. Leggi API_RULES.md prima di toccare news.ts."
     },
     {
       "id": "US-003",
-      "title": "Add job_applications table (schema + migration)",
-      "description": "As a developer, I need to persist the user's job applications so the tracker and cover-letter features are real.",
+      "title": "Togli il quality gate dal build di produzione Vercel",
+      "description": "As the founder, voglio che i deploy Vercel vadano a buon fine cosi' il lavoro recente torna online: oggi il buildCommand nel vercel.json di root esegue l'INTERO quality gate (lint + typecheck + 3 suite di coverage + 9 audit) prima di buildare, e il fallimento di un qualsiasi step aborta il deploy (gli ultimi 4 deploy sono in ERROR; la produzione e' congelata a un build del 2026-06-02).",
       "acceptanceCriteria": [
-        "Add packages/db/src/schema/jobApplications.ts: table job_applications with id serial PK, userId integer (FK users, onDelete cascade), company text notNull, role text notNull, status text enum ['wishlist','applied','interview','offer','rejected'] default 'wishlist', jobUrl text, jobPostingText text, coverLetter text, notes text, createdAt/updatedAt timestamptz defaultNow",
-        "Add index on userId and export the table from packages/db/src/schema/index.ts",
-        "Generate the Drizzle migration (db:generate) so the SQL exists under packages/db/drizzle/",
+        "Modifica il buildCommand nel vercel.json DI ROOT togliendo SOLO il prefisso `pnpm run quality:required && `, cosi' diventa `pnpm --filter @northstar/server exec node build.mjs && pnpm --filter @northstar/web run build` (MANTIENI sia il build del server sia quello del web — il deploy Vercel serve l'API come serverless function via la rewrite /api)",
+        "NON modificare outputDirectory, rewrites o headers (CSP) nel vercel.json",
+        "In locale, sia `pnpm --filter @northstar/server exec node build.mjs` sia `pnpm --filter @northstar/web run build` vanno a buon fine; se uno dei due build fallisce di per se', e' un vero blocco al deploy: risolvilo e annotalo",
+        "Aggiungi una nota/commento che il quality gate completo resta applicato in CI (.github/workflows/ci.yml), non nel build Vercel",
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": true,
-      "notes": "ADJUSTED: job_applications table ALREADY EXISTS in packages/db/src/schema/users.ts (status enum: saved|applied|interviewing|offer|rejected|withdrawn; cols include company, role, url, salary, location, notes, notesLog). Did NOT create a duplicate. Added the 2 missing cols jobPostingText + coverLetter (needed for US-006) + raw idempotent migration 0044_job_applications.sql. Verified db+server typecheck green. US-004/005 must use the existing enum, not wishlist/interview."
-    },
-    {
-      "id": "US-004",
-      "title": "Real CRUD for applications (backend)",
-      "description": "As a user, I want my job applications saved in the database instead of the current stub that returns constants.",
-      "acceptanceCriteria": [
-        "Replace the stub apps/server/src/routes/applications.ts with real CRUD backed by jobApplicationsTable: GET / (list current user's applications, newest first), POST / (create), PATCH /:id (update fields incl. status), DELETE /:id",
-        "userId ALWAYS from req.user.id; every query scoped to the owner (no IDOR); requireAuth on all routes",
-        "Validate input (zod or manual, matching the file's style); return 404 when the row is not owned by the user",
-        "Add a DB-REAL integration test (no DB mock) covering create -> list -> update -> delete and owner-scoping",
-        "Typecheck passes",
-        "Tests pass"
-      ],
-      "priority": 4,
-      "passes": true,
-      "notes": "Real CRUD on jobApplicationsTable (GET /:userId owner-scoped via req.user.id, POST, PATCH, DELETE) with FE<->DB status mapping (interview<->interviewing). DB-REAL integration test added (applications.integration.test.ts, skipIf(!DATABASE_URL)) and VERIFIED GREEN (2 tests) against the user-provided testing DB (host ep-falling-tooth, NOT prod — confirmed dotenv override:false keeps the testing URL). Covers create/list/update/delete + owner-scoping."
-    },
-    {
-      "id": "US-005",
-      "title": "Applications tracker UI (kanban)",
-      "description": "As a user, I want a board to add, move, edit and delete my job applications.",
-      "acceptanceCriteria": [
-        "Wire apps/web/src/pages/applications.tsx to the real CRUD via apiFetch/React Query (API endpoints via API_ENDPOINTS or ${BASE}api/applications, following the codebase pattern)",
-        "Show applications grouped by status (wishlist/applied/interview/offer/rejected); allow add, edit (incl. change status), and delete with confirmation",
-        "Empty state when the user has no applications",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill (or note manual verification needed if no browser tools)"
-      ],
-      "priority": 5,
-      "passes": true,
-      "notes": "Already built: apps/web/src/pages/applications.tsx is a full kanban (drag-drop status, add/edit/delete dialog, empty state, stats view) + features/applications/* . It was non-functional only because the backend was a stub. Now functional via the real US-004 CRUD. No FE change needed. Browser verification pending (no browser tools here)."
-    },
-    {
-      "id": "US-006",
-      "title": "AI cover-letter generator (backend, Pro freemium)",
-      "description": "As a user, I want an AI cover letter tailored from my CV and a job posting, saved on the application.",
-      "acceptanceCriteria": [
-        "Add POST /api/applications/:id/cover-letter (requireAuth): generate a cover letter via getLLM (see skills-gap.ts) from the user's own CV (userProfileSettings.cvText/cvJson) + the application's jobPostingText/company/role; persist into job_applications.coverLetter and return it",
-        "Only the user's OWN data goes to the LLM (no third-party PII); the application must belong to req.user.id (404 otherwise)",
-        "Freemium: free users get COVERLETTER_FREE_MONTHLY_LIMIT (default 1) per month via cacheIncr (key `coverletter:month:${userId}:${YYYY-MM}`); over the limit return 402 { code:'PLAN_REQUIRED', feature:'export_plan_pdf'/appropriate, requiredPlan:'pro' } (or requireFeature); Pro/Team unlimited; fail-open if Redis down",
-        "Add a DB-REAL integration test (no DB mock) for ownership + persistence + the free-limit gate",
-        "Typecheck passes",
-        "Tests pass"
-      ],
-      "priority": 6,
-      "passes": true,
-      "notes": "Created POST /api/cover-letter/generate (the exact endpoint the pre-existing CoverLetterDialog calls) + mounted authenticated. Generates from the user's OWN CV (cvText) + company/role/jobDescription via getLLM (gemini-flash-1.5); freemium 1/month via Redis cacheIncr returning a soft {error} gate the dialog already surfaces. No appId/persistence (matches the dialog contract). Typecheck + lint green. DB-real test deferred to staging."
-    },
-    {
-      "id": "US-007",
-      "title": "Cover-letter UI in application detail",
-      "description": "As a user, I want a button to generate and view the AI cover letter for an application.",
-      "acceptanceCriteria": [
-        "In the applications UI, add a 'Genera cover letter AI' action on an application (where jobPostingText can be entered/edited)",
-        "Show the generated cover letter; allow copy; persist via the backend",
-        "Handle the 402/gate response by showing an upgrade prompt with a Link to /premium",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill (or note manual verification needed if no browser tools)"
-      ],
-      "priority": 7,
-      "passes": true,
-      "notes": "CoverLetterDialog already existed and surfaces the backend's {error}. Enhanced it: when the error is the Pro gate (contains 'Pro'), it now renders a 'Passa a Pro' Link to /premium instead of a plain error. Web typecheck + lint green."
-    },
-    {
-      "id": "US-008",
-      "title": "Add user_roadmaps table (schema + migration)",
-      "description": "As a developer, I need to persist generated roadmaps so the roadmap tool is real instead of returning a hardcoded example.",
-      "acceptanceCriteria": [
-        "Add packages/db/src/schema/userRoadmaps.ts: table user_roadmaps with id serial PK, userId integer (FK users, cascade), sectorId integer (FK sectors, set null), title text notNull, milestones jsonb $type array of { id, title, description, done } default [], createdAt/updatedAt timestamptz",
-        "Index on (userId, sectorId); export from packages/db/src/schema/index.ts",
-        "Generate the Drizzle migration so SQL exists under packages/db/drizzle/",
-        "Typecheck passes"
-      ],
-      "priority": 8,
       "passes": false,
-      "notes": "DESCOPED (honest): the FE roadmap.tsx regenerates on demand via SSE and does NOT load a saved roadmap, so a user_roadmaps table would be write-only / low-value and add surface. Persistence deferred until a 'my saved roadmaps' FE feature is actually desired. US-009 delivers the real generation without it."
-    },
-    {
-      "id": "US-009",
-      "title": "Real roadmap generation + persistence (backend)",
-      "description": "As a user, I want a real AI roadmap for a sector that is saved, instead of the current hardcoded stub.",
-      "acceptanceCriteria": [
-        "Replace the stub apps/server/src/routes/roadmap.ts: POST /:id/generate (id = sectorId) builds a roadmap via getLLM from the sector (real name + skills) and the user profile, persists to user_roadmaps, and returns it; GET /:id returns the persisted roadmap for the user+sector; PATCH /:id/milestone/:milestoneId toggles done",
-        "userId from req.user.id; queries owner-scoped; requireAuth",
-        "Add a DB-REAL integration test (no DB mock) for generate -> get -> milestone toggle",
-        "Typecheck passes",
-        "Tests pass"
-      ],
-      "priority": 9,
-      "passes": true,
-      "notes": "Replaced the hardcoded 'Roadmap di esempio' stub with a REAL streaming SSE generate that matches the FE contract (data:{content} chunks + data:{done}), prompting the LLM (gemini-flash-1.5) for the exact RoadmapData JSON from the real sector (name/skills/salary) + the user's CV. Server typecheck + lint green. CAVEAT: the deep RoadmapData JSON shape needs a LIVE smoke test (no LLM in this env) — same unverifiable-LLM caveat as interview/cover-letter/cv. Persistence + phase PATCH persistence descoped (see US-008)."
-    },
-    {
-      "id": "US-010",
-      "title": "Roadmap UI wired to real backend",
-      "description": "As a user, I want to generate my roadmap and tick off milestones, with everything saved.",
-      "acceptanceCriteria": [
-        "Wire apps/web/src/pages/roadmap.tsx to the real endpoints (generate, get, milestone toggle) via apiFetch/React Query",
-        "Show persisted milestones with completion toggles that save immediately; loading and empty states",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill (or note manual verification needed if no browser tools)"
-      ],
-      "priority": 10,
-      "passes": true,
-      "notes": "Already built: roadmap.tsx streams /generate (reader on \\n\\n, extracts the RoadmapData JSON) and renders paths/phases with a generate UI + progress + error handling, and PATCHes phase updates. Functional with the real US-009 backend. No FE change needed. Browser + live-LLM verification pending (no tools here)."
-    },
-    {
-      "id": "US-011",
-      "title": "DB-real integration test: interview freemium quota",
-      "description": "As a developer, I need a real-DB test that the interview free monthly limit gates correctly.",
-      "acceptanceCriteria": [
-        "Add a DB-REAL integration test (no DB mock) for POST /api/interview/:id/ask: a free user starting a 2nd interview in the same month receives an SSE event type 'gate'; a Pro user is not gated",
-        "Test sets up a real sector row and uses the real subscriptions/plan path (or a seeded Pro user); follow DB_RULES.md test conventions",
-        "If DATABASE_URL is unavailable in this environment, still write the test and note in progress.txt that it must run on staging",
-        "Typecheck passes",
-        "Tests pass (or documented as staging-only if no DB)"
-      ],
-      "priority": 11,
-      "passes": false,
-      "notes": "PARTIALLY UNBLOCKED: a testing DB is now available (schema pushed), but this gate ALSO needs Redis (the interview quota uses cacheIncr; without Redis it is fail-open and the gate never fires) AND the LLM (generateQuestions for the first question). Neither Redis nor an AI provider is available in this env (only the DB was provided). Run with a local Redis + USE_MOCK_AI on staging/CI. Pattern proven by the green US-013 gate test."
-    },
-    {
-      "id": "US-012",
-      "title": "DB-real integration test: CV generate + export gate",
-      "description": "As a developer, I need real-DB tests for the CV generation and the Pro-gated PDF export.",
-      "acceptanceCriteria": [
-        "Add a DB-REAL integration test (no DB mock) for the CV endpoints in apps/server/src/routes/cv.ts: generate persists cvJson with non-empty AI sections; the PDF/export endpoint returns 402/gate for a free user and succeeds for Pro (requireFeature('export_plan_pdf'))",
-        "Follow the freemium/gating assertions used elsewhere",
-        "If DATABASE_URL is unavailable, write the test and note staging-only in progress.txt",
-        "Typecheck passes",
-        "Tests pass (or documented staging-only)"
-      ],
-      "priority": 12,
-      "passes": false,
-      "notes": "PARTIALLY UNBLOCKED: testing DB available, but CV AI generation needs an LLM provider (not in this env). The PDF-export Pro gate (requireFeature) could be tested DB-only like US-013; deferred for now to keep scope, run on staging/CI with USE_MOCK_AI. Pattern proven by US-013."
-    },
-    {
-      "id": "US-013",
-      "title": "DB-real integration test: market endpoints",
-      "description": "As a developer, I need real-DB tests for the market intelligence endpoints and their gating.",
-      "acceptanceCriteria": [
-        "Add a DB-REAL integration test (no DB mock) for apps/server/src/routes/market-intelligence.ts: GET /api/market/overview returns sectors radar for any authed user; GET /api/market/signals returns 402/gate for free and data for Pro (requireFeature('weak_signals'))",
-        "Seed at least one sector row for the overview assertion",
-        "If DATABASE_URL is unavailable, write the test and note staging-only in progress.txt",
-        "Typecheck passes",
-        "Tests pass (or documented staging-only)"
-      ],
-      "priority": 13,
-      "passes": true,
-      "notes": "DONE + VERIFIED GREEN (3 tests) against the user-provided testing DB. market-intelligence.integration.test.ts (skipIf(!DATABASE_URL)) asserts /overview returns the seeded sector radar for a free user, and /signals is gated: 402 PLAN_REQUIRED for free, 200 with {signals,emergingSkills} for Pro (plan resolved from a real subscriptions row; getEffectivePlan is fail-open without Redis). Schema built on the empty testing DB via drizzle-kit push (90 tables, pgvector enabled)."
-    },
-    {
-      "id": "US-014",
-      "title": "Deploy readiness checklist (docs)",
-      "description": "As the founder, I need a precise, ordered checklist to take NorthStar live and accept the first payment.",
-      "acceptanceCriteria": [
-        "Create docs/DEPLOY.md: the shortest critical path to production referencing existing config (vercel.json, .github/workflows/production.yml, RUNBOOK.md)",
-        "Document required production env vars from .env.example (DATABASE_URL + migrator, JWT_SECRET >=32 chars, an AI provider key, STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET + the 4 STRIPE_*_PRICE_ID, ALLOWED_ORIGINS/APP_URL) and which are optional (REDIS_URL, SENTRY_DSN)",
-        "Document the Drizzle journal reconciliation step (44 SQL files vs journal idx 34) to run on a STAGING DB before the prod migration, and the Stripe test->live steps (KYC, create 4 Prices, register webhook)",
-        "Call out the single deploy target decision (Railway for the long-running server vs Vercel serverless) and the legal prerequisite (P.IVA in the privacy policy)",
-        "Typecheck passes"
-      ],
-      "priority": 14,
-      "passes": true,
-      "notes": "docs/DEPLOY.md created: architecture decision (Railway long-running vs Vercel serverless), legal/Stripe-KYC prerequisites, the §2 schema/journal reconciliation on staging (44 SQL vs idx 34), required prod env vars, Stripe test->live, go-live via production.yml + smoke test, infra cost table, top risk. Fully sourced from the repo config."
+      "notes": "Confermato dal log di build dell'ultimo deploy ERROR (commit 9958a96): lint + typecheck + i test ai/server/web (123 verdi) PASSANO su Vercel; il log e' troncato durante gli audit, quindi l'audit esatto che fallisce (file-size ratchet / dead-code knip / db-types / mojibake) non e' stato individuato — ma il fix architetturale (gate fuori dal build di deploy) risolve la fragilita' a prescindere. VERIFICA FINALE = il founder fa push e conferma che il deployment Vercel va READY (Ralph non puo' osservare Vercel). NOTA ulteriore per il founder (fuori da questo fix di codice): il dominio ainorthstar.vercel.app punta a un vecchio deploy CLI di feature/fase2-cervello-runtime con target:production; dopo questo fix va deciso lato Vercel se impostare il production branch su release/launch-candidate / promuovere i build GitHub a produzione."
     }
   ]
 }
