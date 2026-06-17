@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
@@ -35,10 +35,11 @@ const TOGGLE_TO_API: Record<BillingInterval, PlanOption["interval"]> = {
 export default function Premium() {
   const { t } = useTranslation();
   const { isLoggedIn } = useAuth();
-  const { isPro } = useSubscription();
+  const { isPro, isTeam } = useSubscription();
   const [, navigate] = useLocation();
   const [billing, setBilling] = useState<BillingInterval>("month");
   const [error, setError] = useState<string | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<"pro" | "team" | null>(null);
 
   const features = [
     { icon: <Brain className="w-5 h-5 text-primary" />, title: t("premium.features.wiki.title"), description: t("premium.features.wiki.desc") },
@@ -56,6 +57,14 @@ export default function Premium() {
     t("premium.includes.goals"),
   ];
 
+  const teamExtras = [
+    "Tutto del piano Pro, per ogni membro",
+    "Workspace condivisi e collaborazione",
+    "Mentor mode e dashboard del team",
+    "Export dei dati in CSV",
+    "Onboarding prioritario",
+  ];
+
   const { data: plansData, isLoading: plansLoading } = useQuery<PlansResponse>({
     queryKey: ["subscription-plans"],
     queryFn: () => getJson<PlansResponse>(API_ENDPOINTS.subscription.plans),
@@ -66,13 +75,18 @@ export default function Premium() {
   const proPlan = plansData?.plans.find(
     (p) => p.plan === "pro" && p.interval === apiInterval,
   );
-  const price = proPlan?.amountEur ?? (billing === "month" ? 9 : 90);
-  const perMonth = billing === "year" ? (price / 12).toFixed(2) : null;
+  const teamPlan = plansData?.plans.find(
+    (p) => p.plan === "team" && p.interval === apiInterval,
+  );
+  const proPrice = proPlan?.amountEur ?? (billing === "month" ? 9 : 90);
+  const teamPrice = teamPlan?.amountEur ?? (billing === "month" ? 29 : 290);
+  const proPerMonth = billing === "year" ? (proPrice / 12).toFixed(2) : null;
+  const teamPerMonth = billing === "year" ? (teamPrice / 12).toFixed(2) : null;
 
   const upgrade = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (plan: "pro" | "team") => {
       const res = await postJson<{ url: string }>(API_ENDPOINTS.subscription.upgrade, {
-        plan: "pro",
+        plan,
         interval: apiInterval,
       });
       return res.url;
@@ -83,15 +97,17 @@ export default function Premium() {
     onError: (e) => {
       setError(e instanceof Error ? e.message : "Errore nell'avvio del pagamento");
     },
+    onSettled: () => setPendingPlan(null),
   });
 
-  function handleUpgrade() {
+  function handleUpgrade(plan: "pro" | "team") {
     setError(null);
     if (!isLoggedIn) {
       navigate("/login?redirect=/premium");
       return;
     }
-    upgrade.mutate();
+    setPendingPlan(plan);
+    upgrade.mutate(plan);
   }
 
   return (
@@ -155,8 +171,10 @@ export default function Premium() {
           </div>
         </div>
 
-        {/* Pricing Card */}
-        <div className="max-w-sm mx-auto">
+        {/* Pricing Cards */}
+        <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto items-start">
+
+          {/* Pro */}
           <Card className="border-2 border-primary rounded-3xl shadow-xl overflow-hidden">
             <div className="bg-primary text-primary-foreground text-xs font-bold uppercase tracking-wider text-center py-2">
               {t("premium.mostPopular")}
@@ -170,14 +188,14 @@ export default function Premium() {
             <CardContent className="text-center pb-6">
               <div className="mb-6">
                 <div className="text-5xl font-bold text-foreground mb-1">
-                  €{price}
+                  €{proPrice}
                   <span className="text-lg font-normal text-muted-foreground">
                     {billing === "month" ? t("premium.perMonth") : t("premium.perYear")}
                   </span>
                 </div>
-                {perMonth && (
+                {proPerMonth && (
                   <p className="text-sm text-emerald-600 font-medium mt-1">
-                    {t("premium.savingsMsg", { price: perMonth })}
+                    {t("premium.savingsMsg", { price: proPerMonth })}
                   </p>
                 )}
               </div>
@@ -198,31 +216,86 @@ export default function Premium() {
                   <p className="text-xs text-emerald-700 mt-1">{t("premium.planAccess")}</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-2">
-                  <Button
-                    type="button"
-                    onClick={handleUpgrade}
-                    disabled={upgrade.isPending || plansLoading}
-                    className="w-full rounded-xl h-11"
-                  >
-                    {upgrade.isPending ? (
-                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t("premium.exploreNow")}</>
-                    ) : (
-                      <><Zap className="w-4 h-4 mr-2" /> {t("premium.planName")} · €{price}</>
-                    )}
-                  </Button>
-                  {error && <p className="text-xs text-destructive mt-1">{error}</p>}
-                </div>
+                <Button
+                  type="button"
+                  onClick={() => handleUpgrade("pro")}
+                  disabled={upgrade.isPending || plansLoading}
+                  className="w-full rounded-xl h-11"
+                >
+                  {pendingPlan === "pro" ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {t("premium.exploreNow")}</>
+                  ) : (
+                    <><Zap className="w-4 h-4 mr-2" /> {t("premium.planName")} · €{proPrice}</>
+                  )}
+                </Button>
               )}
             </CardContent>
-
-            <CardFooter className="pb-6 px-6 justify-center">
-              <p className="text-xs text-muted-foreground text-center">
-                {t("premium.guarantee")} · {t("premium.cancelAnytime")}
-              </p>
-            </CardFooter>
           </Card>
+
+          {/* Team */}
+          <Card className="border rounded-3xl shadow-sm overflow-hidden">
+            <div className="bg-muted text-muted-foreground text-xs font-bold uppercase tracking-wider text-center py-2">
+              Per team e mentori
+            </div>
+
+            <CardHeader className="text-center pb-4 pt-8">
+              <CardTitle className="text-2xl font-serif">Team</CardTitle>
+              <CardDescription>Collaborazione, mentoring e dashboard condivisa</CardDescription>
+            </CardHeader>
+
+            <CardContent className="text-center pb-6">
+              <div className="mb-6">
+                <div className="text-5xl font-bold text-foreground mb-1">
+                  €{teamPrice}
+                  <span className="text-lg font-normal text-muted-foreground">
+                    {billing === "month" ? t("premium.perMonth") : t("premium.perYear")}
+                  </span>
+                </div>
+                {teamPerMonth && (
+                  <p className="text-sm text-emerald-600 font-medium mt-1">
+                    {t("premium.savingsMsg", { price: teamPerMonth })}
+                  </p>
+                )}
+              </div>
+
+              <ul className="space-y-3 text-left mb-8">
+                {teamExtras.map((item) => (
+                  <li key={item} className="flex items-center gap-3 text-sm">
+                    <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+
+              {isTeam ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-center">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-emerald-800">{t("premium.joinedTitle")}</p>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleUpgrade("team")}
+                  disabled={upgrade.isPending || plansLoading}
+                  className="w-full rounded-xl h-11"
+                >
+                  {pendingPlan === "team" ? (
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Avvio…</>
+                  ) : (
+                    <><Network className="w-4 h-4 mr-2" /> Team · €{teamPrice}</>
+                  )}
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
         </div>
+
+        {error && <p className="text-xs text-destructive mt-4 text-center">{error}</p>}
+        <p className="text-xs text-muted-foreground text-center mt-6">
+          {t("premium.guarantee")} · {t("premium.cancelAnytime")}
+        </p>
 
         {/* Trust signals */}
         <div className="mt-16 grid md:grid-cols-3 gap-6 text-center">
