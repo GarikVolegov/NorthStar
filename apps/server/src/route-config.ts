@@ -172,7 +172,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/favorites", router: favoritesRouter, auth: "authenticated", description: "Favorites" },
   { path: "/api/nft-certificates", router: nftCertificatesRouter, auth: "authenticated", description: "NFT certificates" },
   { path: "/api/certifications", router: certificationsRouter, auth: "authenticated", description: "Certifications" },
-  { path: "/api/affiliazione", router: affiliazioneRouter, auth: "authenticated", description: "Programma affiliazione" },
+  { path: "/api/affiliazione", router: affiliazioneRouter, auth: "public", description: "Programma affiliazione (lead pubblico; /leads/* protetti nel router)" },
   { path: "/api/affiliate", router: affiliateRouter, auth: "authenticated", description: "Affiliate" },
   { path: "/api/openhuman", router: openhumanRouter, auth: "authenticated", description: "OpenHuman bridge" },
   { path: "/api/graphify", router: graphifyRouter, auth: "authenticated", description: "Graphify bridge" },

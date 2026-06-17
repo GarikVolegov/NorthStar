@@ -15,6 +15,61 @@ const router = Router();
 
 router.use("/leads", requireAdminAccess);
 
+// ── POST /lead — cattura lead B2B pubblica (form affiliazioni) ─────────────────
+// Pubblico: i prospect (scuole/università/agenzie/formazione) non sono loggati.
+// Il router è montato "public" in route-config; gli endpoint /leads/* restano
+// protetti dal guard interno requireAdminAccess. Il path "/lead" (singolare) non
+// matcha il prefisso "/leads", quindi non è soggetto al guard admin.
+router.post("/lead", async (req, res) => {
+  const body = asPlainRecord(getRequestBody(req));
+
+  const email = stringValue(body.email).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    res.status(400).json({ error: "Email non valida" });
+    return;
+  }
+
+  const institutionName = stringValue(body.institutionName);
+  const contactName = stringValue(body.contactName);
+  const partnerType = stringValue(body.partnerType) || "direct";
+  const phone = stringValue(body.phone);
+  const message = stringValue(body.message);
+  const estimatedUsers = stringValue(body.estimatedUsers);
+
+  // La tabella ha colonne limitate: preserviamo qui contatto/telefono/utenti/messaggio
+  // così l'admin (toAdminLead → message = notes) vede tutte le informazioni inviate.
+  const notes = [
+    message,
+    contactName ? `Contatto: ${contactName}` : "",
+    phone ? `Tel: ${phone}` : "",
+    estimatedUsers ? `Utenti stimati: ${estimatedUsers}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  try {
+    const [lead] = await db
+      .insert(affiliationLeadsTable)
+      .values({
+        email,
+        name: institutionName || contactName || null,
+        source: partnerType,
+        notes: notes || null,
+        status: "pending",
+      })
+      .returning({ id: affiliationLeadsTable.id });
+
+    req.log?.info?.(
+      { leadId: lead?.id, source: partnerType },
+      "affiliation lead captured",
+    );
+    res.status(201).json({ ok: true });
+  } catch (err) {
+    req.log?.error?.({ err }, "affiliation lead capture failed");
+    res.status(500).json({ error: "Impossibile inviare la richiesta. Riprova." });
+  }
+});
+
 const LEAD_STATUSES = [
   "pending",
   "contacted",
