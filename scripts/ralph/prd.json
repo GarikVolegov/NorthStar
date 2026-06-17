@@ -46,8 +46,8 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "ADJUSTED: job_applications table ALREADY EXISTS in packages/db/src/schema/users.ts (status enum: saved|applied|interviewing|offer|rejected|withdrawn; cols include company, role, url, salary, location, notes, notesLog). Did NOT create a duplicate. Added the 2 missing cols jobPostingText + coverLetter (needed for US-006) + raw idempotent migration 0044_job_applications.sql. Verified db+server typecheck green. US-004/005 must use the existing enum, not wishlist/interview."
     },
     {
       "id": "US-004",
