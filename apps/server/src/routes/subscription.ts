@@ -170,7 +170,7 @@ router.post("/upgrade", requireAuth, async (req, res) => {
       ...(existing?.stripeCustomerId
         ? { customer: existing.stripeCustomerId }
         : { customer_email: userEmail }),
-      success_url: `${baseUrl}/premium-success?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${baseUrl}/premium/successo?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/premium`,
       allow_promotion_codes: true,
     });
