@@ -102,6 +102,32 @@ Genera ESATTAMENTE 2 paths, ognuno con 3 phases (id phase progressivi 1,2,3). fi
       requestType: "roadmap",
     });
 
+    // Robustezza: valida il JSON PRIMA di segnalare done, così la FE non prova a
+    // parsare un output troncato/malformato (mostrerebbe un errore generico).
+    // La FE estrae il JSON con /\{[\s\S]*\}/: usiamo lo stesso criterio.
+    const match = full.match(/\{[\s\S]*\}/);
+    let valid = false;
+    if (match) {
+      try {
+        const parsed: unknown = JSON.parse(match[0]);
+        valid =
+          typeof parsed === "object" &&
+          parsed !== null &&
+          Array.isArray((parsed as { paths?: unknown }).paths) &&
+          (parsed as { paths: unknown[] }).paths.length > 0;
+      } catch {
+        valid = false;
+      }
+    }
+    if (!valid) {
+      req.log?.warn?.({ sectorId }, "roadmap generate: invalid LLM JSON");
+      res.write(
+        `data: ${JSON.stringify({ error: "La roadmap generata non è valida. Riprova tra poco." })}\n\n`,
+      );
+      res.end();
+      return;
+    }
+
     res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
     res.end();
   } catch (err) {
