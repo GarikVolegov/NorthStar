@@ -15,6 +15,7 @@
  */
 import { PageLoader } from "@/components/PageLoader";
 import { useAuth } from "@/contexts/AuthContext";
+import { isClerkConfigured } from "@/lib/clerk-config";
 import { useClerk, useUser } from "@clerk/react";
 import { type ComponentType } from "react";
 import { Redirect } from "wouter";
@@ -29,6 +30,13 @@ export function ProtectedRoute({ component: Component, ...rest }: ProtectedRoute
   const { isLoaded, isSignedIn } = useUser();
   const { signOut } = useClerk();
   const { authReady, isLoggedIn, authSyncFailed, authSyncError, logout } = useAuth();
+
+  // Senza Clerk configurato non esiste sessione possibile: manda subito al
+  // /sign-in invece di restare bloccati per sempre sullo spinner (Clerk non
+  // diventa mai isLoaded → authReady non si risolve).
+  if (!isClerkConfigured()) {
+    return <Redirect to="/sign-in" />;
+  }
 
   // Aspetta che sia Clerk che il sync locale siano pronti
   if (!isLoaded || !authReady) {
@@ -95,6 +103,12 @@ export function ProtectedRoute({ component: Component, ...rest }: ProtectedRoute
 
 export function PublicOnlyRoute({ component: Component, ...rest }: ProtectedRouteProps) {
   const { isLoaded, isSignedIn } = useUser();
+
+  // Senza Clerk configurato non c'è sessione: mostra la pagina pubblica
+  // (es. /sign-in) invece di restare sullo spinner in attesa di Clerk.
+  if (!isClerkConfigured()) {
+    return <Component {...rest} />;
+  }
 
   if (!isLoaded) {
     return (

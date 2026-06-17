@@ -1,30 +1,45 @@
 /**
- * subscription.ts — gestione piano abbonamento e Stripe webhook.
+ * subscription.ts — gestione piano abbonamento e Stripe checkout/webhook.
  *
- * GET  /api/subscription        — piano corrente dell'utente
- * POST /api/subscription/webhook — Stripe webhook (raw body)
+ * GET  /api/subscription              — piano corrente dell'utente (auth)
+ * GET  /api/subscription/plans        — catalogo piani + prezzi (pubblico)
+ * POST /api/subscription/upgrade      — crea Checkout Session Stripe (auth)
+ * POST /api/subscription/cancel       — disdetta a fine periodo (auth)
+ * GET  /api/subscription/billing-portal — Stripe Billing Portal (auth)
+ * POST /api/subscription/webhook      — Stripe webhook (raw body, no auth)
  *
  * SECURITY:
  *   - webhook verificato con stripe-signature
- *   - userId mai dal body del webhook — sempre da Stripe metadata
- *   - stripeCustomerId mai restituito al client
+ *   - userId mai dal body del webhook — sempre da Stripe metadata / JWT
+ *   - stripeCustomerId/stripeSubscriptionId mai restituiti al client
  */
 import { Router, type Request, type Response } from "express";
-import { eq, and, desc, isNull, sql } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { rootLogger } from "../middleware/logger";
-import {
-  affiliateAccountsTable,
-  affiliateCommissionsTable,
-  affiliateReferralsTable,
-  db,
-  subscriptionsTable,
-  usersTable,
-} from "@workspace/db";
+import { db, subscriptionsTable, usersTable } from "@workspace/db";
 import { invalidatePlanCache } from "../middleware/check-feature";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord, isOneOf } from "../lib/type-guards";
 import { logSecurityEvent } from "../lib/security-events";
+import {
+  getStripe,
+  getPlanCatalog,
+  priceIdFor,
+  planForPriceId,
+  PAID_PLANS,
+  BILLING_INTERVALS,
+  type PaidPlan,
+  type BillingInterval,
+} from "../lib/stripe";
+import {
+  type StripeLikeEvent,
+  applyAffiliateCommissionForInvoice,
+  normalizeStripeEvent,
+  readMetadata,
+  readSubscriptionId,
+  readSubscriptionPriceId,
+} from "../lib/stripe-webhook-helpers";
 
 const router = Router();
 const log = rootLogger.child({ module: "subscription" });
@@ -32,189 +47,22 @@ const log = rootLogger.child({ module: "subscription" });
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
 const SUBSCRIPTION_PLANS = ["pro", "team"] as const;
 
-interface StripeLikeEvent {
-  type: string;
-  data: { object: Record<string, unknown> };
-}
+/**
+ * Base URL del frontend per success/cancel/return URL.
+ * Ordine: APP_BASE_URL → primo di ALLOWED_ORIGINS → fallback locale.
+ * Un solo helper, niente localhost hardcoded sparsi.
+ */
+function webBaseUrl(): string {
+  const explicit = process.env.APP_BASE_URL;
+  if (explicit) return explicit.replace(/\/+$/, "");
 
-function affiliateCommissionPct(): number {
-  const value = Number(process.env.AFFILIATE_COMMISSION_PCT ?? "20");
-  return Number.isFinite(value) && value > 0 ? value : 20;
-}
+  const allowed = (process.env.ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
+  if (allowed[0]) return allowed[0].replace(/\/+$/, "");
 
-function affiliateReserveCents(): number {
-  const value = Number(process.env.AFFILIATE_RESERVE_CENTS ?? "900");
-  return Number.isInteger(value) && value > 0 ? value : 900;
-}
-
-function monthKey(date: Date): string {
-  return date.toISOString().slice(0, 7);
-}
-
-function readSubscriptionId(obj: Record<string, unknown>): string | null {
-  if (typeof obj.subscription === "string") return obj.subscription;
-  if (
-    obj.subscription &&
-    typeof obj.subscription === "object" &&
-    "id" in obj.subscription
-  ) {
-    const id = (obj.subscription as { id?: unknown }).id;
-    return typeof id === "string" ? id : null;
-  }
-  return null;
-}
-
-function normalizeStripeEvent(value: unknown): StripeLikeEvent | null {
-  const event = asPlainRecord(value);
-  const data = asPlainRecord(event.data);
-  const object = asPlainRecord(data.object);
-  return typeof event.type === "string" && Object.keys(object).length > 0
-    ? { type: event.type, data: { object } }
-    : null;
-}
-
-function readMetadata(value: unknown): Record<string, string> {
-  const metadata = asPlainRecord(value);
-  return Object.fromEntries(
-    Object.entries(metadata).filter(
-      (entry): entry is [string, string] => typeof entry[1] === "string",
-    ),
-  );
-}
-
-function readSubscriptionPriceId(
-  obj: Record<string, unknown>,
-): string | undefined {
-  const items = asPlainRecord(obj.items);
-  const data = Array.isArray(items.data) ? items.data : [];
-  const firstItem = asPlainRecord(data[0]);
-  const price = asPlainRecord(firstItem.price);
-  return typeof price.id === "string" ? price.id : undefined;
-}
-
-async function findUserIdByStripeSubscription(
-  subId: string,
-): Promise<number | null> {
-  const [subscription] = await db
-    .select({ userId: subscriptionsTable.userId })
-    .from(subscriptionsTable)
-    .where(eq(subscriptionsTable.stripeSubscriptionId, subId))
-    .limit(1);
-
-  if (subscription?.userId) return subscription.userId;
-
-  const [user] = await db
-    .select({ id: usersTable.id })
-    .from(usersTable)
-    .where(eq(usersTable.stripeSubscriptionId, subId))
-    .limit(1);
-
-  return user?.id ?? null;
-}
-
-async function applyAffiliateCommissionForInvoice(
-  obj: Record<string, unknown>,
-): Promise<void> {
-  const invoiceId = typeof obj.id === "string" ? obj.id : null;
-  const subId = readSubscriptionId(obj);
-  const amountPaid = Number(obj.amount_paid ?? 0);
-
-  if (
-    !invoiceId ||
-    !subId ||
-    !Number.isInteger(amountPaid) ||
-    amountPaid <= 0
-  ) {
-    log.debug(
-      { invoiceId, subId, amountPaid },
-      "[subscription] invoice.paid skipped for affiliate commission",
-    );
-    return;
-  }
-
-  const referredUserId = await findUserIdByStripeSubscription(subId);
-  if (!referredUserId) {
-    log.debug(
-      { invoiceId, subId },
-      "[subscription] invoice.paid has no local subscription user",
-    );
-    return;
-  }
-
-  const rate = affiliateCommissionPct();
-  const commissionCents = Math.round((amountPaid * rate) / 100);
-  if (commissionCents <= 0) return;
-
-  const paidAt =
-    typeof obj.created === "number" ? new Date(obj.created * 1000) : new Date();
-  const reserveCents = affiliateReserveCents();
-
-  await db.transaction(async (tx) => {
-    const [referral] = await tx
-      .select({
-        affiliateId: affiliateReferralsTable.affiliateId,
-        referredUserId: affiliateReferralsTable.referredUserId,
-        status: affiliateReferralsTable.status,
-      })
-      .from(affiliateReferralsTable)
-      .where(eq(affiliateReferralsTable.referredUserId, referredUserId))
-      .limit(1);
-
-    if (!referral || referral.status === "cancelled") return;
-
-    const [account] = await tx
-      .select({
-        id: affiliateAccountsTable.id,
-        status: affiliateAccountsTable.status,
-        lockedBalance: affiliateAccountsTable.lockedBalance,
-      })
-      .from(affiliateAccountsTable)
-      .where(eq(affiliateAccountsTable.id, referral.affiliateId))
-      .limit(1);
-
-    if (!account || account.status === "suspended") return;
-
-    const lockedRoom = Math.max(0, reserveCents - account.lockedBalance);
-    const lockedAdd = Math.min(commissionCents, lockedRoom);
-    const withdrawableAdd = commissionCents - lockedAdd;
-    const appliedTo = withdrawableAdd > 0 ? "withdrawable" : "locked";
-
-    const inserted = await tx
-      .insert(affiliateCommissionsTable)
-      .values({
-        affiliateId: account.id,
-        referredUserId: referral.referredUserId,
-        amountCents: commissionCents,
-        stripeInvoiceId: invoiceId,
-        sourceAmountCents: amountPaid,
-        commissionRatePct: Math.round(rate),
-        month: monthKey(paidAt),
-        appliedTo,
-        status: "applied",
-        appliedAt: new Date(),
-      })
-      .onConflictDoNothing({
-        target: affiliateCommissionsTable.stripeInvoiceId,
-      })
-      .returning({ id: affiliateCommissionsTable.id });
-
-    if (inserted.length === 0) return;
-
-    await tx
-      .update(affiliateAccountsTable)
-      .set({
-        lockedBalance: sql`${affiliateAccountsTable.lockedBalance} + ${lockedAdd}`,
-        withdrawableBalance: sql`${affiliateAccountsTable.withdrawableBalance} + ${withdrawableAdd}`,
-        totalEarned: sql`${affiliateAccountsTable.totalEarned} + ${commissionCents}`,
-        updatedAt: new Date(),
-      })
-      .where(eq(affiliateAccountsTable.id, account.id));
-  });
-
-  log.info(
-    { invoiceId, subId, referredUserId, commissionCents, rate },
-    "[subscription] affiliate commission applied",
-  );
+  return "http://localhost:5173";
 }
 
 // ── GET /api/subscription ─────────────────────────────────────────────────────
@@ -253,6 +101,168 @@ router.get("/", requireAuth, async (req, res) => {
   } catch (e) {
     log.error({ e, userId }, "[subscription] get error");
     res.status(500).json({ error: "Errore nel recupero abbonamento" });
+  }
+});
+
+// ── GET /api/subscription/plans ───────────────────────────────────────────────
+// Pubblico — catalogo piani + prezzi per la FE (niente prezzi hardcoded lato web).
+
+router.get("/plans", (_req, res) => {
+  const plans = getPlanCatalog().map((p) => ({
+    plan: p.plan,
+    interval: p.interval,
+    priceId: p.priceId ?? null,
+    amountEur: p.amountEur,
+  }));
+  res.json({ plans });
+});
+
+// ── POST /api/subscription/upgrade ────────────────────────────────────────────
+// Crea una Stripe Checkout Session per (plan, interval) e ritorna l'URL.
+
+router.post("/upgrade", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+  const userEmail = req.user!.email;
+  const body = asPlainRecord(getRequestBody(req));
+
+  const plan = isOneOf(body.plan, PAID_PLANS) ? (body.plan as PaidPlan) : null;
+  const interval = isOneOf(body.interval, BILLING_INTERVALS)
+    ? (body.interval as BillingInterval)
+    : null;
+
+  if (!plan || !interval) {
+    res.status(400).json({
+      error: "Parametri non validi: plan ∈ {pro,team}, interval ∈ {monthly,yearly}",
+    });
+    return;
+  }
+
+  const priceId = priceIdFor(plan, interval);
+  if (!priceId) {
+    log.error({ plan, interval }, "[subscription] missing Stripe price ID");
+    res
+      .status(503)
+      .json({ error: "Piano non disponibile al momento. Riprova più tardi." });
+    return;
+  }
+
+  try {
+    // Riusa lo stripeCustomerId se l'utente ha già una subscription Stripe.
+    const [existing] = await db
+      .select({ stripeCustomerId: subscriptionsTable.stripeCustomerId })
+      .from(subscriptionsTable)
+      .where(eq(subscriptionsTable.userId, userId))
+      .orderBy(desc(subscriptionsTable.createdAt))
+      .limit(1);
+
+    const baseUrl = webBaseUrl();
+    const metadata = {
+      userId: String(userId),
+      plan,
+      interval,
+    };
+
+    const session = await getStripe().checkout.sessions.create({
+      mode: "subscription",
+      line_items: [{ price: priceId, quantity: 1 }],
+      metadata,
+      subscription_data: { metadata },
+      ...(existing?.stripeCustomerId
+        ? { customer: existing.stripeCustomerId }
+        : { customer_email: userEmail }),
+      success_url: `${baseUrl}/premium/successo?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/premium`,
+      allow_promotion_codes: true,
+    });
+
+    if (!session.url) {
+      log.error({ userId, plan, interval }, "[subscription] checkout session no URL");
+      res.status(502).json({ error: "Impossibile avviare il pagamento" });
+      return;
+    }
+
+    log.info({ userId, plan, interval }, "[subscription] checkout session created");
+    res.json({ url: session.url });
+  } catch (e) {
+    log.error({ e, userId, plan, interval }, "[subscription] upgrade error");
+    res.status(500).json({ error: "Errore nella creazione del checkout" });
+  }
+});
+
+// ── POST /api/subscription/cancel ─────────────────────────────────────────────
+// Disdetta a fine periodo. Il webhook riconcilia lo stato DB.
+
+router.post("/cancel", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+
+  try {
+    const [sub] = await db
+      .select({ stripeSubscriptionId: subscriptionsTable.stripeSubscriptionId })
+      .from(subscriptionsTable)
+      .where(
+        and(
+          eq(subscriptionsTable.userId, userId),
+          isNull(subscriptionsTable.cancelledAt),
+        ),
+      )
+      .orderBy(desc(subscriptionsTable.createdAt))
+      .limit(1);
+
+    if (!sub?.stripeSubscriptionId) {
+      res.status(404).json({ error: "Nessun abbonamento attivo da disdire" });
+      return;
+    }
+
+    const updated = await getStripe().subscriptions.update(
+      sub.stripeSubscriptionId,
+      { cancel_at_period_end: true },
+    );
+
+    // Stripe API v22 (Basil): current_period_end vive sui subscription item.
+    const periodEndUnix = updated.items.data[0]?.current_period_end;
+
+    log.info({ userId }, "[subscription] cancel at period end requested");
+    res.json({
+      status: updated.status,
+      cancelAtPeriodEnd: updated.cancel_at_period_end,
+      currentPeriodEnd: periodEndUnix
+        ? new Date(periodEndUnix * 1000).toISOString()
+        : null,
+    });
+  } catch (e) {
+    log.error({ e, userId }, "[subscription] cancel error");
+    res.status(500).json({ error: "Errore nella disdetta dell'abbonamento" });
+  }
+});
+
+// ── GET /api/subscription/billing-portal ──────────────────────────────────────
+// Crea una sessione Stripe Billing Portal e ritorna l'URL.
+
+router.get("/billing-portal", requireAuth, async (req, res) => {
+  const userId = req.user!.id;
+
+  try {
+    const [sub] = await db
+      .select({ stripeCustomerId: subscriptionsTable.stripeCustomerId })
+      .from(subscriptionsTable)
+      .where(eq(subscriptionsTable.userId, userId))
+      .orderBy(desc(subscriptionsTable.createdAt))
+      .limit(1);
+
+    if (!sub?.stripeCustomerId) {
+      res.status(404).json({ error: "Nessun profilo di fatturazione disponibile" });
+      return;
+    }
+
+    const session = await getStripe().billingPortal.sessions.create({
+      customer: sub.stripeCustomerId,
+      return_url: `${webBaseUrl()}/profilo`,
+    });
+
+    res.json({ url: session.url });
+  } catch (e) {
+    log.error({ e, userId }, "[subscription] billing-portal error");
+    res.status(500).json({ error: "Errore nell'apertura del portale di fatturazione" });
   }
 });
 
@@ -389,6 +399,29 @@ async function handleStripeEvent(event: StripeLikeEvent): Promise<void> {
       break;
     }
 
+    case "invoice.payment_failed": {
+      // Pagamento fallito → downgrade a free (mirror di subscription.deleted).
+      // Il userId si risolve dalla subscription, mai dal body.
+      const subId = readSubscriptionId(obj);
+      if (!subId) {
+        log.warn({ obj }, "[subscription] invoice.payment_failed without subscription");
+        break;
+      }
+
+      const [downgraded] = await db
+        .update(subscriptionsTable)
+        .set({ plan: "free", updatedAt: new Date() })
+        .where(eq(subscriptionsTable.stripeSubscriptionId, subId))
+        .returning({ userId: subscriptionsTable.userId });
+
+      if (downgraded?.userId) invalidatePlanCache(downgraded.userId);
+      log.warn(
+        { subId },
+        "[subscription] invoice.payment_failed → downgraded to free",
+      );
+      break;
+    }
+
     case "customer.subscription.updated": {
       const subId = typeof obj.id === "string" ? obj.id : "";
       const status = typeof obj.status === "string" ? obj.status : "";
@@ -398,14 +431,22 @@ async function handleStripeEvent(event: StripeLikeEvent): Promise<void> {
         : Date.now();
       const priceId = readSubscriptionPriceId(obj);
 
-      // Determina il piano dal price ID (configurabile via env)
-      const teamPriceId = process.env.STRIPE_TEAM_PRICE_ID;
-      const plan = priceId && priceId === teamPriceId ? "team" : "pro";
+      // Determina il piano dal price ID via mappa configurata.
+      // Fallback alla subscription metadata se il price non è mappato.
+      const metaPlan = readMetadata(obj.metadata).plan;
+      const mappedPlan = planForPriceId(priceId);
+      const plan =
+        mappedPlan !== "free"
+          ? mappedPlan
+          : isOneOf(metaPlan, SUBSCRIPTION_PLANS)
+            ? metaPlan
+            : "pro";
 
       const [updated] = await db
         .update(subscriptionsTable)
         .set({
           plan: status === "active" ? plan : "free",
+          stripePriceId: priceId ?? null,
           validUntil: new Date(periodEnd),
           updatedAt: new Date(),
         })

@@ -60,6 +60,8 @@ export type { QualityEvent } from "./growth-agent/quality-tracker";
 export { searchMemory, buildContextualMemorySection } from "./growth-agent/memory-search";
 export type { MemoryHit, MemoryHitType } from "./growth-agent/memory-search";
 export { runMemoryDecayJob, computeDecayScore } from "./jobs/memory-decay";
+export { applyNeuralEdgeDecay } from "./jobs/neural-edge-decay";
+export type { NeuralEdgeDecayResult } from "./jobs/neural-edge-decay";
 export { runQualityOptimizer, runQualityOptimizerJob } from "./jobs/quality-optimizer";
 // Phase 5: Plugin Tool Registry
 export { toolRegistry } from "./tools/registry";

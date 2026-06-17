@@ -111,7 +111,7 @@ describe("admin Wendy route", () => {
     expect(toolEvent?.result).toMatchObject({
       wendyAction: {
         type: "admin_run_agent",
-        actionToken: expect.any(String),
+        actionToken: expect.any(String) as unknown as string,
       },
     });
   });

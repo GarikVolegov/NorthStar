@@ -100,7 +100,7 @@ describe("admin Wendy Brain neural endpoints", () => {
 
     const response = await request(app()).get("/api/admin/wendy-brain/neural/recent").expect(200);
 
-    expect(response.body.activations).toEqual(activationsRows.value);
+    expect((response.body as { activations: unknown[] }).activations).toEqual(activationsRows.value);
   });
 
   it("returns candidate neural edges and supports review actions", async () => {
@@ -116,7 +116,7 @@ describe("admin Wendy Brain neural endpoints", () => {
     ];
 
     const response = await request(app()).get("/api/admin/wendy-brain/neural/edges?status=candidate").expect(200);
-    expect(response.body.edges).toEqual(edgesRows.value);
+    expect((response.body as { edges: unknown[] }).edges).toEqual(edgesRows.value);
 
     await request(app()).post("/api/admin/wendy-brain/neural/edges/11/approve").expect(200);
     expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ status: "active" }));

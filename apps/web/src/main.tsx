@@ -2,6 +2,7 @@ import { ClerkProvider } from "@clerk/react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { clerkPublishableKey } from "./lib/clerk-config";
 import "./i18n";
 import "./index.css";
 import "./lib/sentry";
@@ -71,12 +72,6 @@ const clerkAppearance = {
     termsPageUrl: "/termini-di-servizio",
   },
 };
-
-const env = import.meta.env as unknown as Record<string, unknown>;
-const clerkPublishableKey =
-  typeof env.VITE_CLERK_PUBLISHABLE_KEY === "string"
-    ? env.VITE_CLERK_PUBLISHABLE_KEY
-    : "";
 
 createRoot(document.getElementById("root")!).render(
   <ClerkProvider

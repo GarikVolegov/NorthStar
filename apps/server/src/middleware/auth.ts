@@ -28,12 +28,66 @@ declare global {
 const CLERK_SECRET_KEY = process.env.CLERK_SECRET_KEY ?? "";
 const CLERK_JWKS_URL =
   process.env.CLERK_JWKS_URL ?? "https://api.clerk.com/v1/jwks";
+// Issuer della nostra istanza Clerk. Senza questo, il fallback Clerk è disattivo:
+// pinnare `iss` evita di accettare token firmati da un'ALTRA istanza/tenant.
+const CLERK_ISSUER = process.env.CLERK_ISSUER ?? "";
 
 interface ClerkJwtPayload {
   sub: string;
   email?: string;
   name?: string;
-  userId?: number;
+}
+
+/** Dati utente risolti dal DB (path Clerk), forma stabile come il JWT NorthStar. */
+type ResolvedDbUser = {
+  id: number;
+  name: string;
+  email: string;
+  role: string | null;
+  stripeSubscriptionId: string | null;
+  journeyType: string | null;
+  testSessionId: number | null;
+  onboardingCompleted: boolean | null;
+};
+
+function toReqUser(dbUser: ResolvedDbUser): NonNullable<Request["user"]> {
+  return {
+    id: dbUser.id,
+    name: dbUser.name,
+    email: dbUser.email,
+    role: (dbUser.role as "user" | "admin") ?? "user",
+    stripeSubscriptionId: dbUser.stripeSubscriptionId,
+    journeyType: dbUser.journeyType,
+    testSessionId: dbUser.testSessionId,
+    onboardingCompleted: dbUser.onboardingCompleted ?? false,
+  };
+}
+
+/**
+ * Risolve l'utente locale a partire dal `sub` Clerk (mappato su `users.clerkId`).
+ * SICUREZZA: l'identità deriva SOLO dal `sub` di un token verificato, mai da
+ * claim `userId`/`email` arbitrari. Nessun auto-provisioning/linking-by-email
+ * (era un vettore di account takeover): un account si crea via /register o
+ * /google-token, non dentro un middleware di lettura.
+ */
+async function resolveClerkUserBySub(
+  sub: string,
+): Promise<ResolvedDbUser | null> {
+  const [dbUser] = await db
+    .select({
+      id: usersTable.id,
+      name: usersTable.name,
+      email: usersTable.email,
+      role: usersTable.role,
+      stripeSubscriptionId: usersTable.stripeSubscriptionId,
+      journeyType: usersTable.journeyType,
+      testSessionId: usersTable.testSessionId,
+      onboardingCompleted: usersTable.onboardingCompleted,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.clerkId, sub))
+    .limit(1);
+  return dbUser ?? null;
 }
 
 /** Shape of the stable user data embedded in every JWT at login/register time */
@@ -67,7 +121,9 @@ async function verifyClerkToken(
   token: string,
 ): Promise<ClerkJwtPayload | null> {
   try {
-    if (!CLERK_SECRET_KEY) return null;
+    // Fail-closed: il fallback Clerk opera solo se l'istanza è pienamente
+    // configurata (secret key + issuer pinnato).
+    if (!CLERK_SECRET_KEY || !CLERK_ISSUER) return null;
 
     const jwks = await getClerkJwks();
     if (!jwks) return null;
@@ -97,6 +153,7 @@ async function verifyClerkToken(
 
     const payload = verify(token, pem, {
       algorithms: ["RS256"],
+      issuer: CLERK_ISSUER,
     }) as ClerkJwtPayload;
     return payload;
   } catch {
@@ -146,123 +203,23 @@ export async function requireAuth(
 
     next();
   } catch {
-    // Fallback: prova a verificare come Clerk JWT
+    // Fallback: verifica come Clerk JWT e risolvi l'utente SOLO tramite sub.
     const clerkPayload = await verifyClerkToken(token);
     if (clerkPayload?.sub) {
-      // Cerca l'utente nel DB tramite clerkId (sub)
       try {
-        const [dbUser] = await db
-          .select({
-            id: usersTable.id,
-            name: usersTable.name,
-            email: usersTable.email,
-            role: usersTable.role,
-            stripeSubscriptionId: usersTable.stripeSubscriptionId,
-            journeyType: usersTable.journeyType,
-            testSessionId: usersTable.testSessionId,
-            onboardingCompleted: usersTable.onboardingCompleted,
-          })
-          .from(usersTable)
-          .where(eq(usersTable.clerkId, clerkPayload.sub))
-          .limit(1);
-
+        const dbUser = await resolveClerkUserBySub(clerkPayload.sub);
         if (dbUser) {
-          req.user = {
-            id: dbUser.id,
-            name: dbUser.name,
-            email: dbUser.email,
-            role: (dbUser.role as "user" | "admin") ?? "user",
-            stripeSubscriptionId: dbUser.stripeSubscriptionId,
-            journeyType: dbUser.journeyType,
-            testSessionId: dbUser.testSessionId,
-            onboardingCompleted: dbUser.onboardingCompleted ?? false,
-          };
-
+          req.user = toReqUser(dbUser);
           if (req.log) req.log = req.log.child({ userId: dbUser.id });
           next();
           return;
         }
-
-        // Utente Clerk non in DB → auto-upsert (evita 401 per nuovi utenti o utenti pre-migrazione)
-        // Estrae email e nome dai claim del token Clerk (se presenti) o usa fallback
-        const rawPayload = clerkPayload as unknown as Record<string, unknown>;
-        const clerkEmail = rawPayload.email as string | undefined;
-        const clerkName =
-          (rawPayload.name as string | undefined) ??
-          (rawPayload.username as string | undefined) ??
-          "Utente";
-        const clerkSub = clerkPayload.sub;
-
-        if (clerkEmail) {
-          try {
-            // Cerca per email per collegare account pre-esistenti
-            const [existingByEmail] = await db
-              .select({ id: usersTable.id })
-              .from(usersTable)
-              .where(eq(usersTable.email, clerkEmail.toLowerCase()))
-              .limit(1);
-
-            let userId: number;
-
-            if (existingByEmail) {
-              // Collega clerkId all'account esistente
-              await db
-                .update(usersTable)
-                .set({
-                  clerkId: clerkSub,
-                  emailVerified: true,
-                  updatedAt: new Date(),
-                })
-                .where(eq(usersTable.id, existingByEmail.id));
-              userId = existingByEmail.id;
-            } else {
-              // Crea nuovo utente
-              const [newUser] = await db
-                .insert(usersTable)
-                .values({
-                  clerkId: clerkSub,
-                  email: clerkEmail.toLowerCase(),
-                  name: clerkName,
-                  emailVerified: true,
-                  role: "user",
-                  passwordHash: "",
-                })
-                .returning({ id: usersTable.id });
-              if (!newUser) throw new Error("Failed to create Clerk user");
-              userId = newUser.id;
-            }
-
-            req.user = {
-              id: userId,
-              name: clerkName,
-              email: clerkEmail,
-              role: "user",
-              stripeSubscriptionId: null,
-              journeyType: null,
-              testSessionId: null,
-              onboardingCompleted: false,
-            };
-
-            if (req.log) req.log = req.log.child({ userId });
-            next();
-            return;
-          } catch (upsertErr) {
-            rootLogger.warn(
-              { upsertErr, clerkSub },
-              "[auth] auto-upsert Clerk user failed",
-            );
-          }
-        }
-
         rootLogger.warn(
-          { clerkId: clerkSub },
-          "[auth] Clerk user not synced, no email in token",
+          { clerkId: clerkPayload.sub },
+          "[auth] Clerk token valido ma nessun utente collegato (clerkId non in DB)",
         );
       } catch (dbErr) {
-        rootLogger.warn(
-          { dbErr },
-          "[auth] DB lookup/upsert for Clerk user failed",
-        );
+        rootLogger.warn({ dbErr }, "[auth] lookup utente Clerk fallito");
       }
     }
 
@@ -387,21 +344,19 @@ export async function optionalAuth(
       req.log = req.log.child({ userId: payload.userId });
     }
   } catch {
+    // SICUREZZA: risolvi l'identità SOLO dal sub di un token Clerk verificato
+    // (mai dal claim numerico `userId` fornito dal client). Se non risolve,
+    // si prosegue come anonimi (optionalAuth non blocca mai).
     const clerkPayload = await verifyClerkToken(token);
-    if (clerkPayload && clerkPayload.userId) {
-      req.user = {
-        id: clerkPayload.userId,
-        name: clerkPayload.name ?? "",
-        email: clerkPayload.email ?? "",
-        role: "user",
-        stripeSubscriptionId: null,
-        journeyType: null,
-        testSessionId: null,
-        onboardingCompleted: false,
-      };
-
-      if (req.log) {
-        req.log = req.log.child({ userId: clerkPayload.userId });
+    if (clerkPayload?.sub) {
+      try {
+        const dbUser = await resolveClerkUserBySub(clerkPayload.sub);
+        if (dbUser) {
+          req.user = toReqUser(dbUser);
+          if (req.log) req.log = req.log.child({ userId: dbUser.id });
+        }
+      } catch (dbErr) {
+        rootLogger.warn({ dbErr }, "[auth] optionalAuth lookup Clerk fallito");
       }
     }
   }

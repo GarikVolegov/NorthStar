@@ -11,6 +11,9 @@
     },
     {
       "path": "./packages/ai-server"
+    },
+    {
+      "path": "./packages/api-client-react"
     }
   ]
 }

@@ -24,7 +24,7 @@ vi.mock("@workspace/api-client-react", () => ({
   getGetTestSessionQueryKey: (id: number) => ["test-session", id],
   useConfirmSector: () => ({ mutate: vi.fn() }),
   useGetStatsSummary: () => ({ data: null }),
-  useGetTestSession: (...args: unknown[]) => apiState.getTestSession(...args),
+  useGetTestSession: (...args: unknown[]): unknown => apiState.getTestSession(...args),
 }));
 
 vi.mock("@/contexts/AuthContext", () => ({
@@ -32,7 +32,7 @@ vi.mock("@/contexts/AuthContext", () => ({
 }));
 
 vi.mock("@/hooks/useAgentAnalysis", () => ({
-  useAgentAnalysis: (...args: unknown[]) => apiState.useAgentAnalysis(...args),
+  useAgentAnalysis: (...args: unknown[]): unknown => apiState.useAgentAnalysis(...args),
 }));
 
 vi.mock("@/hooks/useWendyPageContext", () => ({

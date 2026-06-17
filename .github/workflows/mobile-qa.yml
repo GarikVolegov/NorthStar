@@ -44,7 +44,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "20.10.x"
+  NODE_VERSION: "22.13.x"
   PNPM_VERSION: "11.0.9"
 
 # ─────────────────────────────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import {
 } from "@workspace/db";
 import { desc, sql } from "drizzle-orm";
 import { rootLogger } from "../../middleware/logger";
+import { asPlainRecord } from "../../lib/type-guards";
 import {
   writeAgentRunSnapshot,
 } from "./shared/agents";
@@ -52,7 +53,7 @@ router.get("/research/runs", async (req: Request, res: Response) => {
 router.post("/research/news/run", async (req: Request, res: Response) => {
   const startedAt = new Date();
   try {
-    const result = await runNewsPublishingPipeline({ body: req.body ?? {}, startedAt });
+    const result = await runNewsPublishingPipeline({ body: asPlainRecord(req.body), startedAt });
     res.status(result.ok ? 201 : 500).json(result);
   } catch (err) {
     const run = await writeAgentRunSnapshot({
@@ -71,7 +72,7 @@ router.post("/research/news/run", async (req: Request, res: Response) => {
 router.post("/research/growth/run", async (req: Request, res: Response) => {
   const startedAt = new Date();
   try {
-    const result = await runGrowthResearchReviewPipeline({ body: req.body ?? {}, startedAt });
+    const result = await runGrowthResearchReviewPipeline({ body: asPlainRecord(req.body), startedAt });
     res.status(201).json(result);
   } catch (err) {
     const run = await writeAgentRunSnapshot({

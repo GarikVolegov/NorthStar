@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BackgroundPicker } from "./BackgroundPicker";
 
@@ -66,7 +67,7 @@ describe("BackgroundPicker", () => {
     });
   });
 
-  it("shows library full state without crashing", () => {
+  it("shows library full state without crashing", async () => {
     hookMock.mockReturnValue({
       presets: [],
       library: Array.from({ length: 5 }, (_, index) => ({
@@ -101,7 +102,7 @@ describe("BackgroundPicker", () => {
     });
 
     render(<BackgroundPicker userId={7} open onOpenChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole("tab", { name: /Foto/i }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: /Foto/i }));
 
     expect(screen.getAllByText(/massimo/i).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /Carica foto/i })).toBeDisabled();
@@ -182,8 +183,9 @@ describe("BackgroundPicker", () => {
     });
 
     render(<BackgroundPicker userId={7} open onOpenChange={vi.fn()} />);
-    fireEvent.click(screen.getByRole("tab", { name: /Aspetto/i }));
-    fireEvent.click(screen.getByRole("button", { name: /Manuale/i }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("tab", { name: /Aspetto/i }));
+    await user.click(screen.getByRole("button", { name: /Manuale/i }));
 
     await waitFor(() => {
       expect(updateAppearance).toHaveBeenCalledWith(expect.objectContaining({ mode: "manual" }));

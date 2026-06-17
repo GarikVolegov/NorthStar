@@ -58,7 +58,7 @@ export function SectorPremiumTools({ sectorId, t, onOpenWendy }: SectorPremiumTo
           </div>
         </Link>
 
-        <button onClick={onOpenWendy} className="block w-full text-left">
+        <Link href={`/colloquio/${sectorId}`} className="block">
           <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">
             <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center mb-4 group-hover:bg-orange-100 transition-colors">
               <MessageSquare className="w-5 h-5 text-orange-600" />
@@ -69,7 +69,7 @@ export function SectorPremiumTools({ sectorId, t, onOpenWendy }: SectorPremiumTo
               Inizia colloquio <ArrowRight className="w-3.5 h-3.5 ml-1 group-hover:translate-x-0.5 transition-transform" />
             </div>
           </div>
-        </button>
+        </Link>
 
         <Link href={`/skills-gap/${sectorId}`} className="block">
           <div className="h-full p-5 bg-card border rounded-2xl hover:border-primary/30 hover:shadow-md transition-all cursor-pointer group">

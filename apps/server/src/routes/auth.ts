@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import crypto from "node:crypto";
 import {
   db,
@@ -220,7 +220,7 @@ router.post("/login", authLimiter, async (req, res) => {
 });
 
 /* ─── POST /api/auth/verify-email  —  verifica email ─────────────── */
-router.post("/verify-email", async (req, res) => {
+router.post("/verify-email", authLimiter, async (req, res) => {
   try {
     const body = asPlainRecord(getRequestBody(req));
     const email = readStringField(body, "email");
@@ -230,15 +230,22 @@ router.post("/verify-email", async (req, res) => {
       return;
     }
 
+    // SICUREZZA: scope per email + codice, mai lookup globale sul solo codice
+    // (era brute-forzabile su 6 cifre attraverso lo spazio codici condiviso).
     const [user] = await protectedDbQuery(async () => {
       return await db
         .select()
         .from(usersTable)
-        .where(eq(usersTable.verificationCode, code))
+        .where(
+          and(
+            eq(usersTable.email, email.toLowerCase()),
+            eq(usersTable.verificationCode, code),
+          ),
+        )
         .limit(1);
     });
 
-    if (!user || user.email !== email.toLowerCase()) {
+    if (!user) {
       res.status(400).json({ error: "Codice non valido" });
       return;
     }
@@ -298,15 +305,21 @@ router.post("/verify-2fa", authLimiter, async (req, res) => {
       return;
     }
 
+    // SICUREZZA: scope per email + codice (no lookup globale sul solo codice).
     const [user] = await protectedDbQuery(async () => {
       return await db
         .select()
         .from(usersTable)
-        .where(eq(usersTable.verificationCode, code))
+        .where(
+          and(
+            eq(usersTable.email, email.toLowerCase()),
+            eq(usersTable.verificationCode, code),
+          ),
+        )
         .limit(1);
     });
 
-    if (!user || user.email !== email.toLowerCase()) {
+    if (!user) {
       res.status(400).json({ error: "Codice non valido" });
       return;
     }
@@ -352,7 +365,7 @@ router.post("/verify-2fa", authLimiter, async (req, res) => {
 });
 
 /* ─── POST /api/auth/resend-verification  —  rimanda codice ──────── */
-router.post("/resend-verification", async (req, res) => {
+router.post("/resend-verification", authLimiter, async (req, res) => {
   try {
     const body = asPlainRecord(getRequestBody(req));
     const email = readStringField(body, "email");

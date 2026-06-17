@@ -69,6 +69,9 @@ export const jobApplicationsTable = pgTable(
     notes: text("notes"),
     salary: text("salary"),
     location: text("location"),
+    // Career tools: testo annuncio (input cover-letter) + cover letter generata.
+    jobPostingText: text("job_posting_text"),
+    coverLetter: text("cover_letter"),
     appliedAt: timestamp("applied_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
     reminderSentAt: timestamp("reminder_sent_at", { withTimezone: true }),

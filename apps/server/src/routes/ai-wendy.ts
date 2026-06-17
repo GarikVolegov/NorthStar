@@ -14,6 +14,7 @@ import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middleware/auth";
 import { wendyLimiter } from "../middleware/rate-limit";
+import { costGuard } from "../middleware/cost-guard";
 import { rootLogger } from "../middleware/logger";
 import {
   checkFeatureAccess,
@@ -72,6 +73,10 @@ router.post(
   "/",
   requireAuth,
   wendyLimiter,
+  // Cost-guard: blocca se l'utente supera il tetto di costo LLM mensile del suo
+  // piano (free $0.50 / pro $10, override via env). Legge ai_cost_log, popolato da
+  // recordAiCall su questa stessa route → qui il limite in $ diventa effettivo.
+  costGuard,
   async (req: Request, res: Response) => {
     const parsed = WendyRequestSchema.safeParse(req.body);
     if (!parsed.success) {

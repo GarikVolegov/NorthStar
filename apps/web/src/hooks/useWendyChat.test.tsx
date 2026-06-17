@@ -206,7 +206,7 @@ describe("useWendyChat", () => {
       });
     });
 
-    const [, request] = sse.start.mock.calls[0]!;
+    const [, request] = sse.start.mock.calls[0]! as [string, RequestInit | undefined];
     expect(JSON.parse(String(request?.body))).toMatchObject({
       message: "Fammi un piano carriera",
       isPredefined: true,

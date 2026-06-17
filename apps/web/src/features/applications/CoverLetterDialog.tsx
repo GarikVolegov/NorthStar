@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { UpgradePrompt } from "@/components/ui/UpgradeGate";
 import { postJson } from "@/lib/apiClient";
 import { AlertCircle, Building2, Copy, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
@@ -12,8 +13,8 @@ const BASE = import.meta.env.BASE_URL || "/";
 type CoverLetterResponse = { error?: string; text?: string };
 
 export function CoverLetterDialog({ app, onClose }: { app: Application; onClose: () => void }) {
-  const [jobDescription, setJobDescription] = useState("");
-  const [text, setText] = useState("");
+  const [jobDescription, setJobDescription] = useState(app.jobPostingText ?? "");
+  const [text, setText] = useState(app.coverLetter ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -26,6 +27,7 @@ export function CoverLetterDialog({ app, onClose }: { app: Application; onClose:
         company: app.company,
         role: app.role,
         jobDescription,
+        applicationId: app.id,
       });
       if (data.error) throw new Error(data.error);
       setText(data.text ?? "");
@@ -74,12 +76,20 @@ export function CoverLetterDialog({ app, onClose }: { app: Application; onClose:
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Generazione in corso…</>
               : <><Sparkles className="w-4 h-4" /> {text ? "Rigenera lettera" : "Genera lettera AI"}</>}
           </Button>
-          {error && (
-            <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
-              <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
-              <p className="text-xs text-destructive">{error}</p>
-            </div>
-          )}
+          {error &&
+            (error.includes("Pro") ? (
+              <UpgradePrompt
+                feature="export_plan_pdf"
+                requiredPlan="pro"
+                message={error}
+                compact
+              />
+            ) : (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
+                <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
+                <p className="text-xs text-destructive">{error}</p>
+              </div>
+            ))}
           {text && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">

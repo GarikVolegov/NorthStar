@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: "20.10.x"
+  NODE_VERSION: "22.13.x"
   PNPM_VERSION: "11.0.9"
 
 jobs:
@@ -53,7 +53,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["20.10.x", "24.x"]
+        node-version: ["22.13.x", "24.x"]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: northstar
+          POSTGRES_PASSWORD: northstar
+          POSTGRES_DB: northstar_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -62,12 +75,22 @@ jobs:
           node-version: ${{ matrix.node-version }}
           pnpm-version: ${{ env.PNPM_VERSION }}
 
+      # Le suite di test girano su DB reale (regola progetto: niente mock DB).
+      - name: Enable pgvector extension (test DB)
+        run: PGPASSWORD=northstar psql -h localhost -U northstar -d northstar_test -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+
+      - name: Run DB migrations (test)
+        run: pnpm --filter @workspace/db exec drizzle-kit push
+        env:
+          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_test
+
       - name: Required quality gate
         run: pnpm run quality:required
         env:
           NODE_ENV: test
           JWT_SECRET: ci-jwt-secret-for-github-actions-32chars
           USE_MOCK_AI: "true"
+          DATABASE_URL: postgresql://northstar:northstar@localhost:5432/northstar_test
 
       - name: Web production build
         run: pnpm --filter @northstar/web run build
@@ -116,6 +139,9 @@ jobs:
 
       - name: Install Chromium
         run: pnpm exec playwright install chromium
+
+      - name: Enable pgvector extension (e2e DB)
+        run: PGPASSWORD=northstar psql -h localhost -U northstar -d northstar_e2e -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
       - name: Run DB migrations
         run: pnpm --filter @workspace/db exec drizzle-kit push
@@ -168,6 +194,11 @@ jobs:
           API_URL: http://localhost:3001
           BASE_URL: http://localhost:5000
           CI: "true"
+          # The API (:3001) and web (:5000) servers are already started by the
+          # steps above, and the web dev server proxies /api → :3001. Tell
+          # Playwright to use them instead of spawning its own webServer (which
+          # would collide on the port: "localhost:5000 is already used").
+          PLAYWRIGHT_SKIP_WEBSERVER: "true"
 
       - name: Upload Playwright artifacts
         if: always()

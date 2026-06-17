@@ -53,8 +53,9 @@ function currentMonthRange(): { start: Date; end: Date } {
 /**
  * LLM Cost Guard Middleware
  *
- * Reads cumulative monthly spend from ai_request_log.cost_usd_est.
- * llm_usage is deprecated — cost-guard no longer writes to or reads from it.
+ * Reads cumulative monthly spend from ai_cost_log.cost_usd_estimate (populated by
+ * recordAiCall on the /api/ai/wendy route). llm_usage is deprecated — the cost-guard
+ * no longer writes to or reads from it.
  */
 export async function costGuard(
   req: Request,

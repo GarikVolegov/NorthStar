@@ -9,13 +9,11 @@ export function metricsProtection(req: Request, res: Response, next: NextFunctio
   const metricsToken = process.env.METRICS_TOKEN;
   const allowedIpsStr = process.env.ALLOWED_IPS ?? "";
   
-  // Get client IP (handling proxies)
-  const clientIp = req.headers["x-forwarded-for"] 
-    ? Array.isArray(req.headers["x-forwarded-for"]) 
-      ? req.headers["x-forwarded-for"][0] ?? ""
-      : req.headers["x-forwarded-for"]
-    : req.socket.remoteAddress ?? "";
-  
+  // SICUREZZA: usa req.ip (calcolato da Express in base a `trust proxy`), NON
+  // l'header x-forwarded-for grezzo: quest'ultimo è spoofabile dal client e
+  // permetteva di aggirare l'IP allowlist iniettando X-Forwarded-For.
+  const clientIp = req.ip ?? req.socket.remoteAddress ?? "";
+
   // Normalize IP (handle ::ffff:127.0.0.1 -> 127.0.0.1)
   const normalizedIp = clientIp.replace(/^::ffff:/, "");
 

@@ -4,7 +4,12 @@ import {
   runGrowthResearchReviewPipeline,
   runMarketRefreshPipeline,
   runNewsPublishingPipeline,
+  type GrowthArticlePayload,
 } from "./pipelines";
+import type { writeAgentRunSnapshot } from "../../../lib/agent-runs";
+
+type AgentRunInput = Parameters<typeof writeAgentRunSnapshot>[0];
+type AgentRunResult = Awaited<ReturnType<typeof writeAgentRunSnapshot>>;
 
 describe("admin runnable pipelines", () => {
   it("exposes task-oriented pipelines without atomic agents as primary actions", () => {
@@ -23,7 +28,7 @@ describe("admin runnable pipelines", () => {
 
   it("runs news publishing steps in order and records one pipeline run", async () => {
     const order: string[] = [];
-    const writeAgentRunSnapshot = vi.fn(async (input) => ({ id: 41, ...input }));
+    const writeAgentRunSnapshot = vi.fn(async (input: AgentRunInput) => ({ id: 41, ...input } as unknown as AgentRunResult));
 
     const result = await runNewsPublishingPipeline({
       body: { sectorNames: ["Economia"] },
@@ -56,7 +61,7 @@ describe("admin runnable pipelines", () => {
   });
 
   it("records a failed pipeline run when the first news step fails", async () => {
-    const writeAgentRunSnapshot = vi.fn(async (input) => ({ id: 44, ...input }));
+    const writeAgentRunSnapshot = vi.fn(async (input: AgentRunInput) => ({ id: 44, ...input } as unknown as AgentRunResult));
 
     const result = await runNewsPublishingPipeline({
       body: {},
@@ -73,14 +78,14 @@ describe("admin runnable pipelines", () => {
       agentName: "news-publishing",
       taskType: "manual_pipeline_run",
       status: "failed",
-      errorMessage: expect.stringContaining("collector down"),
+      errorMessage: expect.stringContaining("collector down") as unknown as string,
     }));
     expect(result).toMatchObject({ ok: false, runId: 44 });
   });
 
   it("creates growth research outputs as pending review drafts", async () => {
     const inserted: Array<Record<string, unknown>> = [];
-    const writeAgentRunSnapshot = vi.fn(async (input) => ({ id: 42, ...input }));
+    const writeAgentRunSnapshot = vi.fn(async (input: AgentRunInput) => ({ id: 42, ...input } as unknown as AgentRunResult));
 
     const result = await runGrowthResearchReviewPipeline({
       body: { topics: ["focus lavoro"], limit: 1 },
@@ -96,7 +101,7 @@ describe("admin runnable pipelines", () => {
         }]),
         loadGrowthDiscoverySources: vi.fn(async () => []),
         findExistingGrowthArticleBySlug: vi.fn(async () => null),
-        insertGrowthArticle: vi.fn(async (payload) => {
+        insertGrowthArticle: vi.fn(async (payload: GrowthArticlePayload) => {
           inserted.push(payload);
           return { id: 7, title: String(payload.title), slug: String(payload.slug) };
         }),
@@ -116,7 +121,7 @@ describe("admin runnable pipelines", () => {
 
   it("runs market refresh jobs and sector data in order", async () => {
     const order: string[] = [];
-    const writeAgentRunSnapshot = vi.fn(async (input) => ({ id: 43, ...input }));
+    const writeAgentRunSnapshot = vi.fn(async (input: AgentRunInput) => ({ id: 43, ...input } as unknown as AgentRunResult));
 
     const result = await runMarketRefreshPipeline({
       body: {},

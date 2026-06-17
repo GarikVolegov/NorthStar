@@ -3,10 +3,12 @@ import { eq, or } from "drizzle-orm";
 import { db, generateUsername, protectedDbQuery, userProfileSettingsTable, usersTable } from "@workspace/db";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord } from "../lib/type-guards";
+import { verifyGoogleIdToken } from "../lib/google-auth";
+import { authLimiter } from "../middleware/rate-limit";
 import { buildJwtPayload, generateToken, readStringField } from "./auth-shared";
 
 export function registerGoogleTokenRoute(router: Router): void {
-router.post("/google-token", async (req, res) => {
+router.post("/google-token", authLimiter, async (req, res) => {
     try {
       const body = asPlainRecord(getRequestBody(req));
       const credential = readStringField(body, "credential");
@@ -15,24 +17,22 @@ router.post("/google-token", async (req, res) => {
         return;
       }
 
-      const credentialPayload = credential.split(".")[1];
-      if (!credentialPayload) {
-        res.status(400).json({ error: "Credential non valido" });
+      // SICUREZZA: verifica crittografica del token (firma + aud + iss).
+      // Non ci si fida MAI del payload base64 grezzo: era un takeover di account.
+      const identity = await verifyGoogleIdToken(credential);
+      if (!identity) {
+        res.status(401).json({ error: "Token Google non valido" });
         return;
       }
-      const googlePayload = JSON.parse(
-        Buffer.from(credentialPayload, "base64").toString(),
-      ) as {
-        sub: string;
-        email: string;
-        name: string;
-        picture?: string;
-      };
+      if (!identity.emailVerified) {
+        res.status(403).json({ error: "Email Google non verificata" });
+        return;
+      }
 
-      const googleId = googlePayload.sub;
-      const email = googlePayload.email.toLowerCase();
-      const name = googlePayload.name;
-      const avatarUrl = googlePayload.picture ?? null;
+      const googleId = identity.sub;
+      const email = identity.email;
+      const name = identity.name;
+      const avatarUrl = identity.picture;
 
       let [existing] = await protectedDbQuery(async () => {
         return await db

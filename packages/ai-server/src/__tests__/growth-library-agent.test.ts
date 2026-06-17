@@ -48,8 +48,8 @@ describe("growth-library-agent", () => {
     ], now);
 
     expect(gaps).toEqual(expect.arrayContaining([
-      { category: "mindset", recentCount: 2, suggestedTopic: expect.any(String) },
-      { category: "finanza", recentCount: 0, suggestedTopic: expect.any(String) },
+      { category: "mindset", recentCount: 2, suggestedTopic: expect.any(String) as unknown as string },
+      { category: "finanza", recentCount: 0, suggestedTopic: expect.any(String) as unknown as string },
     ]));
     expect(gaps.some((gap) => gap.category === "carriera")).toBe(false);
   });
