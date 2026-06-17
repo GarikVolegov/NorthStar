@@ -199,7 +199,9 @@ export default defineConfig(async ({ command }) => ({
     allowedHosts: true,
     proxy: {
       "/api": {
-        target: "http://localhost:3001",
+        // Segue la porta del server (PORT, default 3201) così il proxy resta
+        // allineato se cambi la porta dell'API.
+        target: `http://localhost:${process.env.PORT || "3201"}`,
         changeOrigin: true,
       },
     },

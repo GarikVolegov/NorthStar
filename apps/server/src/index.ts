@@ -4,7 +4,7 @@ import http from "node:http";
 import { rootLogger } from "./middleware/logger";
 import { pool } from "@workspace/db";
 
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3201;
 
 await otelReady;
 const { default: app } = await import("./app");
