@@ -34,3 +34,13 @@ Started: 2026-06-17 (seeded by Opus 4.8 after Phase 0/1 monetization work)
   - The gate UI pattern (Lock + message + Link /premium) is now used in colloquio.tsx, mercato.tsx, and skills-gap.tsx — reuse it for cover-letter (US-007) too.
   - Browser verification still pending (no dev-browser tools in this env) — manual check recommended.
 ---
+
+## 2026-06-17 - US-003 / US-004 (applications backend)
+- US-003: job_applications table already existed in users.ts; added jobPostingText + coverLetter columns + raw idempotent migration 0044.
+- US-004: replaced the stub apps/server/src/routes/applications.ts with real owner-scoped CRUD on jobApplicationsTable. serialize() maps DB 'interviewing' -> FE 'interview'; writes map back. Server typecheck green.
+- **Learnings for future iterations:**
+  - The FE applications.tsx kanban + features/applications/* (ApplicationCard, StatsView, CoverLetterDialog, applicationTypes) ALREADY EXIST and call GET /api/applications/:userId, POST /api/applications, PATCH/DELETE /:id. So US-005 is essentially done by making the backend real.
+  - FE AppStatus is saved|applied|interview|offer|rejected (5) — map to/from DB enum which also has 'interviewing' and 'withdrawn'. ALWAYS check applicationTypes.ts for the FE contract.
+  - CoverLetterDialog (US-007 UI) already exists and POSTs to /api/cover-letter/generate with { company, role, jobDescription }, expecting { text } or { error }. US-006 must create that exact route.
+  - DB-REAL tests: no DATABASE_URL safe to use here (Neon = prod), and no existing supertest+real-DB pattern. Integration tests are deferred to a staging run (US-011/012/013). Do NOT mock the DB to fake a pass.
+---

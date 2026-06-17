@@ -62,8 +62,8 @@
         "Tests pass"
       ],
       "priority": 4,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Real CRUD implemented on jobApplicationsTable (GET /:userId list owner-scoped via req.user.id, POST, PATCH owner-scoped, DELETE owner-scoped) with FE<->DB status mapping (interview<->interviewing). Server typecheck green. DB-REAL integration test DEFERRED TO STAGING (no DATABASE_URL/runner safe to use here — Neon is prod; no existing supertest+real-DB pattern to mirror). Tracked with US-011/012/013."
     },
     {
       "id": "US-005",
