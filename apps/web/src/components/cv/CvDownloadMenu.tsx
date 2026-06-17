@@ -1,13 +1,17 @@
 /**
  * CvDownloadMenu
- * Dropdown per scaricare il CV in 3 formati: PDF, DOCX, JSON
+ * Dropdown per scaricare il CV. PDF (stampabile) è gated a Pro; JSON è sempre
+ * disponibile (dati raw). DOCX non è ancora implementato lato server.
  */
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Download, File, FileJson, FileText } from "lucide-react";
+import { apiFetch } from "@/lib/api-fetch";
+import { useSubscription } from "@/hooks/useSubscription";
+import { Download, File, FileJson, FileText, Lock } from "lucide-react";
+import { useLocation } from "wouter";
 import type { GeneratedCv } from "./CvEditorDrawer";
 
 const BASE = import.meta.env.BASE_URL || "/";
@@ -24,18 +28,40 @@ interface Props {
 }
 
 export function CvDownloadMenu({ userId, template, filename, generatedCv, iconOnly }: Props) {
-  function downloadPdf() {
-    const a = document.createElement("a");
-    a.href = `${BASE}api/cv/${userId}/pdf?template=${template}`;
-    a.download = filename;
-    a.click();
-  }
+  const [, setLocation] = useLocation();
+  const { canAccess } = useSubscription();
+  const canPdf = canAccess("export_plan_pdf");
 
-  function downloadDocx() {
-    const a = document.createElement("a");
-    a.href = `${BASE}api/cv/${userId}/docx?template=${template}`;
-    a.download = filename.replace(/\.pdf$/i, ".docx");
-    a.click();
+  // Il PDF è gated (Pro): l'endpoint richiede auth (apiFetch inietta il token) e
+  // restituisce un documento stampabile che apriamo in una nuova finestra
+  // (window.print → "Salva come PDF"). I free vengono mandati al paywall.
+  async function downloadPdf() {
+    if (!canPdf) {
+      setLocation("/premium");
+      return;
+    }
+    // Apri la finestra SINCRONICAMENTE nel gesto del click: aprirla dopo l'await
+    // verrebbe bloccata dai popup blocker.
+    const w = window.open("", "_blank", "width=820,height=1060");
+    try {
+      const res = await apiFetch(`${BASE}api/cv/${userId}/pdf?template=${template}`);
+      if (res.status === 402) {
+        w?.close();
+        setLocation("/premium");
+        return;
+      }
+      if (!res.ok) {
+        w?.close();
+        return;
+      }
+      const html = await res.text();
+      if (!w) return;
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+    } catch {
+      w?.close();
+    }
   }
 
   function downloadJson() {
@@ -65,14 +91,21 @@ export function CvDownloadMenu({ userId, template, filename, generatedCv, iconOn
       <DropdownMenuContent align="end" className="w-44">
         <DropdownMenuLabel className="text-xs font-medium text-muted-foreground">Scarica come</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={downloadPdf} className="gap-2 text-xs cursor-pointer">
+        <DropdownMenuItem onClick={() => { void downloadPdf(); }} className="gap-2 text-xs cursor-pointer">
           <FileText className="w-3.5 h-3.5 text-red-500" />
           PDF
-          <span className="ml-auto text-[10px] text-muted-foreground">Template {template}</span>
+          {canPdf ? (
+            <span className="ml-auto text-[10px] text-muted-foreground">Template {template}</span>
+          ) : (
+            <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-semibold text-primary">
+              <Lock className="w-3 h-3" /> Pro
+            </span>
+          )}
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={downloadDocx} className="gap-2 text-xs cursor-pointer">
+        <DropdownMenuItem disabled className="gap-2 text-xs">
           <File className="w-3.5 h-3.5 text-blue-500" />
           Word (DOCX)
+          <span className="ml-auto text-[10px] text-muted-foreground">presto</span>
         </DropdownMenuItem>
         <DropdownMenuItem onClick={downloadJson} disabled={!generatedCv} className="gap-2 text-xs cursor-pointer">
           <FileJson className="w-3.5 h-3.5 text-yellow-500" />
