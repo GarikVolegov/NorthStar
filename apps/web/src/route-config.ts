@@ -31,6 +31,7 @@ export const routes: RouteConfig[] = [
   { path: "/calendario", component: () => import("@/pages/calendar"), guard: "protected", layout: "default", title: "Calendario" },
   { path: "/mood", component: () => import("@/pages/mood"), guard: "protected", layout: "default", title: "Mood" },
   { path: "/diario", component: () => import("@/pages/diario"), guard: "protected", layout: "default", title: "Diario" },
+  { path: "/chi-sono", component: () => import("@/pages/chi-sono"), guard: "protected", layout: "default", title: "Chi sono" },
   { path: PATHS.FRIENDS, component: () => import("@/pages/amici"), guard: "protected", layout: "default", title: "Amici" },
   { path: "/social", component: () => import("@/pages/social"), guard: "protected", layout: "default", title: "Social" },
   { path: "/utente/:id", component: () => import("@/pages/utente"), guard: "public", layout: "default", title: "Utente" },
