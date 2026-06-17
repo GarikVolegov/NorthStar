@@ -62,6 +62,7 @@ import affiliateRouter from "./routes/affiliate";
 import openhumanRouter from "./routes/openhuman";
 import graphifyRouter from "./routes/graphify";
 import skillsGapRouter from "./routes/skills-gap";
+import marketRouter from "./routes/market-intelligence";
 import aiImageRouter from "./routes/ai-image";
 import { getHealthPayload } from "./lib/health";
 
@@ -177,6 +178,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/openhuman", router: openhumanRouter, auth: "authenticated", description: "OpenHuman bridge" },
   { path: "/api/graphify", router: graphifyRouter, auth: "authenticated", description: "Graphify bridge" },
   { path: "/api/skills-gap", router: skillsGapRouter, auth: "authenticated", description: "Skills gap analysis" },
+  { path: "/api/market", router: marketRouter, auth: "authenticated", description: "Market intelligence (radar free; segnali Pro)" },
 
   { path: "/api/admin", router: adminRouter, auth: "admin", description: "Pannello admin" },
   { path: "/api/admin/rag", router: ragAdminRouter, auth: "admin", description: "Admin RAG" },
