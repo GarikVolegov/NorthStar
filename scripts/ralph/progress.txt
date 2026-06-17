@@ -54,3 +54,13 @@ Started: 2026-06-17 (seeded by Opus 4.8 after Phase 0/1 monetization work)
   - Pattern for the remaining stub career routes (jobs.ts etc.): check for an existing FE + table first; most FE is already built and only the backend is a stub.
   - FINAL STATE this session: US-001..007, US-014 done (8). US-009 code done (LLM-shape live-smoke pending). US-005/010 functional via real backends. US-008 descoped. US-011/012/013 deferred to staging. Roadmap PRD ready for the Ralph loop (./scripts/ralph/ralph.sh --tool claude) to pick up the deferred items where a CLI + staging DB exist.
 ---
+
+## 2026-06-17 - DB-real integration tests (US-004, US-013) RUN GREEN
+- The user provided an EMPTY testing Neon DB. Built the full schema on it via `drizzle-kit push` (run directly with inline testing DATABASE_URL/_MIGRATOR, NOT via push.mjs which loads the repo .env=prod; pgvector enabled first; non-destructive on empty DB → no auto-confirm). 90 tables created.
+- US-004: applications.integration.test.ts → 2 tests GREEN against the testing DB (CRUD + owner-scoping + interview<->interviewing mapping).
+- US-013: market-intelligence.integration.test.ts → 3 tests GREEN (/overview radar free; /signals 402 free vs 200 Pro via a real subscriptions row).
+- **Learnings for future iterations / running DB-real tests:**
+  - Pattern: `vi.mock("../lib/jwt-secret", () => ({ JWT_SECRET: "test-secret" }))`; sign a NorthStar JWT with payload {userId,...}; requireAuth happy-path reads req.user.id with NO DB query. Seed real users (only name+email required) for FK; mount the router on a bare express app + supertest. Guard the suite with `describe.skipIf(!process.env.DATABASE_URL)` so it skips on no-DB runs and executes in CI `quality` / staging.
+  - SAFETY: run with `set -a; . ./.env.ralph-test; set +a` (gitignored testing URL) BEFORE vitest. The repo .env points to a DIFFERENT (prod) host; dotenv override:false keeps the pre-set testing URL. ALWAYS verify the resolved host before trusting a DB-real run.
+  - getEffectivePlan/cached() is fail-open without Redis (recomputes from DB) → plan gating is testable DB-only (US-013). The cacheIncr freemium quotas (interview/skills-gap/cover-letter) need Redis to actually gate (US-011), and LLM features (interview/cv/roadmap/cover-letter) need an AI provider (USE_MOCK_AI) — neither was available here.
+---
