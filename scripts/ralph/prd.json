@@ -93,8 +93,8 @@
         "Tests pass"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Created POST /api/cover-letter/generate (the exact endpoint the pre-existing CoverLetterDialog calls) + mounted authenticated. Generates from the user's OWN CV (cvText) + company/role/jobDescription via getLLM (gemini-flash-1.5); freemium 1/month via Redis cacheIncr returning a soft {error} gate the dialog already surfaces. No appId/persistence (matches the dialog contract). Typecheck + lint green. DB-real test deferred to staging."
     },
     {
       "id": "US-007",

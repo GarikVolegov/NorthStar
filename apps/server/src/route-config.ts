@@ -24,6 +24,7 @@ import xpRouter from "./routes/xp";
 import badgesRouter from "./routes/badges";
 import completionRouter from "./routes/completion";
 import applicationsRouter from "./routes/applications";
+import coverLetterRouter from "./routes/cover-letter";
 import testSessionsRouter from "./routes/test-sessions";
 import businessIdeasRouter from "./routes/business-ideas";
 import jobsRouter from "./routes/jobs";
@@ -145,6 +146,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/badges", router: badgesRouter, auth: "authenticated", description: "Badges" },
   { path: "/api/completion", router: completionRouter, auth: "authenticated", description: "Completion" },
   { path: "/api/applications", router: applicationsRouter, auth: "authenticated", description: "Candidature" },
+  { path: "/api/cover-letter", router: coverLetterRouter, auth: "authenticated", description: "Cover letter AI (Pro freemium)" },
   { path: "/api/test-sessions", router: testSessionsRouter, auth: "authenticated", description: "Test sessions" },
   { path: "/api/business-ideas", router: businessIdeasRouter, auth: "authenticated", description: "Business ideas" },
   { path: "/api/jobs", router: jobsRouter, auth: "authenticated", description: "Jobs" },
