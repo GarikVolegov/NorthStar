@@ -10,9 +10,9 @@
 > tiene sincronizzata. Le verità di dettaglio vivono nei file `*_RULES.md`, in `ARCHITECTURE.md`,
 > in `docs/` e nel cervello `.brain/`. Qui c'è la mappa e lo stato.
 
-- **Ultima revisione:** 2026-06-16 — *Opus 4.8 (audit sciame P0–P3 + risanamento CI; gate core verde)*
-- **Stato repo alla revisione:** 4 PR aperti su `main` (#8 base `chore/fase3-boot-fixes`, #9 P0, #10 P1, #11 P2). `ci.yml` job **audit + quality VERDI**; `e2e` rosso (vedi §8 Handoff). `main` non protetto (CI advisory). Nessun deploy.
-- **Numeri verificati:** 72 tabelle schema · 43 migrazioni · 79 file route · 72 pagine web
+- **Ultima revisione:** 2026-06-17 — *Opus 4.8 (/finish-northstar: consolidamento P0/P1/P2 + checkout Stripe + fix e2e/serverless; verso staging)*
+- **Stato repo alla revisione:** branch d'integrazione **`release/launch-candidate`** (draft PR #12 → `main`, **DO-NOT-MERGE**) consolida `chore/fase3-boot-fixes` (CI) + P0 + P1 + P2 e aggiunge: **flusso checkout Stripe completo** (prima ASSENTE — upgrade/cancel/billing-portal/plans + `invoice.payment_failed`), **plan-cache su Redis condiviso** (serverless-safe), e i **fix e2e** (vite HTTPS/navbar, Playwright port, ProtectedRoute senza Clerk). `ci.yml` **audit + quality VERDI**; build prod web+server verde; `e2e` infra risolta — restano i test browser **autenticati** che richiedono `VITE_CLERK_PUBLISHABLE_KEY` configurato (vedi §8). `main` non protetto (CI advisory). **Nessun deploy.**
+- **Numeri verificati:** 72 tabelle schema · 43 migrazioni (**journal fermo a idx 34** — da riconciliare contro DB staging, vedi §8) · ~80 file route · 72 pagine web
 
 ---
 
@@ -256,8 +256,15 @@ Note di fase: [`.brain/30_Process/GSD-Phases/`](.brain/30_Process/GSD-Phases/). 
 
 ### Prossimi passi
 
-- [ ] Chiudere **Fase 1 / Step 9** (test + security gate) e mergiare in `main`.
-- [ ] Avviare **Fase 3 — Wendy Neural Attention** una volta Fase 1 stabile.
+**Linea /finish-northstar (verso il lancio monetizzabile) — branch `release/launch-candidate`:**
+- [ ] **Staging deploy + verifica flusso reale** (register→test→risultato→upgrade→premium→cancel). Serve infra founder: DB Postgres+pgvector + `REDIS_URL`, Railway (`staging.yml` on `develop`), chiavi **Stripe test** (`STRIPE_SECRET_KEY`/`STRIPE_WEBHOOK_SECRET` + 4 price-ID), `VITE_CLERK_PUBLISHABLE_KEY` test. Env sulla piattaforma, **mai nel repo**.
+- [ ] **Riconciliare il journal Drizzle** contro il DB staging (vedi §8) prima di affidargli `db:migrate`.
+- [ ] **e2e browser autenticati**: configurare la chiave Clerk test in CI (oppure decidere il path JWT-primary). Solo allora `e2e` può andare 100% verde.
+- [ ] Merge `release/launch-candidate` → `main` = **deploy prod**: gate umano esplicito del founder.
+
+**Pre-esistenti:**
+- [ ] Chiudere **Fase 1 / Step 9** (test + security gate).
+- [ ] Avviare **Fase 3 — Wendy Neural Attention** una volta stabile.
 - [ ] Ripianare il debito noto (§8): allineare service layer ai bounded context, collegare i componenti Fase 2 staged, consolidare `route-paths.ts`.
 
 ### Pipeline interne (`.brain/20_Product/Pipelines/`)
@@ -281,12 +288,18 @@ Da riconciliare nel tempo. Quando ne risolvi una, rimuovila da qui.
 5. **Componenti Fase 2 staged** in knip-ignore: vanno **collegati** alle pagine, non cancellati (il gate dead-code può ingannare su feature read-only — vedi memoria `staged-wip-components-fase2` e `wendy-session-memory-restore`).
 6. **Numeri "vivi".** route/tabelle/pagine cambiano: la fonte di verità è il codice, non questo file. Aggiorna l'header quando rifai il conteggio.
 
-### 🔧 Handoff CI (2026-06-16) — chiudere `e2e` + riconciliazione schema
+### 🔧 Handoff CI (2026-06-17) — e2e: root cause REALE + cosa resta
 
-Stato: `ci.yml` **audit + quality VERDI**. Restano rossi (advisory — `main` non è branch-protected):
+**La diagnosi "drift schema" del 2026-06-16 era SBAGLIATA.** Verificato dai log CI: in e2e il **server API parte e diventa healthy** (`Run DB migrations` + `Start API server` verdi) e lo schema TS è **completo** (tutti gli oggetti di 0035–0042 sono già in `packages/db/src/schema/**`, e2e usa `drizzle-kit push`). Le vere cause di `e2e` rosso erano, a strati (tutte corrette su `release/launch-candidate`):
+1. **`Start web app`**: `apps/web/vite.config.ts` serviva **HTTPS** (`basicSsl()` in serve) mentre l'health-check/Playwright usano `http://` → "empty reply". Fix: `basicSsl()` gated dietro `!process.env.CI`. + path warmup `navbar.tsx` minuscolo (case-sensitive su Linux) → `Navbar.tsx`.
+2. **`Runtime quality gate`** — port conflict: il workflow pre-avvia api(:3001)+web(:5000) ma `playwright.config.ts` (`reuseExistingServer:!CI`) provava a lanciare un secondo server. Fix: `PLAYWRIGHT_SKIP_WEBSERVER=true` nello step.
+3. **Smoke `core-smoke.spec`** (protected route → redirect /sign-in): `ProtectedRoute`/`AuthContext` sono **gated su Clerk**; senza `VITE_CLERK_PUBLISHABLE_KEY` (CI) Clerk non carica mai → spinner infinito invece del redirect. Fix: `lib/clerk-config.ts` + guard `isClerkConfigured()` (se Clerk non configurato → redirect /sign-in; prod sempre con Clerk → invariato).
 
-- **`ci.yml` → `e2e`**: il server API **non si mette in ascolto su :3001** in CI (crash/hang in `apps/server/src/index.ts` prima di `httpServer.listen()`). Escluso `/ready` (db/pgvector/redis/embedder ok in quell'env). **Per pinnare serve riprodurre l'ambiente e2e** (Postgres+pgvector + `tsx src/index.ts` con `USE_MOCK_AI=true`) — non fattibile senza Docker/DB di staging. Sospetto principale: **drift schema** — il DB e2e è creato da `drizzle-kit push` (dallo schema Drizzle), ma alcune colonne esistono su Neon solo via le **migrazioni raw 0035–0042 applicate a mano** (journal Drizzle fermo a idx 34). Già trovato e corretto un caso (`alerts.ts` usava `cost` invece di `estimated_cost_usd`); possono essercene altri. **Fix corretto:** rendere lo **schema Drizzle la fonte di verità** (allineare `packages/db/src/schema/**` a ciò che le SQL raw hanno creato) così `push`/`db:migrate` ricostruiscono un DB completo — risolve sia e2e sia il debito journal. Da fare con un **DB di staging** (mai prod).
-- **Lighthouse** (perf mobile) e **Playwright mobile** (`mobile-qa.yml`): workflow separati, preesistenti; decidere se devono essere verdi o restare advisory.
+**Cosa RESTA rosso in `e2e`:** i test **browser autenticati** (`auth`/`test-riasec`/`admin`/`objectives` via `loginViaApi` JWT) richiedono una sessione. La guard frontend è Clerk-centrica → senza `VITE_CLERK_PUBLISHABLE_KEY` (chiave **test** dell'istanza Clerk del founder) questi non passano. **Decisione founder:** configurare la chiave Clerk test in CI/staging (serve comunque per lo staging) **oppure** valutare un path auth frontend JWT-primary (cambio strutturale → gate). `mobile-qa.yml`/Lighthouse: separati, advisory.
+
+### 🗄️ Riconciliazione journal Drizzle (per lo STAGING/PROD deploy, non per e2e)
+
+`staging.yml` e `production.yml` usano **`db:migrate`** (journal-driven), ma il journal è **fermo a idx 34** mentre le SQL 0035–0042 esistono come file applicati a mano fuori dal journal. Su un DB **fresco** (staging nuovo) `db:migrate` costruirebbe uno schema incompleto. e2e NON è impattato (usa `push`). **Fix (da fare con DB staging reale, mai prod):** aggiungere le voci journal 0035–0042 così `db:migrate` applica anche quelle su un DB fresco; per il **prod esistente** (che ha già 0035–0042 applicate a mano) inserire le righe corrispondenti in `__drizzle_migrations` per evitare il re-apply ("already exists"). Verificare entrambi i casi contro un DB di staging.
 
 > Merge di un PR su `main` = **deploy in produzione** (`production.yml`, include migrazione DB prod) → è una scelta umana esplicita. Il `db-migrate-prod` è journal-driven: riconciliare il journal **prima** di affidargli la migrazione prod.
 
@@ -328,6 +341,7 @@ Aggiungi una riga ad ogni revisione significativa. Più recente in alto.
 
 | Data | Modello/AI | Cosa è cambiato |
 | --- | --- | --- |
+| 2026-06-17 | Opus 4.8 | **/finish-northstar — verso il lancio monetizzabile (sciame parallelo).** Branch d'integrazione `release/launch-candidate` (draft PR #12, DO-NOT-MERGE). (C) Consolidati `chore/fase3-boot-fixes`+P0+P1+P2 (solo conflitti `memoria.md`; typecheck/lint/unit verdi). (M) **Costruito il flusso checkout Stripe, prima INTERAMENTE ASSENTE** (era il vero blocco all'incasso, non il webhook che già funzionava): `lib/stripe.ts` (client lazy + mappa price-ID↔piano), endpoint `upgrade`/`cancel`/`billing-portal`/`plans`, webhook `invoice.payment_failed`, FE `/premium` reale + UI gestione abbonamento in `profilo.tsx`; helper estratti in `lib/stripe-webhook-helpers.ts` (file-size gate). (S) Plan-cache `check-feature` da `Map` in-process → **Redis condiviso** (cross-replica). (D) **e2e: root cause reale ≠ schema drift** (vedi §8): fix vite HTTPS+navbar, Playwright port, ProtectedRoute senza Clerk. Build prod web+server verde. **Audit verifica:** i "P0 bug" dello skill erano quasi tutti già risolti (RIASEC, /auth/me, isPremium-cancelled, CORS, no ADMIN_KEY hardcoded). Restano gated sul founder: infra staging + chiave Clerk test + riconciliazione journal. |
 | 2026-06-16 | Opus 4.8 | **Audit sciame (5 agenti) + risanamento CI.** Roadmap P0–P3 e fix su 4 PR. (a) **P0 sicurezza** (#9): verifica crittografica token Google/Clerk, fix IDOR/PII, OTP rate-limit, `requireOwnership`, metrics `req.ip`. (b) **P1 scalabilità** (#10): indice hnsw `knowledge_nodes`, helper `cached()`, leader-lock cron, store rate-limit Redis condiviso, fan-out WS pub/sub. (c) **P2 riuso** (#11): cache embedding query, global error handler smart. (d) **Base `chore/fase3-boot-fixes`** (#8): committati i fix Fase-3 non committati (sbloccano `main` rotto) + **risanamento CI a strati** — Node 20.10→22.13 (pnpm lo richiede), 6 vuln dipendenze high via overrides (`pnpm-workspace.yaml`), Postgres+pgvector nel job `quality`, soglia coverage ai-server 70→45, `health.test` (clear `USE_MOCK_AI`), ratchet file-size (baseline rigenerato), dead-code knip (2 staged ignorati), guard e2e-determinism, drift test UI (WendyEmptyState/BackgroundPicker), bug `alerts.ts` (colonna `cost`→`estimated_cost_usd`). **Risultato:** `ci.yml` audit+quality VERDI su Node 22.13+24. **Toolchain qui:** `pnpm` via corepack shim in `~/.local/bin`; `gh` assente (PR creati via REST API + token keychain). Vedi §8 Handoff per e2e/schema. |
 | 2026-06-01 | Opus 4.8 | Creazione iniziale di `memoria.md` tramite workflow agentico (4 agenti Explore: backend/DB, frontend/UX, AI/Wendy/RAG, stato/direzione) + verifica diretta di git, conteggi e posizioni file. Stato: Fase 2 mergiata, Fase 1 in chiusura, Fase 3 in arrivo. |
 
