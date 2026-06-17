@@ -32,8 +32,8 @@
         "Verify in browser using dev-browser skill (or note manual verification needed if no browser tools)"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Done by Opus 4.8. skills-gap.tsx now detects type:'gate' in the SSE reader loop and renders an upgrade card (Lock + message + Link /premium), mirroring colloquio.tsx. Verified web typecheck + lint green."
     },
     {
       "id": "US-003",

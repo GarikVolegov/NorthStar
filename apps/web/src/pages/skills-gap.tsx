@@ -8,8 +8,10 @@ import {
   ArrowLeft,
   ArrowRight,
   Loader2,
+  Lock,
   Plus,
   RefreshCw,
+  Sparkles,
   Target,
   X,
 } from "lucide-react";
@@ -18,7 +20,7 @@ import { Link, useLocation, useParams } from "wouter";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
-type Step = "select" | "analyzing" | "results";
+type Step = "select" | "analyzing" | "results" | "gate";
 type Level = "junior" | "mid" | "senior";
 
 const LEVEL_LABELS: Record<Level, string> = {
@@ -112,6 +114,7 @@ export default function SkillsGap() {
   const [result, setResult] = useState("");
   const [progressIdx, setProgressIdx] = useState(0);
   const [, setIsStreaming] = useState(false);
+  const [gateMsg, setGateMsg] = useState<string | null>(null);
 
   const { data: sector, isLoading: sectorLoading } = useGetSector(id, {
     query: { enabled: !!id, queryKey: ["sector", id] },
@@ -175,6 +178,21 @@ export default function SkillsGap() {
           if (!line.startsWith("data: ")) continue;
           try {
             const data = JSON.parse(line.slice(6)) as unknown;
+            // Freemium gate (free monthly limit reached) → mostra upgrade.
+            if (
+              typeof data === "object" && data !== null &&
+              "type" in data && (data as { type?: unknown }).type === "gate"
+            ) {
+              const msg =
+                "message" in data && typeof (data as { message?: unknown }).message === "string"
+                  ? (data as { message: string }).message
+                  : "Hai esaurito le analisi gratuite di questo mese. Passa a Pro per continuare.";
+              setGateMsg(msg);
+              setStep("gate");
+              setIsStreaming(false);
+              clearInterval(interval);
+              return;
+            }
             const content =
               typeof data === "object" && data !== null && "content" in data && typeof data.content === "string"
                 ? data.content
@@ -388,6 +406,26 @@ export default function SkillsGap() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Step — Gate (limite mensile free raggiunto) */}
+      {step === "gate" && (
+        <Card className="border-2 border-primary/30">
+          <CardContent className="pt-8 pb-8 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-5">
+              <Lock className="w-7 h-7 text-primary" />
+            </div>
+            <h2 className="font-bold text-lg mb-2">Analisi illimitate con Pro</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6 leading-relaxed">
+              {gateMsg}
+            </p>
+            <Button asChild size="lg" className="rounded-full px-8">
+              <Link href="/premium">
+                <Sparkles className="w-4 h-4 mr-2" /> Passa a Pro
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {/* Step 3 — Results */}

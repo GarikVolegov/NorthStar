@@ -23,3 +23,12 @@ Started: 2026-06-17 (seeded by Opus 4.8 after Phase 0/1 monetization work)
   - skills-gap.ts has NO unit test file — gate logic mirrors interview.ts. Verified via typecheck + lint only.
   - US-002 (FE) must detect type==='gate' in the SSE reader loop in apps/web/src/pages/skills-gap.tsx and render an upgrade card (mirror the gate block in apps/web/src/pages/colloquio.tsx).
 ---
+
+## 2026-06-17 - US-002
+- skills-gap.tsx now handles the Pro gate: a 'gate' SSE event sets step='gate' and renders an upgrade card (Lock icon + message + Link to /premium).
+- Files: apps/web/src/pages/skills-gap.tsx — added 'gate' to Step union, gateMsg state, Lock/Sparkles imports, gate detection in the reader loop (stops streaming + clears the progress interval), and a gate render branch before the Results block.
+- **Learnings for future iterations:**
+  - When returning early from the SSE reader loop, clear the progress interval and setIsStreaming(false) inline — the trailing cleanup after the try/catch is skipped on early return.
+  - The gate UI pattern (Lock + message + Link /premium) is now used in colloquio.tsx, mercato.tsx, and skills-gap.tsx — reuse it for cover-letter (US-007) too.
+  - Browser verification still pending (no dev-browser tools in this env) — manual check recommended.
+---
