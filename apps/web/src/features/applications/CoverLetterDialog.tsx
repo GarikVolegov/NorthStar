@@ -13,8 +13,8 @@ const BASE = import.meta.env.BASE_URL || "/";
 type CoverLetterResponse = { error?: string; text?: string };
 
 export function CoverLetterDialog({ app, onClose }: { app: Application; onClose: () => void }) {
-  const [jobDescription, setJobDescription] = useState("");
-  const [text, setText] = useState("");
+  const [jobDescription, setJobDescription] = useState(app.jobPostingText ?? "");
+  const [text, setText] = useState(app.coverLetter ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -27,6 +27,7 @@ export function CoverLetterDialog({ app, onClose }: { app: Application; onClose:
         company: app.company,
         role: app.role,
         jobDescription,
+        applicationId: app.id,
       });
       if (data.error) throw new Error(data.error);
       setText(data.text ?? "");

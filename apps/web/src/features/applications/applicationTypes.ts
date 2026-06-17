@@ -18,6 +18,9 @@ export interface Application {
   appliedAt: string;
   updatedAt: string;
   notesLog: NoteEntry[] | null;
+  // Career tools: cover letter AI generata + testo annuncio (persistiti per candidatura).
+  coverLetter?: string | null;
+  jobPostingText?: string | null;
 }
 
 export const STATUS_META: Record<

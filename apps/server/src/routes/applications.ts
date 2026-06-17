@@ -49,6 +49,8 @@ function serialize(row: typeof jobApplicationsTable.$inferSelect) {
     notes: row.notes,
     salary: row.salary,
     location: row.location,
+    coverLetter: row.coverLetter,
+    jobPostingText: row.jobPostingText,
     appliedAt: row.appliedAt?.toISOString() ?? null,
     updatedAt: row.updatedAt?.toISOString() ?? null,
     notesLog: row.notesLog ?? null,

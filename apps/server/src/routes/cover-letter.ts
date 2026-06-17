@@ -8,9 +8,9 @@
  * FREEMIUM: 1 lettera/mese gratis, poi Pro (Redis cacheIncr, fail-open).
  */
 import { Router } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod/v4";
-import { db, userProfileSettingsTable } from "@workspace/db";
+import { db, userProfileSettingsTable, jobApplicationsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { wendyLimiter } from "../middleware/rate-limit";
 import { getEffectivePlan, planMeets } from "../middleware/check-feature";
@@ -31,6 +31,8 @@ const schema = z.object({
   company: z.string().min(1).max(200),
   role: z.string().min(1).max(200),
   jobDescription: z.string().max(5000).optional().default(""),
+  // Se fornito, la lettera viene persistita su quella candidatura (owner-scoped).
+  applicationId: z.number().int().positive().optional(),
 });
 
 router.post("/generate", requireAuth, wendyLimiter, async (req, res) => {
@@ -40,7 +42,7 @@ router.post("/generate", requireAuth, wendyLimiter, async (req, res) => {
     res.status(400).json({ error: "Dati non validi" });
     return;
   }
-  const { company, role, jobDescription } = parsed.data;
+  const { company, role, jobDescription, applicationId } = parsed.data;
 
   // ── Freemium gate: 1 lettera/mese gratis, poi Pro ───────────────────────────
   const plan = await getEffectivePlan(userId);
@@ -90,6 +92,7 @@ Scrivi la lettera di presentazione, pronta all'uso.`;
 
     let text = "";
     for await (const delta of stream) text += delta;
+    const finalText = text.trim();
 
     recordLlmUsage({
       userId,
@@ -99,7 +102,25 @@ Scrivi la lettera di presentazione, pronta all'uso.`;
       requestType: "cover-letter",
     });
 
-    res.json({ text: text.trim() });
+    // Persisti la lettera sulla candidatura (owner-scoped) se richiesto, così non
+    // va persa alla chiusura del dialog e viene riproposta alla riapertura.
+    if (applicationId) {
+      await db
+        .update(jobApplicationsTable)
+        .set({
+          coverLetter: finalText,
+          jobPostingText: jobDescription || null,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(jobApplicationsTable.id, applicationId),
+            eq(jobApplicationsTable.userId, userId),
+          ),
+        );
+    }
+
+    res.json({ text: finalText });
   } catch (err) {
     req.log?.error?.({ err }, "cover-letter generate failed");
     res.status(500).json({ error: "Errore nella generazione della lettera. Riprova." });
