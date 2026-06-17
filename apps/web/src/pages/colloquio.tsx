@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UpgradePrompt } from "@/components/ui/UpgradeGate";
 import { apiFetch } from "@/lib/api-fetch";
 import { useGetSector } from "@workspace/api-client-react";
 import {
@@ -11,7 +12,6 @@ import {
   CheckCircle2,
   Lightbulb,
   Loader2,
-  Lock,
   MessageSquare,
   RefreshCw,
   Send,
@@ -419,29 +419,16 @@ export default function Colloquio() {
 
       {/* ── Gate (free quota exhausted) ── */}
       {phase === "gate" && gate && (
-        <Card className="border-2 border-primary/30">
-          <CardContent className="pt-8 pb-8 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-5">
-              <Lock className="w-7 h-7 text-primary" />
-            </div>
-            <h2 className="font-bold text-lg mb-2">Colloqui illimitati con Pro</h2>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6 leading-relaxed">
-              {gate.message}
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3 justify-center">
-              <Button
-                size="lg"
-                className="rounded-full px-8"
-                onClick={() => setLocation("/premium")}
-              >
-                <Sparkles className="w-4 h-4 mr-2" /> Passa a Pro
-              </Button>
-              <Button size="lg" variant="outline" className="rounded-full px-6" asChild>
-                <Link href={`/settore/${id}`}>Torna al settore</Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="max-w-md mx-auto space-y-3">
+          <UpgradePrompt
+            feature="interview_unlimited"
+            requiredPlan="pro"
+            {...(gate.message ? { message: gate.message } : {})}
+          />
+          <Button variant="ghost" className="w-full rounded-full" asChild>
+            <Link href={`/settore/${id}`}>Torna al settore</Link>
+          </Button>
+        </div>
       )}
 
       {/* ── Conversation (turns) ── */}

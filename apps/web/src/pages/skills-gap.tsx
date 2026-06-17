@@ -4,14 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { apiFetch } from "@/lib/api-fetch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useGetSector } from "@workspace/api-client-react";
+import { UpgradePrompt } from "@/components/ui/UpgradeGate";
 import {
   ArrowLeft,
   ArrowRight,
   Loader2,
-  Lock,
   Plus,
   RefreshCw,
-  Sparkles,
   Target,
   X,
 } from "lucide-react";
@@ -410,22 +409,13 @@ export default function SkillsGap() {
 
       {/* Step — Gate (limite mensile free raggiunto) */}
       {step === "gate" && (
-        <Card className="border-2 border-primary/30">
-          <CardContent className="pt-8 pb-8 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-5">
-              <Lock className="w-7 h-7 text-primary" />
-            </div>
-            <h2 className="font-bold text-lg mb-2">Analisi illimitate con Pro</h2>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6 leading-relaxed">
-              {gateMsg}
-            </p>
-            <Button asChild size="lg" className="rounded-full px-8">
-              <Link href="/premium">
-                <Sparkles className="w-4 h-4 mr-2" /> Passa a Pro
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="max-w-md mx-auto">
+          <UpgradePrompt
+            feature="rag_search"
+            requiredPlan="pro"
+            {...(gateMsg ? { message: gateMsg } : {})}
+          />
+        </div>
       )}
 
       {/* Step 3 — Results */}

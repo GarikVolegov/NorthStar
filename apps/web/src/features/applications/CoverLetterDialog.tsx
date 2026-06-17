@@ -2,10 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { UpgradePrompt } from "@/components/ui/UpgradeGate";
 import { postJson } from "@/lib/apiClient";
 import { AlertCircle, Building2, Copy, Loader2, Sparkles } from "lucide-react";
 import { useState } from "react";
-import { Link } from "wouter";
 
 import type { Application } from "./applicationTypes";
 
@@ -77,14 +77,12 @@ export function CoverLetterDialog({ app, onClose }: { app: Application; onClose:
           </Button>
           {error &&
             (error.includes("Pro") ? (
-              <div className="p-3 rounded-xl bg-primary/5 border border-primary/20 space-y-2">
-                <p className="text-xs text-foreground">{error}</p>
-                <Button asChild size="sm" className="rounded-lg w-full gap-1.5">
-                  <Link href="/premium">
-                    <Sparkles className="w-3.5 h-3.5" /> Passa a Pro
-                  </Link>
-                </Button>
-              </div>
+              <UpgradePrompt
+                feature="export_plan_pdf"
+                requiredPlan="pro"
+                message={error}
+                compact
+              />
             ) : (
               <div className="flex items-center gap-2 p-3 rounded-xl bg-destructive/10 border border-destructive/20">
                 <AlertCircle className="w-4 h-4 text-destructive shrink-0" />
