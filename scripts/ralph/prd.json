@@ -211,8 +211,8 @@
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "docs/DEPLOY.md created: architecture decision (Railway long-running vs Vercel serverless), legal/Stripe-KYC prerequisites, the §2 schema/journal reconciliation on staging (44 SQL vs idx 34), required prod env vars, Stripe test->live, go-live via production.yml + smoke test, infra cost table, top risk. Fully sourced from the repo config."
     }
   ]
 }
