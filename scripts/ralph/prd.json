@@ -63,7 +63,7 @@
       ],
       "priority": 4,
       "passes": true,
-      "notes": "Real CRUD implemented on jobApplicationsTable (GET /:userId list owner-scoped via req.user.id, POST, PATCH owner-scoped, DELETE owner-scoped) with FE<->DB status mapping (interview<->interviewing). Server typecheck green. DB-REAL integration test DEFERRED TO STAGING (no DATABASE_URL/runner safe to use here — Neon is prod; no existing supertest+real-DB pattern to mirror). Tracked with US-011/012/013."
+      "notes": "Real CRUD on jobApplicationsTable (GET /:userId owner-scoped via req.user.id, POST, PATCH, DELETE) with FE<->DB status mapping (interview<->interviewing). DB-REAL integration test added (applications.integration.test.ts, skipIf(!DATABASE_URL)) and VERIFIED GREEN (2 tests) against the user-provided testing DB (host ep-falling-tooth, NOT prod — confirmed dotenv override:false keeps the testing URL). Covers create/list/update/delete + owner-scoping."
     },
     {
       "id": "US-005",
@@ -167,7 +167,7 @@
       ],
       "priority": 11,
       "passes": false,
-      "notes": "DEFERRED TO STAGING: requires a real Postgres+pgvector with a safe DATABASE_URL. The only DATABASE_URL available in this env points to the prod Neon DB (project rule: never run destructive tests/migrations on prod), and there is no existing supertest+real-DB integration pattern to mirror. Run on the staging DB during the §2 reconciliation in docs/DEPLOY.md."
+      "notes": "PARTIALLY UNBLOCKED: a testing DB is now available (schema pushed), but this gate ALSO needs Redis (the interview quota uses cacheIncr; without Redis it is fail-open and the gate never fires) AND the LLM (generateQuestions for the first question). Neither Redis nor an AI provider is available in this env (only the DB was provided). Run with a local Redis + USE_MOCK_AI on staging/CI. Pattern proven by the green US-013 gate test."
     },
     {
       "id": "US-012",
@@ -182,7 +182,7 @@
       ],
       "priority": 12,
       "passes": false,
-      "notes": "DEFERRED TO STAGING (same reason as US-011): needs a safe staging DATABASE_URL. Run during the docs/DEPLOY.md §2 reconciliation."
+      "notes": "PARTIALLY UNBLOCKED: testing DB available, but CV AI generation needs an LLM provider (not in this env). The PDF-export Pro gate (requireFeature) could be tested DB-only like US-013; deferred for now to keep scope, run on staging/CI with USE_MOCK_AI. Pattern proven by US-013."
     },
     {
       "id": "US-013",
@@ -196,8 +196,8 @@
         "Tests pass (or documented staging-only)"
       ],
       "priority": 13,
-      "passes": false,
-      "notes": "DEFERRED TO STAGING (same reason as US-011): needs a safe staging DATABASE_URL. Run during the docs/DEPLOY.md §2 reconciliation."
+      "passes": true,
+      "notes": "DONE + VERIFIED GREEN (3 tests) against the user-provided testing DB. market-intelligence.integration.test.ts (skipIf(!DATABASE_URL)) asserts /overview returns the seeded sector radar for a free user, and /signals is gated: 402 PLAN_REQUIRED for free, 200 with {signals,emergingSkills} for Pro (plan resolved from a real subscriptions row; getEffectivePlan is fail-open without Redis). Schema built on the empty testing DB via drizzle-kit push (90 tables, pgvector enabled)."
     },
     {
       "id": "US-014",
