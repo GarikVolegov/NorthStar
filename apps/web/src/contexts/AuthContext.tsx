@@ -216,6 +216,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAuthSyncError(null);
         setAuthTokenGetter(() => nsToken);
         setUser({ ...clerkOnlyUser, ...serverUser });
+
+        // Collega l'eventuale sessione di test anonima salvata prima del signup
+        // (results.tsx / sign-up.tsx), così l'utente ad alto intento atterra su
+        // una dashboard già popolata invece dell'empty state "completa il test".
+        // Il token NorthStar è già in memoria (setInMemoryToken sopra) → apiFetch
+        // inietta l'Authorization header.
+        const pendingTestSession = localStorage.getItem("pendingTestSession");
+        if (pendingTestSession && serverUser.id) {
+          localStorage.removeItem("pendingTestSession");
+          sessionStorage.removeItem("pendingTestSession");
+          const sid = Number(pendingTestSession);
+          if (Number.isFinite(sid)) {
+            void postJson(`${BASE}api/test-sessions/${sid}/assign-user`, {
+              userId: serverUser.id,
+            }).catch(() => { /* best effort: associazione sessione */ });
+          }
+        }
+
         localStorage.removeItem(REFERRAL_STORAGE_KEY);
         sessionStorage.removeItem(REFERRAL_STORAGE_KEY);
         queryClient.invalidateQueries();

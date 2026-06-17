@@ -16,6 +16,14 @@ import { Link } from "wouter";
 export default function SignUpPage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
+    // Cattura l'eventuale sessione di test anonima completata prima del signup,
+    // così AuthContext potrà collegarla all'utente dopo la sincronizzazione.
+    const session = params.get("session");
+    if (session?.trim()) {
+      localStorage.setItem("pendingTestSession", session.trim());
+    }
+
     const referralCode = params.get("ref") ?? params.get("referralCode");
     if (!referralCode?.trim()) return;
     localStorage.setItem("referralCode", referralCode.trim());

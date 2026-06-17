@@ -70,6 +70,9 @@ export default function Results() {
           setLocation("/");
         } else {
           const wm = anonymousWorkMode ?? "unknown";
+          // Persisti la sessione anonima: dopo il signup verrà collegata all'utente
+          // (AuthContext) così la dashboard è già popolata e non mostra l'empty state.
+          try { localStorage.setItem("pendingTestSession", String(id)); } catch { /* ignore */ }
           setLocation(`/registra?session=${id}&sector=${sectorId}&work_mode=${wm}`);
         }
       },
