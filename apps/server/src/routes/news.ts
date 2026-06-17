@@ -3,6 +3,11 @@ import { eq, desc, or, like, and, lt, sql, type SQL } from "drizzle-orm";
 import { db, newsArticlesTable } from "@workspace/db";
 import { PUBLIC_NEWS_SOURCES } from "@workspace/ai-server";
 import { cacheGet, cacheSet } from "../lib/redis";
+import {
+  getStaticNewsItems,
+  getStaticNewsDetail,
+  isStaticNewsId,
+} from "../lib/news-fallback";
 
 const router = Router();
 
@@ -141,8 +146,8 @@ router.get("/", async (req, res) => {
     if (!category && !cursor) {
       const cacheKey = "news:recent:real:v1";
       const cached = await cacheGet<ReturnType<typeof mapNewsItem>[]>(cacheKey);
-      if (cached) {
-        res.json({ news: cached, nextCursor: null });
+      if (cached && cached.length > 0) {
+        res.json({ news: cached, nextCursor: null, source: "live" });
         return;
       }
     }
@@ -169,8 +174,19 @@ router.get("/", async (req, res) => {
 
     const mapped = capped.map(mapNewsItem);
 
-    // Cache non-filtered first page
-    if (!category && !cursor) {
+    // Empty result (fresh DB before the discovery agent has populated
+    // news_articles) → static fallback so /news is never blank. First page only.
+    if (mapped.length === 0 && !cursor) {
+      res.json({
+        news: getStaticNewsItems({ category: category as string | undefined, limit: limitNum }),
+        nextCursor: null,
+        source: "static",
+      });
+      return;
+    }
+
+    // Cache non-filtered first page (only real, non-empty results)
+    if (!category && !cursor && mapped.length > 0) {
       await cacheSet("news:recent:real:v1", mapped, CACHE_TTL);
     }
 
@@ -179,16 +195,33 @@ router.get("/", async (req, res) => {
       ? encodeCursor(last.publishedAt, parseInt(last.id))
       : null;
 
-    res.json({ news: mapped, nextCursor });
+    res.json({ news: mapped, nextCursor, source: "live" });
   } catch (err) {
     req.log?.error?.({ err }, "news list error");
-    res.status(200).json({ news: [], nextCursor: null });
+    res.status(200).json({
+      news: getStaticNewsItems({ limit: 12 }),
+      nextCursor: null,
+      source: "static",
+    });
   }
 });
 
 router.get("/article/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id ?? "", 10);
+    const rawId = req.params.id ?? "";
+
+    // Static fallback articles (sample-*) have no DB row.
+    if (isStaticNewsId(rawId)) {
+      const detail = getStaticNewsDetail(rawId);
+      if (!detail) {
+        res.status(404).json({ error: "News article not found" });
+        return;
+      }
+      res.json({ article: detail });
+      return;
+    }
+
+    const id = parseInt(rawId, 10);
     if (!Number.isFinite(id) || id <= 0) {
       res.status(400).json({ error: "Invalid news id" });
       return;
@@ -240,15 +273,27 @@ router.get("/sector/:sectorName", async (req, res) => {
     const capped = hasMore ? articles.slice(0, limitNum) : articles;
     const mapped = capped.map(mapNewsItem);
 
+    if (mapped.length === 0 && !cursor) {
+      res.json({
+        news: getStaticNewsItems({ sector: sectorName, limit: limitNum }),
+        nextCursor: null,
+        source: "static",
+      });
+      return;
+    }
+
     const last = mapped[mapped.length - 1];
     const nextCursor = hasMore && last
       ? encodeCursor(last.publishedAt, parseInt(last.id))
       : null;
 
-    res.json({ news: mapped, nextCursor });
+    res.json({ news: mapped, nextCursor, source: "live" });
   } catch (err) {
     req.log?.error?.({ err }, "news by sector error");
-    res.json({ news: [] });
+    res.json({
+      news: getStaticNewsItems({ sector: req.params.sectorName, limit: 12 }),
+      source: "static",
+    });
   }
 });
 

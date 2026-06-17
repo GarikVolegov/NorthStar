@@ -47,3 +47,13 @@ Started: 2026-06-17 (seeded by Opus 4.8 — sub-progetto A "stabilize-current-li
   - Running quality gates inside the Vercel buildCommand is fragile: any gate step (ratchet/knip/db-types/test infra) aborts the production deploy. Keep CI and deploy concerns separate.
   - FOUNDER TODO (not code): (1) push so a GitHub deploy of release/launch-candidate goes READY; (2) ainorthstar.vercel.app still points to the old 2026-06-02 CLI deploy (target:production) — decide in Vercel whether to set the production branch to release/launch-candidate or promote a current deploy; (3) set VITE_CLERK_PUBLISHABLE_KEY in Vercel env (US-001) or prod login stays broken.
 ---
+
+## 2026-06-17 - US-002 (news) — DONE (founder chose: static fallback)
+- Root cause confirmed by code analysis: GET /api/news (apps/server/src/routes/news.ts) reads from newsArticlesTable, which is populated ONLY by the AI discovery agent (packages/ai-server/src/discovery-agent/news-publisher.ts, insert ... onConflictDoNothing). No simple seed/job. On a fresh/local DB the table is empty → blank page. Prod has it populated, hence it looks fine there.
+- Fix: new apps/server/src/lib/news-fallback.ts — 6 evergreen NorthStar-authored items (clearly source "NorthStar", links point to real app routes, NOT fabricated external news) + pure functions getStaticNewsItems({category?,sector?,limit?}) / getStaticNewsDetail(id) / isStaticNewsId(id). news.ts returns the static set (source:'static') when the DB result is empty on the first page AND in the error catch, across all three routes (/, /sector/:name, and /article/:id for sample-* ids). Also: never read/write an empty cache entry (guards a stale empty cache from blanking the page).
+- Verified: server typecheck OK, eslint OK, 8 unit tests green (pure functions → no DB mock, respects DB_RULES). Browser verification PENDING (needs app+DB running; do it locally/staging).
+- **Learnings for future iterations:**
+  - news_articles is filled by the discovery agent, not a seed. To get REAL news locally/staging you must run that agent (needs an LLM provider). The static fallback only fills the gap so /news is never blank.
+  - The response shape is { news, nextCursor } (+ now an optional source:'live'|'static'); the frontend reads data.news. Static detail items use string ids 'sample-N' and the detail route now short-circuits on isStaticNewsId before parseInt.
+  - news.tsx card click uses wouter navigate(detailUrl) (internal) so detailUrl must be an app path; the "Fonte" link uses sourceUrl as an external <a target=_blank>.
+---
