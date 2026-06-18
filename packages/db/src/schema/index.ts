@@ -98,3 +98,7 @@ export * from "./weakSignal";
 export * from "./jobPostingSnapshot";
 export * from "./skillCooccurrence";
 export * from "./proactiveInsight";
+// ── La Bussola (compass) — percorso dell'indeciso (Fase 1) ────
+export * from "./compassProfile";
+export * from "./compassSignal";
+export * from "./sceneCard";
