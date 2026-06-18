@@ -235,3 +235,28 @@ export { ingestRssToRag } from "./rag/ingestors/rss-ingestor";
 export type { RssIngestOptions, RssIngestResult } from "./rag/ingestors/rss-ingestor";
 export { ingestJsonToRag } from "./rag/ingestors/json-ingestor";
 export type { JsonIngestOptions, JsonIngestResult } from "./rag/ingestors/json-ingestor";
+// ── La Bussola (compass) — scoring + tournament (Fase 1; spike in Fase 2) ──
+export {
+  RIASEC_DIMS,
+  recencyDecay,
+  weightedRiasec,
+  blendRiasec,
+  clusterFit,
+  deriveHypotheses,
+  nextStage,
+  directionConfidence,
+} from "./compass/scoring";
+export type {
+  RiasecDim,
+  RiasecVector,
+  ScoringSignal,
+  CandidateCluster,
+} from "./compass/scoring";
+export {
+  tournamentTarget,
+  selectTournamentPool,
+  rankByChoices,
+  nextTournamentPair,
+  tournamentChoiceDims,
+} from "./compass/tournament";
+export type { TournamentChoice, TournamentStanding } from "./compass/tournament";

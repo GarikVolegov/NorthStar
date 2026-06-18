@@ -1,5 +1,6 @@
 import { Router, type Router as ExpressRouter } from "express";
 import objectivesRouter from "./routes/objectives";
+import compassRouter from "./routes/compass";
 import calendarRouter from "./routes/calendar";
 import dashboardRouter from "./routes/dashboard";
 import coachRouter from "./routes/coach";
@@ -148,6 +149,7 @@ export const routeConfig: RouteConfig[] = [
   { path: "/api/applications", router: applicationsRouter, auth: "authenticated", description: "Candidature" },
   { path: "/api/cover-letter", router: coverLetterRouter, auth: "authenticated", description: "Cover letter AI (Pro freemium)" },
   { path: "/api/test-sessions", router: testSessionsRouter, auth: "authenticated", description: "Test sessions" },
+  { path: "/api/compass", router: compassRouter, auth: "authenticated", description: "Bussola indeciso" },
   { path: "/api/business-ideas", router: businessIdeasRouter, auth: "authenticated", description: "Business ideas" },
   { path: "/api/jobs", router: jobsRouter, auth: "authenticated", description: "Jobs" },
   { path: "/api/crescita", router: growthRouter, auth: "authenticated", description: "Crescita" },
