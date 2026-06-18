@@ -14,13 +14,16 @@ import {
   prefetchRoute,
 } from "@/components/layout/navbarConfig";
 import {
+  BookOpen,
   Brain,
   Briefcase,
   Globe2,
+  HeartHandshake,
   LogOut,
   MapPin,
   Settings,
   Sparkles,
+  UserCircle,
   Users,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -260,6 +263,27 @@ export function NavbarDesktopProfileMenu(props: ProfileMenuProps) {
       >
         Impostazioni profilo
       </DesktopItem>
+      <DesktopItem
+        icon={<UserCircle className="mr-2 h-4 w-4 text-primary" />}
+        path="/chi-sono"
+        onClick={() => onNavigate("/chi-sono")}
+      >
+        Chi sono
+      </DesktopItem>
+      <DesktopItem
+        icon={<BookOpen className="mr-2 h-4 w-4 text-primary" />}
+        path="/diario"
+        onClick={() => onNavigate("/diario")}
+      >
+        Diario
+      </DesktopItem>
+      <DesktopItem
+        icon={<HeartHandshake className="mr-2 h-4 w-4 text-primary" />}
+        path="/mood"
+        onClick={() => onNavigate("/mood")}
+      >
+        Mood check-in
+      </DesktopItem>
       <DropdownMenuSeparator />
       {insightsUnread > 0 && (
         <>
@@ -371,6 +395,27 @@ export function NavbarMobileProfileMenu(props: ProfileMenuProps) {
         >
           Impostazioni profilo
         </MobileAction>
+        <div className="mt-1 grid grid-cols-3 gap-1.5">
+          {[
+            { label: "Chi sono", icon: UserCircle, path: "/chi-sono" },
+            { label: "Diario", icon: BookOpen, path: "/diario" },
+            { label: "Mood", icon: HeartHandshake, path: "/mood" },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                key={item.path}
+                type="button"
+                onClick={() => onNavigate(item.path)}
+                onMouseEnter={() => prefetchRoute(item.path)}
+                className="flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg border border-border/70 bg-background/60 px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+              >
+                <Icon className="h-4 w-4" />
+                <span className="truncate">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
         {insightsUnread > 0 && (
           <MobileAction
             icon={<Sparkles className="h-4 w-4" />}
