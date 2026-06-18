@@ -45,6 +45,7 @@ import type { JourneyId } from "@/components/dashboard/dashboard-sections";
 import { JourneyToolsSection } from "@/components/dashboard/JourneyToolsSection";
 import { ProfessionCard } from "@/components/dashboard/ProfessionCard";
 import { WorkModePanel } from "@/components/dashboard/WorkModePanel";
+import { BussolaHome } from "@/features/compass/BussolaHome";
 
 const BASE = import.meta.env.BASE_URL || "/";
 
@@ -224,6 +225,18 @@ export default function Dashboard() {
 
   if (!user) return null;
 
+  // La Bussola È la dashboard dell'indeciso (scelta di prodotto): per questo
+  // journey rendiamo l'hub guidato dal profilo compass — anche senza test, è la
+  // Bussola stessa a guidare verso il test. Gli altri journey tengono la
+  // dashboard Guided Focus qui sotto.
+  if (journeyType === "indeciso") {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-8 md:py-12">
+        <BussolaHome />
+      </div>
+    );
+  }
+
   if (!sessionId && !sessionLoading && authReady) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center">
@@ -251,7 +264,7 @@ export default function Dashboard() {
   // Completamento profilo (4 tappe da 25%).
   const profilePercent = Math.min(100, Math.round(
     (sessionId ? 25 : 0) +
-    (journeyType && journeyType !== "indeciso" ? 25 : 0) +
+    25 + // journeyType impostato e non "indeciso" (gli indecisi vedono la Bussola sopra)
     (user?.onboardingCompleted ? 25 : 0) +
     (user?.avatarUrl ? 25 : 0)
   ));
