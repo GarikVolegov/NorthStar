@@ -58,10 +58,15 @@ export default defineConfig(async ({ command }) => ({
   plugins: [
     react(),
     tailwindcss(),
-    // basicSsl serves the dev server over HTTPS for local PWA/service-worker
-    // testing. In CI the e2e health check and Playwright use http://, so a
-    // self-signed HTTPS server would make every request fail ("empty reply").
-    command === "serve" && !process.env.CI && basicSsl(),
+    // basicSsl serves the dev server over HTTPS. It is OPT-IN (VITE_DEV_HTTPS=true)
+    // because the self-signed cert makes the browser show "connection not private"
+    // — if not bypassed the page looks blank, which breaks the Clerk sign-in flow.
+    // Default dev is plain HTTP on localhost (still a secure context, so PWA/
+    // service-worker testing keeps working). CI/e2e use http:// too.
+    command === "serve" &&
+      !process.env.CI &&
+      process.env.VITE_DEV_HTTPS === "true" &&
+      basicSsl(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.svg", "hero.png", "robots.txt"],
