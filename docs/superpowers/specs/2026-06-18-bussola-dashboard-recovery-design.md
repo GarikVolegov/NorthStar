@@ -1,6 +1,6 @@
 # Design — Recupero de "La Bussola" come dashboard dell'indeciso (full-stack)
 
-> Stato: **DRAFT in revisione** · Autore: Opus 4.8 · Data: 2026-06-18
+> Stato: **APPROVATO — Fase 1 implementata** (branch `ralph/bussola-phase1`, fino al confine DB) · Autore: Opus 4.8 · Data: 2026-06-18
 > Sotto-progetto B/C (parte DB-pesante). Fonte di recupero: commit **`9c9a450`**
 > (deploy live del 2026-06-02, branch `feature/fase2-cervello-runtime`).
 
