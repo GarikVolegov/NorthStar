@@ -4,3 +4,5 @@ STOP
 journal/run-*.log
 # Loop-local secrets (DATABASE_URL, etc.) — sourced by loop.sh, NEVER committed.
 .env.loop
+# Single-instance lock (runtime PID file).
+.loop.lock

@@ -28,6 +28,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 CLI="node $SCRIPT_DIR/ralph-cli.mjs"
 STOP_FILE="$SCRIPT_DIR/STOP"
+LOCK_FILE="$SCRIPT_DIR/.loop.lock"
 RUN_LOG="$SCRIPT_DIR/journal/run-$(date +%Y-%m-%d).log"
 BRAIN_CMD="${RALPH_BRAIN_CMD:-claude --dangerously-skip-permissions --print}"
 mkdir -p "$SCRIPT_DIR/journal"
@@ -47,6 +48,21 @@ if [ "$BRAIN_CMD" = "claude --dangerously-skip-permissions --print" ]; then
     exit 3
   }
 fi
+
+# --- Single-instance lock: refuse a second concurrent loop on this checkout ----
+# Two loops on one working tree race on git, branches and backlog.json. Allow one.
+if [ -f "$LOCK_FILE" ]; then
+  other_pid="$(cat "$LOCK_FILE" 2>/dev/null || echo "")"
+  if [ -n "$other_pid" ] && kill -0 "$other_pid" 2>/dev/null; then
+    echo "FATAL: another loop is already running (PID $other_pid). Refusing to start a second instance." >&2
+    echo "If you are sure it is dead, remove $LOCK_FILE and retry." >&2
+    exit 4
+  fi
+  echo "Removing stale lock (PID ${other_pid:-?} not running)." >&2
+  rm -f "$LOCK_FILE"
+fi
+echo "$$" > "$LOCK_FILE"
+trap 'rm -f "$LOCK_FILE"' EXIT
 
 # Resolve knobs (arg overrides config).
 MAX_ITERATIONS="${1:-$($CLI config maxIterations 2>/dev/null || echo 12)}"
