@@ -60,6 +60,7 @@
     "// ── RALPH LOOP ───────────────────────────────────": "---",
     "ralph:test": "node --test scripts/ralph/lib/*.test.mjs",
     "ralph:status": "node scripts/ralph/ralph-cli.mjs status",
+    "ralph:report": "bash scripts/ralph/report.sh",
     "ralph:next": "node scripts/ralph/ralph-cli.mjs next",
     "ralph:loop": "bash scripts/ralph/loop.sh",
     "// ── CLI/MCP ─────────────────────────────────────": "---",
