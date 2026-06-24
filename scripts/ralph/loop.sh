@@ -32,6 +32,10 @@ RUN_LOG="$SCRIPT_DIR/journal/run-$(date +%Y-%m-%d).log"
 BRAIN_CMD="${RALPH_BRAIN_CMD:-claude --dangerously-skip-permissions --print}"
 mkdir -p "$SCRIPT_DIR/journal"
 
+# Load loop-local secrets (gitignored) so the gate's real-DB tests can connect.
+# e.g. DATABASE_URL='postgresql://...'. Exported to every child (claude -> pnpm).
+if [ -f "$SCRIPT_DIR/.env.loop" ]; then set -a; . "$SCRIPT_DIR/.env.loop"; set +a; fi
+
 log() { echo "[$(date '+%H:%M:%S')] $*" | tee -a "$RUN_LOG"; }
 
 # --- Preflight: fail fast with a clear message rather than mid-run -------------
