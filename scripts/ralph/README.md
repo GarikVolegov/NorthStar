@@ -15,6 +15,30 @@ bash scripts/ralph/loop.sh                 # run the loop (uses loop.config.json
 node --test scripts/ralph/lib/*.test.mjs   # run the loop's own unit tests
 ```
 
+## Prerequisites & first real run
+
+Run from a normal terminal (NOT from inside a Claude Code session — a nested
+`--dangerously-skip-permissions` agent is blocked by design):
+
+- **`claude` CLI** on PATH (the iteration brain) + **`node`** + **`pnpm`** (the gate). `loop.sh`
+  prepends `~/.local/bin` to PATH and fails fast if `node`/`claude` are missing.
+- **`gh`** only for `pr-only`/`full-auto` (PR creation). Without it the loop still pushes the
+  branch and notes that the PR needs opening manually.
+- **A reachable non-prod `DATABASE_URL`** so the gate's real-DB tests can pass locally
+  (no mocks — `DB_RULES.md`). Without a DB the first iteration will find the gate red and its
+  only job becomes "make the gate green" — which it can't do without the DB. So: point the loop
+  at a staging/test DB, or run it where the gate is already green.
+
+Verify the plumbing without spawning the real brain (uses a stub):
+
+```bash
+RALPH_BRAIN_CMD='echo "<promise>ITERATION_DONE</promise>"' bash scripts/ralph/loop.sh 1
+```
+
+`RALPH_BRAIN_CMD` overrides the brain command (default
+`claude --dangerously-skip-permissions --print`, prompt fed on stdin) — used for testing the
+control flow.
+
 ## How it works (one iteration)
 
 `loop.sh` runs the iteration brain (`iterate.prompt.md`) headless, over and over:

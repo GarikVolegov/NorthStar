@@ -55,7 +55,9 @@ Open the relevant `*_RULES.md` BEFORE touching code (Regola 0): `API_RULES.md`, 
 Run: `node scripts/ralph/ralph-cli.mjs decide --gate green [--eval-required --eval-file <scores.json>]`
 (use `--gate red` if the gate did not pass). Act on the printed decision:
 - `report`  → **dry-run**: do NOT push/merge/deploy. (You may keep the commit local.) Just record.
-- `open-pr` → ensure the branch is pushed and open/update a PR to `main` via `gh`. No merge.
+- `open-pr` → ensure the branch is pushed; open/update a PR to `main` via `gh` if available.
+  If `gh` is absent, leave the branch pushed and record in the journal that the PR must be
+  opened manually (do NOT fail the iteration over a missing `gh`). No merge.
 - `deploy`  → merge to `main`, let the deploy run (`production.yml`), then health-check. If the
   health-check fails, trigger rollback (`rollback.yml`) and file a P0 bug item.
 - `hold`    → gate red or unsafe: stay on the branch, file a P0 bug item for the failure.
