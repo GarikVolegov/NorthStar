@@ -1,0 +1,23 @@
+{
+  "$schema": "./loop.config.schema.note",
+  "_comment": "Single control surface for the autonomous loop. Change `mode` to walk the safety rollout ladder. See scripts/ralph/README.md.",
+  "mode": "dry-run",
+  "_mode_values": "dry-run = do everything up to the local gate, then only report (no push/merge/deploy) | pr-only = commit+push+open PR, never merge/deploy | full-auto = merge to main + deploy + auto-rollback (objective-gated)",
+  "maxFailures": 3,
+  "_maxFailures": "consecutive gate failures before the loop halts and writes a report (anti-thrash backoff)",
+  "maxIterations": 12,
+  "_maxIterations": "iterations per loop run before stopping cleanly",
+  "discoverEvery": 5,
+  "_discoverEvery": "run a discovery iteration (refill the backlog) every N work iterations, and when the backlog is empty",
+  "branchPrefixByType": {
+    "security": "fix",
+    "bug": "fix",
+    "improvement": "chore",
+    "chore": "chore",
+    "feature": "feat"
+  },
+  "deployRelevantAreas": ["ai", "wendy", "api", "db"],
+  "_deployRelevantAreas": "areas whose changes require a green `pnpm eval` before full-auto deploy",
+  "notify": false,
+  "_notify": "send a PushNotification at end-of-run and on a blocked/halt state"
+}

@@ -1,0 +1,4 @@
+# Kill-switch is a local control surface — never commit it.
+STOP
+# Per-run shell logs (the markdown journal IS committed; these raw logs are not).
+journal/run-*.log

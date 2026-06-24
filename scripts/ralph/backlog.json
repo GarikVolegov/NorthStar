@@ -1,0 +1,121 @@
+{
+  "version": 1,
+  "updatedAt": "2026-06-24",
+  "_comment": "Prioritized work queue for the autonomous loop. Policy: security/bug first, then improvement/chore, then feature; within a tier lower P-number wins, ties FIFO by createdAt. Discovery agents append here. Selection is deterministic via scripts/ralph/lib/backlog.mjs (tested). Status: todo | in_progress | done | blocked.",
+  "items": [
+    {
+      "id": "CHORE-001",
+      "type": "chore",
+      "priority": "P0",
+      "status": "todo",
+      "title": "Verify the full gate is green on the working branch and fix any red step",
+      "rationale": "Invariant of the loop: never leave the gate red. First iteration establishes a green baseline before any feature work.",
+      "acceptance": [
+        "pnpm qa runs to completion (lint + typecheck + 3 coverage suites + 9 audits)",
+        "Any failing step is fixed or its failure recorded as a new bug item",
+        "Result recorded in the journal"
+      ],
+      "area": "repo",
+      "source": "seed (loop bootstrap)",
+      "createdAt": "2026-06-24T00:00:00Z"
+    },
+    {
+      "id": "CHORE-002",
+      "type": "chore",
+      "priority": "P0",
+      "status": "todo",
+      "title": "Confirm staging.yml & production.yml use drizzle-kit push (not db:migrate) and document in DEPLOY.md",
+      "rationale": "memoria.md §8 decision (2026-06-24): SQL migration chain is structurally incomplete; db:push is the authority. Verify the workflows reflect this and the rationale is documented.",
+      "acceptance": [
+        "Verify current state of .github/workflows/{staging,production}.yml against the db:push decision",
+        "If a workflow still calls db:migrate, switch it to db:push",
+        "docs/DEPLOY.md states why db:push is the authority"
+      ],
+      "area": "ci",
+      "source": "seed (memoria.md §8)",
+      "createdAt": "2026-06-24T00:01:00Z"
+    },
+    {
+      "id": "IMP-001",
+      "type": "improvement",
+      "priority": "P2",
+      "status": "todo",
+      "title": "Deprecate route-paths.ts in favor of route-config.ts (verify overlap first)",
+      "rationale": "memoria.md §8 lists route-paths.ts vs route-config.ts partial duplication. Verify it still exists (code wins over docs) before removing.",
+      "acceptance": [
+        "Confirm the duplication still exists in the current code",
+        "If so, consolidate onto route-config.ts and remove route-paths.ts",
+        "Gate stays green; no dead imports (audit:dead-code)"
+      ],
+      "area": "web",
+      "source": "seed (memoria.md §8)",
+      "createdAt": "2026-06-24T00:02:00Z"
+    },
+    {
+      "id": "SEC-001",
+      "type": "security",
+      "priority": "P0",
+      "status": "blocked",
+      "blockedReason": "Needs a Clerk test-instance VITE_CLERK_PUBLISHABLE_KEY secret from the founder (cannot be generated autonomously).",
+      "title": "Wire the Clerk test publishable key into CI for e2e browser auth tests",
+      "rationale": "memoria.md §8 gate: e2e Playwright browser auth tests require VITE_CLERK_PUBLISHABLE_KEY (test instance) in CI.",
+      "acceptance": [
+        "CI passes the test key to the web build for browser auth specs",
+        "e2e browser auth specs run (no longer skipped) in CI"
+      ],
+      "area": "ci",
+      "source": "seed (memoria.md §8 / progress.txt US-001)",
+      "createdAt": "2026-06-24T00:03:00Z"
+    },
+    {
+      "id": "BUG-001",
+      "type": "bug",
+      "priority": "P1",
+      "status": "blocked",
+      "blockedReason": "Needs the app + a real Postgres/pgvector DB running to verify in the browser (runtime env not available headless).",
+      "title": "Browser-verify /news renders the static fallback on a fresh DB",
+      "rationale": "progress.txt US-002: static fallback shipped + unit-tested, but browser verification with app+DB is still pending.",
+      "acceptance": [
+        "With a fresh DB, /news renders cards (source:'static') with no runtime errors",
+        "When news_articles is populated, real items replace the fallback"
+      ],
+      "area": "web",
+      "source": "seed (progress.txt US-002)",
+      "createdAt": "2026-06-24T00:04:00Z"
+    },
+    {
+      "id": "FEAT-001",
+      "type": "feature",
+      "priority": "P2",
+      "status": "blocked",
+      "blockedReason": "Gated on the DB boundary (drizzle-kit push validated on a non-prod DB). Unblock once a staging DB is reachable.",
+      "title": "La Bussola full-stack: compass_profiles/compass_signals tables + seed + integration test",
+      "rationale": "memoria.md §7/§8: code exists on ralph/bussola-phase1, gated on the DB boundary.",
+      "acceptance": [
+        "compass tables created via drizzle-kit push and seeded",
+        "Integration test on a real DB (no mocks) passes",
+        "/bussola dashboard renders for journeyType=indeciso"
+      ],
+      "area": "db",
+      "source": "seed (memoria.md §7)",
+      "createdAt": "2026-06-24T00:05:00Z"
+    },
+    {
+      "id": "FEAT-002",
+      "type": "feature",
+      "priority": "P3",
+      "status": "blocked",
+      "blockedReason": "Gated on the DB boundary + notification infrastructure decision.",
+      "title": "User Routines full-stack (userRoutines table + cron job)",
+      "rationale": "memoria.md §8 gate: routines need a full-stack implementation (table + scheduler).",
+      "acceptance": [
+        "userRoutines table via drizzle-kit push",
+        "Cron job executes routines on schedule (leader-lock aware)",
+        "Integration test on a real DB passes"
+      ],
+      "area": "db",
+      "source": "seed (memoria.md §8)",
+      "createdAt": "2026-06-24T00:06:00Z"
+    }
+  ]
+}
