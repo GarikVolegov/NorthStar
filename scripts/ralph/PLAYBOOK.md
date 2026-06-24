@@ -14,6 +14,16 @@ reusable** — item-specific detail belongs in `progress.txt` / the journal, not
   `describe.skipIf(!process.env.DATABASE_URL)` and note they run in CI/staging.
 - DB: schema is the authority via `drizzle-kit push` (db:migrate is deprecated — memoria §8).
 
+## Codebase Patterns (cont.)
+- CI/docs-only items (area `ci`, changing `.github/workflows/*.yml` or `docs/*.md`) are
+  OUTSIDE the lint/typecheck/vitest gate scope and `ci` is not a deploy-relevant area
+  (no eval). Validate the relevant thing instead: parse the workflow YAML. No global
+  `yaml`/`js-yaml` on PATH, but the pnpm store has one — `require(<repo>/node_modules/.pnpm/yaml@<v>/node_modules/yaml).parse(...)`.
+- When changing a GH-Actions job's PURPOSE, keep its `job-id` stable so downstream
+  `needs:` refs stay valid; rename only the human-facing `name:` + step labels.
+- DB deploy authority is `drizzle-kit push` (`db:push`), NOT `db:migrate` — the SQL chain
+  is structurally incomplete (memoria §8). Workflows now reflect this (CHORE-002).
+
 ## How the loop works (orientation)
 - `loop.config.json mode` walks the safety ladder: `dry-run` → `pr-only` → `full-auto`.
 - Selection is deterministic: `node scripts/ralph/ralph-cli.mjs next` (priority: security/bug >
