@@ -1,7 +1,7 @@
 # DEPLOY — percorso al primo euro (NorthStar)
 
 > Checklist operativa per portare NorthStar in produzione e incassare il primo
-> pagamento. Aggiornato da Opus 4.8 (2026-06-17, branch `ralph/launch-completion`).
+> pagamento. Aggiornato da Opus 4.8 (2026-06-24: deploy schema via `drizzle-kit push`, §2).
 > Riferimenti: [`vercel.json`](../vercel.json), [`.github/workflows/production.yml`](../.github/workflows/production.yml),
 > [`RUNBOOK.md`](../RUNBOOK.md), [`memoria.md`](../memoria.md) §8, [`.env.example`](../.env.example).
 
@@ -19,16 +19,24 @@ plugin AI** → è un **processo long-running**, NON un handler serverless state
 - [ ] **Account Stripe** + completare il **KYC**. Finché in KYC, restare in **test mode**.
 - [ ] Far validare privacy + termini da un professionista (oggi auto-dichiarati "bozza operativa").
 
-## 2. Riconciliazione schema DB (su STAGING, mai prod) — rischio #1
+## 2. Schema DB: `drizzle-kit push` come fonte di verità (su STAGING, mai prod) — rischio #1
 
-memoria §8: ci sono **44 file SQL** (`0000`–`0044`) ma il **journal Drizzle è fermo a idx 34**
-(`packages/db/drizzle/meta/_journal.json`). `production.yml` esegue `db:migrate` (journal-driven)
-→ **le migrazioni 0035–0044 NON verrebbero applicate** e il DB prod nascerebbe incompleto (500 a runtime).
+> **Decisione 2026-06-24 (founder):** staging/prod costruiscono lo schema con **`drizzle-kit push`**
+> (lo schema Drizzle in `packages/db/src/schema/**` è l'**unica fonte di verità**), come già fanno
+> dev, e2e e i test d'integrazione. Si **ritira** `db:migrate` journal-driven.
+
+**Perché non `db:migrate`:** il chain SQL è **strutturalmente incompleto**, non solo "journal fermo a idx 34".
+Il runtime migrator legge solo `meta/_journal.json` (idx 0–34) + `${tag}.sql`, ma alcune tabelle dello
+schema (verificate: `coach_memory_patterns`, `coach_memory_facts`, `discovery_sources`, +altre) **non
+hanno alcun `CREATE TABLE` in nessun `.sql`** — esistono solo via push. Quindi `db:migrate` su un DB
+**fresco** fallirebbe (es. `ALTER TABLE coach_memory_patterns` in `0036` su tabella inesistente), e anche
+riconciliando il journal resterebbe rotto. (Dettaglio: memoria utente `northstar-drizzle-migration-chain-incomplete`.)
 
 - [ ] Creare un **DB di staging** (Neon branch o Postgres+pgvector separato). **MAI testare su prod.**
-- [ ] Allineare lo **schema Drizzle** (`packages/db/src/schema/**`) a ciò che le SQL raw 0035–0044 hanno creato, così `db:migrate`/`db:push` ricostruiscono un DB completo, e riconciliare il journal.
-- [ ] Verificare con `db:migrate:dry-run` (`scripts/.../check-migration-safety.mjs`) poi `db:migrate` su staging; far girare i **test d'integrazione DB-reale** contro lo staging. Sono **opt-in** (per non colpire mai il DB prod del `.env`): `RUN_DB_INTEGRATION=1 DATABASE_URL=<staging> vitest run src/routes/*.integration.test.ts --root apps/server`. Già verdi su DB di testing: `applications.integration`, `market-intelligence.integration`.
-- [ ] Le migrazioni recenti (0035–0044) sono **SQL raw idempotenti** (`CREATE/ALTER ... IF NOT EXISTS`): è il pattern del progetto — mantenerlo.
+- [ ] Cambiare `staging.yml`/`production.yml`: da `db:migrate` a **`db:push`** (`drizzle-kit push`, con `DATABASE_URL_MIGRATOR`). **Validare prima su staging** (DB fresco → push → schema completo, pgvector OK).
+- [ ] Far girare i **test d'integrazione DB-reale** contro lo staging. Sono **opt-in** (per non colpire mai il DB prod del `.env`): `RUN_DB_INTEGRATION=1 DATABASE_URL=<staging> vitest run src/routes/*.integration.test.ts --root apps/server`. Già verdi su DB di testing: `applications.integration`, `market-intelligence.integration`.
+- [ ] **Prod esistente (già popolato):** il **primo** push va fatto con cautela — generare prima il diff (`drizzle-kit push --strict` / dry-run) e **rivederlo a mano** per escludere DROP distruttivi prima di applicarlo. Backup DB prima.
+- [ ] I vecchi file `packages/db/drizzle/*.sql` + `meta/_journal.json` restano come storia; non sono più il driver del deploy (si possono lasciare o archiviare in seguito).
 
 ## 3. Variabili d'ambiente di produzione
 
@@ -50,7 +58,7 @@ memoria §8: ci sono **44 file SQL** (`0000`–`0044`) ma il **journal Drizzle �
 
 ## 5. Go-live (decisione umana)
 
-> Merge su `main` = **deploy in produzione** (`production.yml`: typecheck → unit test → **migrazione DB prod** → `railway up` → health check `/api/health` → release Sentry). Eseguire **solo dopo** la riconciliazione schema (§2).
+> Merge su `main` = **deploy in produzione** (`production.yml`: typecheck → unit test → **schema DB prod** → `railway up` → health check `/api/health` → release Sentry). Lo step schema va portato da `db:migrate` a `db:push` (§2) e validato su staging **prima** del merge.
 
 1. [ ] Configurare i secret dell'Environment GitHub "production" (`production.yml` linee 9-26: `PRODUCTION_DATABASE_URL_MIGRATOR`, `PRODUCTION_JWT_SECRET`, `RAILWAY_PROD_API_TOKEN`, `RAILWAY_PROD_SERVICE_ID`, env Stripe, `SENTRY_*`).
 2. [ ] Merge `release/launch-candidate` → `main` (dopo aver mergiato `ralph/launch-completion` in `release/launch-candidate`).
@@ -72,6 +80,8 @@ memoria §8: ci sono **44 file SQL** (`0000`–`0044`) ma il **journal Drizzle �
 
 ## 7. Rischio singolo più alto
 
-**§2 (drift schema/journal).** Il merge su `main` lancia la migrazione prod journal-driven; se il
-journal non è riconciliato prima, il DB prod nasce monco → 500 al primo traffico. Risolvere su
-**staging** prima del merge.
+**§2 (schema DB).** Due facce dello stesso rischio: (a) finché `production.yml` esegue ancora
+`db:migrate` journal-driven, un deploy su DB fresco nasce **monco** (chain incompleto) → 500 al primo
+traffico; (b) dopo lo switch a `drizzle-kit push`, il **primo push sul prod esistente** potrebbe
+proporre **DROP distruttivi**. Mitigazione unica: **validare su staging** e rivedere a mano il diff
+(`--strict`) con backup, **prima** del merge su `main`.
