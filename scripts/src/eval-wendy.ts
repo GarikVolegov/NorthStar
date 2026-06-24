@@ -24,7 +24,20 @@
  */
 
 import { readFileSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
+import { fileURLToPath } from "url";
+
+// Resolve the test-case file relative to THIS script (cwd-independent), with an
+// env override. The cases live in docs/eval-wendy/ (scripts/src → ../../docs/eval-wendy).
+const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
+const DEFAULT_CASES_PATH = join(
+  SCRIPT_DIR,
+  "..",
+  "..",
+  "docs",
+  "eval-wendy",
+  "wendy-test-cases.json",
+);
 
 interface TestCase {
   id: string;
@@ -88,7 +101,7 @@ const API_BASE = process.env.WENDY_API_URL || "http://localhost:3001";
 const JWT_TOKEN = process.env.WENDY_TEST_TOKEN || "test-jwt-token";
 
 async function loadTestCases(): Promise<TestCase[]> {
-  const filePath = join(process.cwd(), "eval", "wendy-test-cases.json");
+  const filePath = process.env.WENDY_EVAL_CASES || DEFAULT_CASES_PATH;
   const content = readFileSync(filePath, "utf-8");
   const data = JSON.parse(content);
   return data.testCases;
