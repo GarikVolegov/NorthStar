@@ -33,7 +33,7 @@ hanno alcun `CREATE TABLE` in nessun `.sql`** — esistono solo via push. Quindi
 riconciliando il journal resterebbe rotto. (Dettaglio: memoria utente `northstar-drizzle-migration-chain-incomplete`.)
 
 - [ ] Creare un **DB di staging** (Neon branch o Postgres+pgvector separato). **MAI testare su prod.**
-- [ ] Cambiare `staging.yml`/`production.yml`: da `db:migrate` a **`db:push`** (`drizzle-kit push`, con `DATABASE_URL_MIGRATOR`). **Validare prima su staging** (DB fresco → push → schema completo, pgvector OK).
+- [x] **Fatto (2026-06-24):** `staging.yml` e `production.yml` eseguono ora **`db:push`** (`drizzle-kit push`, con `DATABASE_URL_MIGRATOR`) al posto di `db:migrate`/`db:migrate:dry-run`. È il push **non forzato** (mai `push-force`): le modifiche additive sono idempotenti, quelle distruttive abortiscono il job invece di cancellare dati. **Validare prima su staging** (DB fresco → push → schema completo, pgvector OK).
 - [ ] Far girare i **test d'integrazione DB-reale** contro lo staging. Sono **opt-in** (per non colpire mai il DB prod del `.env`): `RUN_DB_INTEGRATION=1 DATABASE_URL=<staging> vitest run src/routes/*.integration.test.ts --root apps/server`. Già verdi su DB di testing: `applications.integration`, `market-intelligence.integration`.
 - [ ] **Prod esistente (già popolato):** il **primo** push va fatto con cautela — generare prima il diff (`drizzle-kit push --strict` / dry-run) e **rivederlo a mano** per escludere DROP distruttivi prima di applicarlo. Backup DB prima.
 - [ ] I vecchi file `packages/db/drizzle/*.sql` + `meta/_journal.json` restano come storia; non sono più il driver del deploy (si possono lasciare o archiviare in seguito).
@@ -58,7 +58,7 @@ riconciliando il journal resterebbe rotto. (Dettaglio: memoria utente `northstar
 
 ## 5. Go-live (decisione umana)
 
-> Merge su `main` = **deploy in produzione** (`production.yml`: typecheck → unit test → **schema DB prod** → `railway up` → health check `/api/health` → release Sentry). Lo step schema va portato da `db:migrate` a `db:push` (§2) e validato su staging **prima** del merge.
+> Merge su `main` = **deploy in produzione** (`production.yml`: typecheck → unit test → **schema DB prod via `db:push`** → `railway up` → health check `/api/health` → release Sentry). Lo step schema usa già `db:push` (§2); validarlo su staging **prima** del merge.
 
 1. [ ] Configurare i secret dell'Environment GitHub "production" (`production.yml` linee 9-26: `PRODUCTION_DATABASE_URL_MIGRATOR`, `PRODUCTION_JWT_SECRET`, `RAILWAY_PROD_API_TOKEN`, `RAILWAY_PROD_SERVICE_ID`, env Stripe, `SENTRY_*`).
 2. [ ] Merge `release/launch-candidate` → `main` (dopo aver mergiato `ralph/launch-completion` in `release/launch-candidate`).
@@ -80,8 +80,9 @@ riconciliando il journal resterebbe rotto. (Dettaglio: memoria utente `northstar
 
 ## 7. Rischio singolo più alto
 
-**§2 (schema DB).** Due facce dello stesso rischio: (a) finché `production.yml` esegue ancora
-`db:migrate` journal-driven, un deploy su DB fresco nasce **monco** (chain incompleto) → 500 al primo
-traffico; (b) dopo lo switch a `drizzle-kit push`, il **primo push sul prod esistente** potrebbe
-proporre **DROP distruttivi**. Mitigazione unica: **validare su staging** e rivedere a mano il diff
-(`--strict`) con backup, **prima** del merge su `main`.
+**§2 (schema DB).** Con lo switch a **`drizzle-kit push`** (fatto: §2), il rischio residuo è il
+**primo push sul prod esistente**, che potrebbe proporre **DROP distruttivi**. Il job usa il push
+**non forzato**, quindi una modifica data-loss **aborta il deploy** invece di applicarla — ma la
+mitigazione resta: **validare su staging** e rivedere a mano il diff (`drizzle-kit push --strict`)
+con backup, **prima** del merge su `main`. (Storico: il vecchio path `db:migrate` journal-driven
+faceva nascere **monco** un DB fresco — chain SQL incompleto — ed è stato ritirato.)

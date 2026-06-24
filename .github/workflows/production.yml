@@ -3,7 +3,7 @@ name: Deploy Production
 # ─────────────────────────────────────────────────────────────────────────────
 # Trigger: ogni push su main (merge di una PR da develop)
 # Jobs in sequenza:
-#   typecheck → unit-tests → db-migrate-prod → deploy-prod → sentry-release-prod
+#   typecheck → unit-tests → db-schema-push-prod → deploy-prod → sentry-release-prod
 #
 # Secret richiesti (GitHub Environment "production"):
 #   PRODUCTION_DATABASE_URL_MIGRATOR  ← ruolo DDL per migration runner
@@ -85,12 +85,19 @@ jobs:
       - name: Dependency audit
         run: pnpm audit --prod --audit-level=high
 
-  # ─── 3. DB Migration production ──────────────────────────────────────────────
+  # ─── 3. DB schema push (production) ──────────────────────────────────────────
   # ⚠️  Questo job modifica il DB di produzione.
+  # Lo schema è applicato con `drizzle-kit push` (db:push), l'UNICA fonte di verità
+  # (packages/db/src/schema/**) — NON con il chain SQL journal-driven, che è
+  # strutturalmente incompleto (vedi docs/DEPLOY.md §2/§7 e memoria.md §8).
   # Usa SEMPRE il ruolo migrator (DDL completo) — mai il ruolo app (solo DML).
-  # La migration è idempotente: il runner Drizzle applica solo migration SQL pending.
+  # `db:push` è il push NON forzato (mai push-force): le modifiche additive sono
+  # idempotenti, mentre quelle distruttive (DROP/data-loss) abortiscono il job invece
+  # di cancellare dati silenziosamente.
+  # ⚠️  PRIMO push su un prod già popolato: farlo PRIMA a mano con diff review
+  # (`drizzle-kit push --strict`) + backup, come da docs/DEPLOY.md §2/§7.
   db-migrate-prod:
-    name: DB migration (production)
+    name: DB schema push (production)
     runs-on: ubuntu-latest
     needs: unit-tests
     environment: production
@@ -102,14 +109,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           pnpm-version: ${{ env.PNPM_VERSION }}
 
-      - name: Dry-run Drizzle migrations for production DB
-        run: pnpm run db:migrate:dry-run
-        env:
-          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL_MIGRATOR }}
-          DATABASE_URL_MIGRATOR: ${{ secrets.PRODUCTION_DATABASE_URL_MIGRATOR }}
-
-      - name: Apply Drizzle migrations to production DB
-        run: pnpm run db:migrate
+      - name: Push Drizzle schema to production DB
+        run: pnpm run db:push
         env:
           DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL_MIGRATOR }}
           DATABASE_URL_MIGRATOR: ${{ secrets.PRODUCTION_DATABASE_URL_MIGRATOR }}
