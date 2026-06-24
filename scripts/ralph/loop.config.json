@@ -1,7 +1,7 @@
 {
   "$schema": "./loop.config.schema.note",
   "_comment": "Single control surface for the autonomous loop. Change `mode` to walk the safety rollout ladder. See scripts/ralph/README.md.",
-  "mode": "dry-run",
+  "mode": "pr-only",
   "_mode_values": "dry-run = do everything up to the local gate, then only report (no push/merge/deploy) | pr-only = commit+push+open PR, never merge/deploy | full-auto = merge to main + deploy + auto-rollback (objective-gated)",
   "maxFailures": 3,
   "_maxFailures": "consecutive gate failures before the loop halts and writes a report (anti-thrash backoff)",
