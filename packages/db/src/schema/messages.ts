@@ -2,7 +2,7 @@
  * FIXED: role field now uses an enum constraint instead of free text.
  * Valid values: "user" | "assistant" | "system"
  */
-import { integer, pgTable, serial, text, timestamp } from "drizzle-orm/pg-core";
+import { integer, pgTable, serial, text, timestamp, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { conversations } from "./conversations";
@@ -17,7 +17,10 @@ export const messages = pgTable("messages", {
   content: text("content").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
-});
+}, (t) => ({
+  // FK lookup hot-path: every conversation-history load filters by conversationId.
+  conversationIdx: index("messages_conversation_idx").on(t.conversationId),
+}));
 
 export const insertMessageSchema = createInsertSchema(messages).omit({
   id: true,

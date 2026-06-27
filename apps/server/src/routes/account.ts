@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db, usersTable, userProfileSettingsTable, nftCertificatesTable, userObjectivesTable, coachSessionsTable, voiceSessionsTable, messages, conversations, businessIdeasTable, coachMemoryFactsTable, coachMemoryPatternsTable, sessionSummariesTable, affiliateAccountsTable, affiliateCommissionsTable, affiliateWithdrawalsTable, affiliateReferralsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
 import { writeAuditLog } from "../middleware/audit";
@@ -18,15 +18,11 @@ async function getUserRelatedData(userId: number) {
   const voiceSessions = await db.select().from(voiceSessionsTable).where(eq(voiceSessionsTable.userId, userId));
   const convs = await db.select().from(conversations).where(eq(conversations.userId, userId));
   const convIds = convs.map((c) => c.id);
-  const allMessages: Array<typeof messages.$inferSelect> = [];
-  for (const conversationId of convIds) {
-    allMessages.push(
-      ...(await db
-        .select()
-        .from(messages)
-        .where(eq(messages.conversationId, conversationId))),
-    );
-  }
+  // Single query instead of one SELECT per conversation (N+1). Empty list → skip
+  // (inArray with an empty array would build invalid SQL).
+  const allMessages: Array<typeof messages.$inferSelect> = convIds.length
+    ? await db.select().from(messages).where(inArray(messages.conversationId, convIds))
+    : [];
   const businessIdeas = await db.select().from(businessIdeasTable).where(eq(businessIdeasTable.userId, userId));
   const coachFacts = await db.select().from(coachMemoryFactsTable).where(eq(coachMemoryFactsTable.userId, userId));
   const coachPatterns = await db.select().from(coachMemoryPatternsTable).where(eq(coachMemoryPatternsTable.userId, userId));
