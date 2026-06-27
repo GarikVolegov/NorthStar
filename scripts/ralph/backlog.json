@@ -116,6 +116,138 @@
       "area": "db",
       "source": "seed (memoria.md §8)",
       "createdAt": "2026-06-24T00:06:00Z"
+    },
+    {
+      "id": "BUG-002",
+      "type": "bug",
+      "priority": "P1",
+      "status": "todo",
+      "title": "LLM cost-guard blind to roadmap/cv/briefings — unlimited free-tier LLM calls",
+      "rationale": "POST /api/roadmap/:id/generate (4000 max-tokens, SSE), POST /api/cv/mine/generate and POST /api/briefings/generate have no costGuard and no freemium check; any authenticated free user can call them unlimited. Root cause: costGuard reads monthly spend from aiCostLogTable (populated only by recordAiCall in ai-wendy.ts + wiki-telemetry.ts), but these routes call recordLlmUsage → deprecated llmUsageTable, which cost-guard.ts:57 says it no longer reads.",
+      "acceptance": [
+        "Reproduce + confirm root cause (which routes write llmUsageTable vs aiCostLogTable)",
+        "Add costGuard (or a freemium monthly gate) to the roadmap/cv/briefings generate routes",
+        "Make their spend visible to the monthly counter (switch to recordAiCall, or sum both tables in costGuard)",
+        "Gate stays green"
+      ],
+      "area": "api",
+      "source": "discovery/problem-hunter",
+      "createdAt": "2026-06-27T00:10:00Z"
+    },
+    {
+      "id": "IMP-002",
+      "type": "improvement",
+      "priority": "P1",
+      "status": "todo",
+      "title": "Fix N+1 in account.ts getUserRelatedData (+ FK indexes on messages/conversations)",
+      "rationale": "apps/server/src/routes/account.ts fetches all conversations then fires one SELECT per conversationId (N+1) on the /account/export path. messages.conversationId and conversations.userId are query hot-paths with no DB index. Replace the loop with a single inArray() and add the two indexes.",
+      "acceptance": [
+        "getUserRelatedData fires exactly 1 query for messages (inArray), not N",
+        "messages adds index on conversationId; conversations adds index on userId (schema)",
+        "Gate green; /account/export returns identical shape (no regression)"
+      ],
+      "area": "api",
+      "source": "discovery/improvement-hunter",
+      "createdAt": "2026-06-27T00:11:00Z"
+    },
+    {
+      "id": "FEAT-003",
+      "type": "feature",
+      "priority": "P2",
+      "status": "todo",
+      "title": "Add 'news' proactive-insight type to the nightly generator",
+      "rationale": "Vision (AaaS 'signal-when-it-matters'): proactive-insight-generator.ts handles weak_signal and skill_gap but stubs 'news — non ancora implementato'. The schema already declares insightType 'news' + linkedRagChunkId, and newsArticlesTable has sectorNames[] for persona matching. No new DB schema, no infra dependency — closes the loop without waiting for staging.",
+      "acceptance": [
+        "generateNewsInsights() added and called in runProactiveInsightGenerator()",
+        "Matches news published in last 7 days to user.preferredSectorIds via sectorNames[] overlap; ≤1 news insight/user/run; respects MAX_UNREAD_PER_USER",
+        "Dedup: skip if a non-dismissed insight with the same linkedRagChunkId exists",
+        "Mock-free unit test for the sector-matching logic; gate green"
+      ],
+      "area": "api",
+      "source": "discovery/feature-hunter",
+      "createdAt": "2026-06-27T00:12:00Z"
+    },
+    {
+      "id": "FEAT-004",
+      "type": "feature",
+      "priority": "P2",
+      "status": "todo",
+      "title": "Wire the staged DashboardCalendar component into the /calendar page",
+      "rationale": "DashboardCalendar.tsx (full monthly grid) is implemented but knip-ignored (staged Fase-2 WIP, memoria §8.4). The /calendar page only shows a list + modal. Wiring the grid in delivers the 'UI personalizzabile' vision and connects events created via Wendy's add_calendar_event. Zero new backend, zero DB gate.",
+      "acceptance": [
+        "DashboardCalendar rendered in calendar.tsx using events from the existing /api/calendar query",
+        "Remove the DashboardCalendar.tsx knip-ignore entry (now referenced)",
+        "Month nav works; existing modal + push-opt-in banner preserved",
+        "Gate green (audit:dead-code passes)"
+      ],
+      "area": "web",
+      "source": "discovery/feature-hunter",
+      "createdAt": "2026-06-27T00:13:00Z"
+    },
+    {
+      "id": "IMP-003",
+      "type": "improvement",
+      "priority": "P2",
+      "status": "todo",
+      "title": "Add DB index on session_summaries (userId, createdAt) for per-user lookup",
+      "rationale": "sessionSummaries.ts comments say it is 'keyed for fast lookup by userId to find the latest N summaries' but declares no index → sequential scan on every session load and on /account/export. Add a composite index on (userId, createdAt).",
+      "acceptance": [
+        "sessionSummariesTable adds index on (userId, createdAt) in the schema",
+        "Index applied via drizzle-kit push (db:push is the authority — memoria §8); push validation on a non-prod DB is founder-gated",
+        "Gate green (typecheck + lint)"
+      ],
+      "area": "db",
+      "source": "discovery/improvement-hunter",
+      "createdAt": "2026-06-27T00:14:00Z"
+    },
+    {
+      "id": "CHORE-003",
+      "type": "chore",
+      "priority": "P2",
+      "status": "todo",
+      "title": "Upgrade express 4.18.2 → 4.22.2 to resolve the qs DoS advisory",
+      "rationale": "pnpm audit --prod flags a moderate qs DoS (qs resolves to 6.15.1, vulnerable). Bumping express ^4.18.2 → ^4.22.2 pulls in a patched qs (≥6.15.2). The @opentelemetry/core advisory is transitive via @sentry/node — defer.",
+      "acceptance": [
+        "apps/server/package.json express bumped to ^4.22.2; pnpm install resolves qs ≥6.15.2 (pnpm why qs)",
+        "pnpm audit --prod no longer reports the qs advisory",
+        "Gate stays green (server typecheck + unit)"
+      ],
+      "area": "api",
+      "source": "discovery/improvement-hunter",
+      "createdAt": "2026-06-27T00:15:00Z"
+    },
+    {
+      "id": "CHORE-004",
+      "type": "chore",
+      "priority": "P3",
+      "status": "todo",
+      "title": "Add unit tests for stripe-webhook-helpers.ts (critical payment path, 0 coverage)",
+      "rationale": "stripe-webhook-helpers.ts (207 lines) handles webhook signature verification + subscription state transitions — the most financially critical code — with zero tests. The helpers are pure functions over Stripe event objects → testable with fixtures, no real Stripe/DB.",
+      "acceptance": [
+        "stripe-webhook-helpers.test.ts with ≥3 cases: valid event parsing, invalid signature rejection, unknown event type",
+        "Server unit suite passes with the new tests; gate green"
+      ],
+      "area": "api",
+      "source": "discovery/improvement-hunter",
+      "createdAt": "2026-06-27T00:16:00Z"
+    },
+    {
+      "id": "FEAT-005",
+      "type": "feature",
+      "priority": "P3",
+      "status": "blocked",
+      "blockedReason": "Large multi-file change — needs a PRD via /ralph-prd and a founder product decision before a single iteration. Flag-gated (WENDY_NEURAL_ENABLED=false).",
+      "title": "Fase 3 Wendy Neural Attention — first-light activation recording",
+      "rationale": "memoria §7 Fase 3: wendyNeuralActivationsTable/wendyNeuralEdgesTable + decay job exist and prompt-builder has a neuralSection slot, but nothing populates it. Activating per-turn source-activation recording + edge reinforcement is the 'layer persistente che decide quali fonti accendere'. Too large for one iteration.",
+      "acceptance": [
+        "PRD produced via /ralph-prd before implementation",
+        "runGrowthAgent records activations + reinforces edges, gated behind WENDY_NEURAL_ENABLED",
+        "neuralSection populated from top edges; admin route to review candidate edges",
+        "Unit test: recording skipped when the flag is off; gate green (pnpm test:ai)"
+      ],
+      "area": "ai",
+      "source": "discovery/feature-hunter",
+      "createdAt": "2026-06-27T00:17:00Z"
     }
   ]
 }
