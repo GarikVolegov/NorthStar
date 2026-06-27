@@ -18,6 +18,7 @@ import { decideIntegration } from './lib/deploy-gate.mjs';
 import { isStopped } from './lib/safety.mjs';
 import { journalPathFor } from './lib/journal.mjs';
 import { renderCheckpoint } from './lib/checkpoint.mjs';
+import { reviewPanel } from './lib/review-panel.mjs';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const readJson = (p, fallback) => (existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : fallback);
@@ -61,7 +62,8 @@ switch (cmd) {
     const evalRequired = flag('eval-required');
     const evalFile = opt('eval-file');
     const evalScores = evalFile ? readJson(evalFile, null) : null;
-    const decision = decideIntegration({ mode: config.mode, gateGreen, evalRequired, evalScores });
+    const reviewGreen = opt('review') !== 'red'; // absent or 'green' => green; only 'red' blocks
+    const decision = decideIntegration({ mode: config.mode, gateGreen, reviewGreen, evalRequired, evalScores });
     console.log(decision);
     break;
   }
@@ -92,6 +94,19 @@ switch (cmd) {
     );
     break;
   }
+  case 'review-panel': {
+    const codeOpt = opt('code');
+    console.log(
+      JSON.stringify(
+        reviewPanel({
+          type: opt('type'),
+          area: opt('area'),
+          hasCodeChange: codeOpt == null ? true : codeOpt !== 'false',
+        }),
+      ),
+    );
+    break;
+  }
   case 'config': {
     const key = process.argv[3];
     const val = config[key];
@@ -101,6 +116,6 @@ switch (cmd) {
   }
   default:
     console.error(`Unknown command: ${cmd ?? '(none)'}`);
-    console.error(`Commands: status | next | mode | decide | journal-path | checkpoint | config`);
+    console.error(`Commands: status | next | mode | decide | journal-path | checkpoint | review-panel | config`);
     process.exit(2);
 }
