@@ -99,6 +99,21 @@ otherwise it falls back to a PR. No human gate — but no reckless deploy either
 | `journal/YYYY-MM-DD.md` | the morning-readable audit trail |
 | `prd.json` / `progress.txt` / `CLAUDE.md` | the original Ralph PRD flow (used for large features) |
 
+## Two ways to run the loop
+
+- **`/ralph-loop [max]` — interactive, attended.** Runs the loop LIVE in your Claude Code
+  session: you watch every reasoning step, tool call, and decision, and a compact
+  checkpoint prints between cycles. Continuous with checkpoints; stops on the `STOP` file,
+  `maxFailures` consecutive failures, empty backlog (after discovery), or `maxIterations`.
+  Interrupt anytime by typing. Brain: `loop-interactive.prompt.md`.
+- **`scripts/ralph/loop.sh [max]` — headless, unattended.** Spawns `claude … --print` per
+  iteration for overnight runs; output goes to `journal/run-YYYY-MM-DD.log`. Same
+  deterministic core (`ralph-cli.mjs next`/`decide`) and the same per-iteration brain
+  (`iterate.prompt.md`).
+
+Both share the deterministic selection and integration-decision logic; the interactive
+loop additionally renders status via `ralph-cli.mjs checkpoint`.
+
 ## Relationship to the original Ralph
 
 The original `CLAUDE.md` + `prd.json` drive a single PRD to completion. The new loop is the
