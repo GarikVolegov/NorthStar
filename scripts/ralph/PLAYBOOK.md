@@ -23,6 +23,19 @@ reusable** — item-specific detail belongs in `progress.txt` / the journal, not
   `needs:` refs stay valid; rename only the human-facing `name:` + step labels.
 - DB deploy authority is `drizzle-kit push` (`db:push`), NOT `db:migrate` — the SQL chain
   is structurally incomplete (memoria §8). Workflows now reflect this (CHORE-002).
+- A guard/audit that LOCKS IN a policy (e.g. `check-playwright-e2e.mjs` asserting the deploy
+  config) must be updated in the SAME change that reverses the policy. Otherwise the guard
+  keeps enforcing the OLD policy and turns `pnpm qa` red later — exactly what happened after
+  US-003 (vercel buildCommand) and CHORE-002 (db:push): the guard still demanded the reversed
+  rules. When you change a deploy/config decision, grep for the audit that pins it and flip it too.
+- `pnpm qa` is `&&`-chained, so it STOPS at the first red step and hides the rest. After fixing
+  one audit, re-run the WHOLE chain (or each remaining `audit:*`) — there may be more reds behind it.
+- `pnpm qa` can OOM in this env when the 3 coverage suites run together (exit 137). Run the
+  pieces separately: `lint:ci`, `typecheck`, each `audit:*`, and `test:{ai,server,web}:coverage`
+  one at a time. The OOM is an env limit, not a code failure.
+- file-size ratchet baseline lives at `docs/quality/file-size-baseline.json` (limits: apps 600,
+  packages 400). A "new offender" or a grown file fails it; to bless intentional growth, update
+  that file's `offenders` list. knip ignores live in `knip.json` (`.design-sync/**` = design tooling).
 
 ## How the loop works (orientation)
 - `loop.config.json mode` walks the safety ladder: `dry-run` → `pr-only` → `full-auto`.

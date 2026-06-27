@@ -7,7 +7,7 @@
       "id": "CHORE-001",
       "type": "chore",
       "priority": "P0",
-      "status": "todo",
+      "status": "done",
       "title": "Verify the full gate is green on the working branch and fix any red step",
       "rationale": "Invariant of the loop: never leave the gate red. First iteration establishes a green baseline before any feature work.",
       "acceptance": [
