@@ -11,6 +11,11 @@ vi.mock("@workspace/db", () => ({
     createdAt: "ai_cost_log.created_at",
     costUsdEstimate: "ai_cost_log.cost_usd_estimate",
   },
+  llmUsageTable: {
+    userId: "llm_usage.user_id",
+    createdAt: "llm_usage.created_at",
+    estimatedCostUsd: "llm_usage.estimated_cost_usd",
+  },
   aiRequestLogTable: {
     userId: "ai_request_log.user_id",
     createdAt: "ai_request_log.created_at",
@@ -26,7 +31,7 @@ vi.mock("./logger", () => ({
   rootLogger: { warn: vi.fn(), error: vi.fn() },
 }));
 
-import { aiCostLogTable } from "@workspace/db";
+import { aiCostLogTable, llmUsageTable } from "@workspace/db";
 import { costGuard } from "./cost-guard";
 
 function request(): Request {
@@ -60,5 +65,24 @@ describe("costGuard", () => {
 
     expect(mockFrom).toHaveBeenCalledWith(aiCostLogTable);
     expect(next).toHaveBeenCalledOnce();
+  });
+
+  it("sums ai_cost_log AND llm_usage, blocking when the combined spend exceeds the limit", async () => {
+    // 0.30 from each ledger → 0.60 combined > 0.50 free limit; either table alone (0.30) is under.
+    // Proves recordLlmUsage spend (roadmap/cv/briefings) is no longer invisible (BUG-002).
+    mockFrom.mockReturnValue({
+      where: vi.fn(async () => [{ totalCost: 0.3 }]),
+    });
+    const next = vi.fn() as NextFunction;
+    const json = vi.fn();
+    const status = vi.fn(() => ({ json }));
+    const res = { status, json } as unknown as Response;
+
+    await costGuard(request(), res, next);
+
+    expect(mockFrom).toHaveBeenCalledWith(aiCostLogTable);
+    expect(mockFrom).toHaveBeenCalledWith(llmUsageTable);
+    expect(status).toHaveBeenCalledWith(403);
+    expect(next).not.toHaveBeenCalled();
   });
 });

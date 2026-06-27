@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { getLLM } from "@workspace/ai-server/llm/client";
 import { requireAuth } from "../middleware/auth";
+import { costGuard } from "../middleware/cost-guard";
 import { requireFeature } from "../middleware/check-feature";
 import {
   db,
@@ -442,7 +443,7 @@ router.post("/mine/upload", requireAuth, async (req, res) => {
 });
 
 // ── POST /api/cv/mine/generate ─────────────────────────────────────────────────
-router.post("/mine/generate", requireAuth, async (req, res) => {
+router.post("/mine/generate", requireAuth, costGuard, async (req, res) => {
   try {
     const body = asPlainRecord(getRequestBody(req));
     const template = readString(body.template, "classic");

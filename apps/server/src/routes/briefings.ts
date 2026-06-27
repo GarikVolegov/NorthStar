@@ -8,6 +8,7 @@
 import { Router } from "express";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { costGuard } from "../middleware/cost-guard";
 import { rootLogger } from "../middleware/logger";
 import { db, wendyBriefingsTable } from "@workspace/db";
 import { generateBriefingForUser } from "../jobs/briefing-generator";
@@ -46,7 +47,7 @@ router.get("/", requireAuth, async (req, res) => {
 // ── POST /api/briefings/generate ─────────────────────────────────────────────
 // On-demand — disponibile 1/settimana per Free, illimitato per Pro+
 
-router.post("/generate", requireAuth, async (req, res) => {
+router.post("/generate", requireAuth, costGuard, async (req, res) => {
   const userId = req.user!.id;
 
   // Controllo rate: 1 briefing manuale per utente ogni 6 ore

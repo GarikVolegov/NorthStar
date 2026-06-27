@@ -2,6 +2,7 @@ import { Router } from "express";
 import { eq } from "drizzle-orm";
 import { db, sectorsTable, userProfileSettingsTable } from "@workspace/db";
 import { requireAuth } from "../middleware/auth";
+import { costGuard } from "../middleware/cost-guard";
 import { getRequestBody } from "../lib/request-context";
 import { asPlainRecord } from "../lib/type-guards";
 import { getLLM } from "@workspace/ai-server/llm/client";
@@ -12,7 +13,7 @@ const router = Router();
 /* ─── POST /api/roadmap/:id/generate  —  genera roadmap (SSE, LLM reale) ─── */
 // Stream SSE atteso da apps/web/src/pages/roadmap.tsx: chunk `data: {"content":...}`
 // poi `data: {"done":true}`; la FE estrae il JSON RoadmapData dall'accumulato.
-router.post("/:id/generate", requireAuth, async (req, res) => {
+router.post("/:id/generate", requireAuth, costGuard, async (req, res) => {
   const userId = req.user!.id;
   const sectorId = parseInt(req.params.id ?? "", 10);
 

@@ -1,6 +1,6 @@
 import { type Request, type Response, type NextFunction } from "express";
 import { sql, and, gte, eq } from "drizzle-orm";
-import { db, aiCostLogTable } from "@workspace/db";
+import { db, aiCostLogTable, llmUsageTable } from "@workspace/db";
 import { rootLogger } from "./logger";
 import { getEffectivePlan } from "./check-feature";
 
@@ -53,9 +53,13 @@ function currentMonthRange(): { start: Date; end: Date } {
 /**
  * LLM Cost Guard Middleware
  *
- * Reads cumulative monthly spend from ai_cost_log.cost_usd_estimate (populated by
- * recordAiCall on the /api/ai/wendy route). llm_usage is deprecated — the cost-guard
- * no longer writes to or reads from it.
+ * Reads cumulative monthly spend for the user from BOTH cost ledgers and blocks when
+ * it exceeds the plan's monthly limit:
+ *   - ai_cost_log.cost_usd_estimate  (recordAiCall — /api/ai/wendy, wiki telemetry)
+ *   - llm_usage.estimated_cost_usd   (recordLlmUsage — roadmap, cv, briefings, coach, …)
+ * Previously the guard read only ai_cost_log, so spend recorded via recordLlmUsage was
+ * invisible and never counted toward the limit — letting free users call the
+ * roadmap/cv/briefings generators without a ceiling (BUG-002). Both tables are summed.
  */
 export async function costGuard(
   req: Request,
@@ -78,20 +82,34 @@ export async function costGuard(
       return;
     }
 
-    const [result] = await db
-      .select({
-        totalCost: sql<number>`coalesce(sum(${aiCostLogTable.costUsdEstimate}), 0)::float`,
-      })
-      .from(aiCostLogTable)
-      .where(
-        and(
-          eq(aiCostLogTable.userId, userId),
-          gte(aiCostLogTable.createdAt, start),
-          sql`${aiCostLogTable.createdAt} < ${end}`,
+    const [[aiRow], [llmRow]] = await Promise.all([
+      db
+        .select({
+          totalCost: sql<number>`coalesce(sum(${aiCostLogTable.costUsdEstimate}), 0)::float`,
+        })
+        .from(aiCostLogTable)
+        .where(
+          and(
+            eq(aiCostLogTable.userId, userId),
+            gte(aiCostLogTable.createdAt, start),
+            sql`${aiCostLogTable.createdAt} < ${end}`,
+          ),
         ),
-      );
+      db
+        .select({
+          totalCost: sql<number>`coalesce(sum(${llmUsageTable.estimatedCostUsd}), 0)::float`,
+        })
+        .from(llmUsageTable)
+        .where(
+          and(
+            eq(llmUsageTable.userId, userId),
+            gte(llmUsageTable.createdAt, start),
+            sql`${llmUsageTable.createdAt} < ${end}`,
+          ),
+        ),
+    ]);
 
-    const currentCost = result?.totalCost ?? 0;
+    const currentCost = (aiRow?.totalCost ?? 0) + (llmRow?.totalCost ?? 0);
 
     if (currentCost >= monthlyLimit) {
       rootLogger.warn(
