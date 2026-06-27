@@ -1,5 +1,4 @@
 import type { ComponentType } from "react";
-import { PATHS } from "./route-paths";
 
 export type RouteGuard = "protected" | "publicOnly" | "public";
 export type RouteLayout = "default" | "admin" | "plain";
@@ -13,7 +12,7 @@ export interface RouteConfig {
 }
 
 export const routes: RouteConfig[] = [
-  { path: PATHS.HOME, component: () => import("@/pages/home"), guard: "public", layout: "default", title: "Home" },
+  { path: "/", component: () => import("@/pages/home"), guard: "public", layout: "default", title: "Home" },
   { path: "/test", component: () => import("@/pages/test"), guard: "public", layout: "default", title: "Test" },
   { path: "/risultati/:id", component: () => import("@/pages/results"), guard: "public", layout: "default", title: "Risultati" },
   { path: "/settore/:id", component: () => import("@/pages/sector"), guard: "public", layout: "default", title: "Settore" },
@@ -25,7 +24,7 @@ export const routes: RouteConfig[] = [
   { path: "/premium/successo", component: () => import("@/pages/premium-success"), guard: "protected", layout: "default", title: "Premium" },
   { path: "/news/:id", component: () => import("@/pages/news-detail"), guard: "public", layout: "default", title: "News" },
   { path: "/news", component: () => import("@/pages/news"), guard: "public", layout: "default", title: "News" },
-  { path: PATHS.PROFILE, component: () => import("@/pages/profilo"), guard: "protected", layout: "default", title: "Profilo" },
+  { path: "/profilo", component: () => import("@/pages/profilo"), guard: "protected", layout: "default", title: "Profilo" },
   { path: "/candidature", component: () => import("@/pages/applications"), guard: "protected", layout: "default", title: "Candidature" },
   { path: "/mercato", component: () => import("@/pages/mercato"), guard: "protected", layout: "default", title: "Intelligence di Mercato" },
   { path: "/calendario", component: () => import("@/pages/calendar"), guard: "protected", layout: "default", title: "Calendario" },
@@ -37,12 +36,12 @@ export const routes: RouteConfig[] = [
   { path: "/bussola/blocco", component: () => import("@/pages/bussola-blocco"), guard: "protected", layout: "default", title: "Cosa ti blocca" },
   { path: "/bussola/torneo", component: () => import("@/pages/bussola-torneo"), guard: "protected", layout: "default", title: "Il Torneo" },
   { path: "/bussola/spike", component: () => import("@/pages/bussola-spike"), guard: "protected", layout: "default", title: "I tuoi Spike" },
-  { path: PATHS.FRIENDS, component: () => import("@/pages/amici"), guard: "protected", layout: "default", title: "Amici" },
+  { path: "/amici", component: () => import("@/pages/amici"), guard: "protected", layout: "default", title: "Amici" },
   { path: "/social", component: () => import("@/pages/social"), guard: "protected", layout: "default", title: "Social" },
   { path: "/utente/:id", component: () => import("@/pages/utente"), guard: "public", layout: "default", title: "Utente" },
   { path: "/wiki/:id", component: () => import("@/pages/wiki"), guard: "protected", layout: "default", title: "Wiki" },
   { path: "/roadmap/:id", component: () => import("@/pages/roadmap"), guard: "protected", layout: "default", title: "Roadmap" },
-  { path: PATHS.ARCHIVE, component: () => import("@/pages/grafo-conoscenza"), guard: "protected", layout: "default", title: "Archivio" },
+  { path: "/archivio", component: () => import("@/pages/grafo-conoscenza"), guard: "protected", layout: "default", title: "Archivio" },
   { path: "/archivio/:id", component: () => import("@/pages/grafo"), guard: "protected", layout: "default", title: "Archivio" },
   { path: "/settori", component: () => import("@/pages/settori"), guard: "public", layout: "default", title: "Settori" },
   { path: "/ruoli", component: () => import("@/pages/ruoli"), guard: "public", layout: "default", title: "Ruoli" },
@@ -58,7 +57,7 @@ export const routes: RouteConfig[] = [
   { path: "/crescita/articolo/:slug", component: () => import("@/pages/crescita-articolo"), guard: "public", layout: "default", title: "Articolo" },
   { path: "/dashboard", component: () => import("@/pages/dashboard"), guard: "protected", layout: "default", title: "Dashboard" },
   { path: "/obiettivi", component: () => import("@/pages/obiettivi"), guard: "protected", layout: "default", title: "Obiettivi" },
-  { path: PATHS.AFFILIATION, component: () => import("@/pages/affiliazione"), guard: "public", layout: "default", title: "Affiliazione" },
+  { path: "/affiliazione", component: () => import("@/pages/affiliazione"), guard: "public", layout: "default", title: "Affiliazione" },
   { path: "/affiliazione/scuole", component: () => import("@/pages/affiliazione-scuole"), guard: "public", layout: "default", title: "Affiliazione scuole" },
   { path: "/affiliazione/universita", component: () => import("@/pages/affiliazione-universita"), guard: "public", layout: "default", title: "Affiliazione universita" },
   { path: "/affiliazione/agenzie-lavoro", component: () => import("@/pages/affiliazione-agenzie"), guard: "public", layout: "default", title: "Affiliazione agenzie" },
