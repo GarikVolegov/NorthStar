@@ -172,9 +172,10 @@
       "id": "FEAT-004",
       "type": "feature",
       "priority": "P2",
-      "status": "todo",
+      "status": "blocked",
+      "blockedReason": "Discovery premise is false (code wins): /calendar (pages/calendar.tsx) ALREADY has a full monthly grid (MonthView) plus week/day views, nav, legend and modal. DashboardCalendar is a SEPARATE, simpler widget for the DASHBOARD (takes DashboardEvent[] from useDashboardData, links back to /calendar) — wiring it into /calendar would be a regression, not an improvement. If the goal is to surface the staged DashboardCalendar (memoria §8.4: connect, don't delete), the correct re-scoped item is 'wire DashboardCalendar into the dashboard', which needs a fresh look at the dashboard layout + browser verification. Not actionable as written.",
       "title": "Wire the staged DashboardCalendar component into the /calendar page",
-      "rationale": "DashboardCalendar.tsx (full monthly grid) is implemented but knip-ignored (staged Fase-2 WIP, memoria §8.4). The /calendar page only shows a list + modal. Wiring the grid in delivers the 'UI personalizzabile' vision and connects events created via Wendy's add_calendar_event. Zero new backend, zero DB gate.",
+      "rationale": "FALSE PREMISE: /calendar already renders a complete MonthView grid. DashboardCalendar is a dashboard widget (different data shape), unused/knip-ignored. Re-scope to the dashboard if desired.",
       "acceptance": [
         "DashboardCalendar rendered in calendar.tsx using events from the existing /api/calendar query",
         "Remove the DashboardCalendar.tsx knip-ignore entry (now referenced)",
