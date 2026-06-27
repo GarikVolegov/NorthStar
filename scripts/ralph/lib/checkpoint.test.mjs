@@ -44,3 +44,9 @@ test('renders push state as sì / no / —', () => {
   assert.match(renderCheckpoint({ ...base, pushed: false }), /push\s+no/);
   assert.match(renderCheckpoint({ ...base, pushed: null }), /push\s+—/);
 });
+
+test('degrades an id-only item to em-dashes (no "undefined")', () => {
+  const out = renderCheckpoint({ ...base, item: { id: 'NONEXISTENT-999' } });
+  assert.match(out, /NONEXISTENT-999 · —\/— · "—"/);
+  assert.doesNotMatch(out, /undefined/);
+});

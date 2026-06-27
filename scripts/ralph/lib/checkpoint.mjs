@@ -5,7 +5,7 @@ const GATE_ICON = { green: '🟢', red: '🔴' };
 
 function itemLine(item) {
   if (!item) return '(nessuno)';
-  return `${item.id} · ${item.type}/${item.priority} · "${item.title}"`;
+  return `${item.id} · ${item.type ?? '—'}/${item.priority ?? '—'} · "${item.title ?? '—'}"`;
 }
 
 export function renderCheckpoint(state) {
