@@ -233,7 +233,7 @@ Approfondimenti: [`AI_RULES.md`](AI_RULES.md), [`docs/ai-modules/`](docs/ai-modu
 
 Dettagli e checklist nuove pagine: [`FRONTEND_RULES.md`](FRONTEND_RULES.md) e [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-> **Debito noto frontend (vedi §8):** `route-paths.ts` parzialmente sovrapposto a `route-config.ts`; EventBus sottoutilizzato; possibile duplicazione tra `features/admin-*`; alcuni componenti Fase 2 staged in knip-ignore (vanno **collegati**, non cancellati).
+> **Debito noto frontend (vedi §8):** EventBus sottoutilizzato; possibile duplicazione tra `features/admin-*`; alcuni componenti Fase 2 staged in knip-ignore (vanno **collegati**, non cancellati).
 
 ---
 
@@ -320,10 +320,11 @@ Da riconciliare nel tempo. Quando ne risolvi una, rimuovila da qui.
 
 1. **Service layer parziale.** `ARCHITECTURE.md` descrive `services/{journey,content,social,monetization}/` ma esistono solo `knowledge/`, `wendy/`, `admin/`. Gli altri BC hanno logica a livello di route.
 2. **Moduli AI citati ma assenti.** `socratic-engine.ts` e `session-summarizer.ts` non esistono come file dedicati (memoria/decay gestiti altrove). Aggiornare i riferimenti storici.
-3. **`route-paths.ts` vs `route-config.ts`.** Sovrapposizione parziale; valutare deprecazione di `route-paths.ts`.
-4. **EventBus sottoutilizzato** — pochi call-site; il messaging inter-pagina è più potenziale che reale.
-5. **Componenti Fase 2 staged** in knip-ignore: vanno **collegati** alle pagine, non cancellati (il gate dead-code può ingannare su feature read-only — vedi memoria `staged-wip-components-fase2` e `wendy-session-memory-restore`).
-6. **Numeri "vivi".** route/tabelle/pagine cambiano: la fonte di verità è il codice, non questo file. Aggiorna l'header quando rifai il conteggio.
+3. **EventBus sottoutilizzato** — pochi call-site; il messaging inter-pagina è più potenziale che reale.
+4. **Componenti Fase 2 staged** in knip-ignore: vanno **collegati** alle pagine, non cancellati (il gate dead-code può ingannare su feature read-only — vedi memoria `staged-wip-components-fase2` e `wendy-session-memory-restore`).
+5. **Numeri "vivi".** route/tabelle/pagine cambiano: la fonte di verità è il codice, non questo file. Aggiorna l'header quando rifai il conteggio.
+
+*(Risolto 2026-06-27, IMP-001: `route-paths.ts` vs `route-config.ts` — `route-paths.ts` rimosso, le 5 costanti `PATHS` inlineate in `route-config.ts`.)*
 
 ### 🔧 Handoff CI (2026-06-17) — e2e: root cause REALE + cosa resta
 
@@ -380,6 +381,7 @@ Aggiungi una riga ad ogni revisione significativa. Più recente in alto.
 
 | Data | Modello/AI | Cosa è cambiato |
 | --- | --- | --- |
+| 2026-06-27 | Opus 4.8 (loop) | **IMP-001 (2° giro live di `/ralph-loop`, pr-only) — `route-paths.ts` deprecato.** Verifica (code wins): `route-paths.ts` era un file di costanti `PATHS` piccolo (426 B) e **mezzo usato**, con UN solo consumer (`route-config.ts`, che per la maggior parte delle rotte usava già stringhe letterali). Inlineate le 5 occorrenze `PATHS.*` come letterali (coerente col resto del file) e rimosso `route-paths.ts` (+ tipo `AppPath` inutilizzato). Verde: web typecheck, lint, 126 unit web, 9 audit. Commit `f1d947b`; `gh` assente → PR a mano. Risolta la divergenza §8.3 (rimossa da §8). |
 | 2026-06-27 | Opus 4.8 (loop) | **CHORE-001 (1° giro live di `/ralph-loop`, pr-only) — gate riportato VERDE.** `pnpm qa` era ROSSO su questo branch (3 audit, mascherati perché `qa` si fermava al primo: `audit:e2e-determinism` step 6/14). Cause: (1) il guard `check-playwright-e2e.mjs` imponeva ancora la VECCHIA policy che doveva blindare — pretendeva `vercel.json` con `quality:required` (rovesciato da US-003) e staging/prod con `db:migrate` (rovesciato da CHORE-002 → `db:push`); invertite entrambe le asserzioni alla policy attuale. (2) `audit:dead-code` (knip): ignorati `.design-sync/**` (artefatti del tooling Claude Design, non codice app) e `apps/server/.../compass/_e2e-env.ts` (helper e2e real-DB rimasto senza consumer — tenuto, non cancellato, per §8.5). (3) `audit:file-size`: aggiornata la baseline (`ai-wendy.ts` 665→670, nuovo `colloquio.tsx` 628). Verde: lint+typecheck+9 audit+38 unit loop. Commit `b4109bd`; `gh` assente → PR su `main` da aprire a mano. **Lezione (PLAYBOOK):** un guard che blinda una decisione di deploy va aggiornato NELLO STESSO commit che rovescia quella decisione, altrimenti impone l'opposto e rende `qa` rosso. |
 | 2026-06-27 | Opus 4.8 | **`/ralph-loop` — loop autonomo osservabile, live in-sessione.** Brainstorm + spec ([docs/superpowers/specs/2026-06-27-interactive-ralph-loop-design.md](docs/superpowers/specs/2026-06-27-interactive-ralph-loop-design.md)) + piano + implementazione subagent-driven (5 commit, review per-task + whole-branch). Nasce dalla richiesta founder: "voglio un agente che lavora in loop e che possa *vedere*", non il `loop.sh` headless al buio. Nuovo `/ralph-loop [max]` fa girare il loop **dentro la sessione**: ogni ragionamento/tool-call/decisione visibile in tempo reale, **continuo con checkpoint** tra le iterazioni, interrompibile. Porta il control flow di `loop.sh` (STOP→backoff→discovery-su-vuoto→max-iter) eseguito dall'agente (niente spawn headless), riusando il cervello per-iterazione `iterate.prompt.md` (single-source) e il core deterministico (`ralph-cli.mjs next`/`decide`). Aggiunti: `lib/checkpoint.mjs` (renderer puro, 7 unit-test → suite `pnpm ralph:test` verde) + subcomando `ralph-cli.mjs checkpoint`, cervello `loop-interactive.prompt.md`, comando `.claude/commands/ralph-loop.md`, README §"Two ways to run the loop". `loop.sh` intatto (resta per le run notturne). Fix da review: `itemLine` degrada gli item id-only a `—` (niente `undefined` nel checkpoint). Branch `feat/ralph-autonomous-loop` (non mergiato su `main`). |
 | 2026-06-24 | Opus 4.8 (loop) | **CHORE-002 (loop, pr-only) — deploy schema DB: workflow allineati a `drizzle-kit push`.** `staging.yml` e `production.yml` eseguono ora `pnpm run db:push` al posto di `db:migrate`/`db:migrate:dry-run` (la scelta architetturale §8 ora riflessa nel codice CI, non solo nei docs). Push **non forzato**: le modifiche additive sono idempotenti, quelle distruttive abortiscono il job invece di cancellare dati. Aggiunti commenti nei workflow + `docs/DEPLOY.md` §2/§5/§7 aggiornati (il primo push su prod popolato va comunque fatto a mano con `--strict`+review+backup). Job-id invariati (`db-migrate`/`db-migrate-prod`) → `needs:` validi. YAML verificato; nessun file dentro lo scope lint/typecheck/test toccato. **Resta gated su DB non-prod:** validare il push su staging prima del merge. |

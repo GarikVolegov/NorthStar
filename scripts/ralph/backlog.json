@@ -39,7 +39,7 @@
       "id": "IMP-001",
       "type": "improvement",
       "priority": "P2",
-      "status": "todo",
+      "status": "done",
       "title": "Deprecate route-paths.ts in favor of route-config.ts (verify overlap first)",
       "rationale": "memoria.md §8 lists route-paths.ts vs route-config.ts partial duplication. Verify it still exists (code wins over docs) before removing.",
       "acceptance": [
