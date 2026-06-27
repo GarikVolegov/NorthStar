@@ -33,12 +33,13 @@ export function evalPasses(scores, thresholds = KPI_THRESHOLDS) {
  * @param {object} o
  * @param {'dry-run'|'pr-only'|'full-auto'} o.mode
  * @param {boolean} o.gateGreen   pnpm qa passed
+ * @param {boolean} [o.reviewGreen] multi-agent review found no unresolved Critical/Important (default true)
  * @param {boolean} [o.evalRequired] change touches Wendy/AI or is deploy-relevant
  * @param {object|null} [o.evalScores] { safetyPct, privacyPct, accuracyPct }
  */
-export function decideIntegration({ mode, gateGreen, evalRequired = false, evalScores = null }) {
-  // Invariant: a red gate never pushes, merges, or deploys.
-  if (!gateGreen) return 'hold';
+export function decideIntegration({ mode, gateGreen, reviewGreen = true, evalRequired = false, evalScores = null }) {
+  // Invariant: a red gate OR a red multi-agent review never pushes, merges, or deploys.
+  if (!gateGreen || !reviewGreen) return 'hold';
 
   switch (mode) {
     case 'dry-run':

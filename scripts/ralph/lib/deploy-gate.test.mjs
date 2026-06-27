@@ -67,3 +67,19 @@ test('full-auto falls back to PR (no deploy) when required eval fails or is miss
 test('an unknown mode is treated conservatively as hold', () => {
   assert.equal(decideIntegration({ mode: 'whatever', gateGreen: true }), 'hold');
 });
+
+test('a red review always holds — even with a green gate, in every mode', () => {
+  for (const mode of ['dry-run', 'pr-only', 'full-auto']) {
+    assert.equal(decideIntegration({ mode, gateGreen: true, reviewGreen: false }), 'hold');
+  }
+});
+
+test('an explicit green review preserves the normal per-mode behavior', () => {
+  assert.equal(decideIntegration({ mode: 'dry-run', gateGreen: true, reviewGreen: true }), 'report');
+  assert.equal(decideIntegration({ mode: 'pr-only', gateGreen: true, reviewGreen: true }), 'open-pr');
+  assert.equal(decideIntegration({ mode: 'full-auto', gateGreen: true, reviewGreen: true, evalRequired: false }), 'deploy');
+});
+
+test('reviewGreen defaults to true (backward compatible)', () => {
+  assert.equal(decideIntegration({ mode: 'pr-only', gateGreen: true }), 'open-pr');
+});
