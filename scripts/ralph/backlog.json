@@ -121,7 +121,7 @@
       "id": "BUG-002",
       "type": "bug",
       "priority": "P1",
-      "status": "todo",
+      "status": "done",
       "title": "LLM cost-guard blind to roadmap/cv/briefings — unlimited free-tier LLM calls",
       "rationale": "POST /api/roadmap/:id/generate (4000 max-tokens, SSE), POST /api/cv/mine/generate and POST /api/briefings/generate have no costGuard and no freemium check; any authenticated free user can call them unlimited. Root cause: costGuard reads monthly spend from aiCostLogTable (populated only by recordAiCall in ai-wendy.ts + wiki-telemetry.ts), but these routes call recordLlmUsage → deprecated llmUsageTable, which cost-guard.ts:57 says it no longer reads.",
       "acceptance": [
