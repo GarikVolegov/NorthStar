@@ -45,6 +45,11 @@ reusable** — item-specific detail belongs in `progress.txt` / the journal, not
   `process.cwd()/../../scripts/...`). Run the server suite with cwd = `apps/server`
   (`(cd apps/server && node_modules/.bin/vitest run ... --configLoader runner)` or
   `pnpm --filter @northstar/server run test`), NOT from the repo root, or you get false failures.
+- Every iteration runs a multi-agent review on the WORK commit before integrating (iterate Step 6.5):
+  a deterministic risk-scaled panel (`ralph-cli.mjs review-panel`) of specialist reviewers
+  (`scripts/ralph/review/*.md`) runs in parallel; Critical/Important findings are fixed in a 2-round
+  fix-loop; an unresolved one makes the review red, and `decide --review red` → `hold` (review is an
+  objective gate alongside the green gate). The bookkeeping commit is not reviewed.
 
 ## How the loop works (orientation)
 - `loop.config.json mode` walks the safety ladder: `dry-run` → `pr-only` → `full-auto`.
