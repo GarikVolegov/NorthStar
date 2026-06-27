@@ -41,3 +41,13 @@ test('formatJournalEntry tolerates missing optional fields', () => {
   assert.match(md, /hold/);
   assert.doesNotMatch(md, /undefined/);
 });
+
+test('formatJournalEntry renders the review field when present', () => {
+  const out = formatJournalEntry({ itemId: 'BUG-009', review: '🟢 panel: correctness,security; 0 crit, 1 imp fixed' });
+  assert.match(out, /- \*\*review:\*\* 🟢 panel: correctness,security; 0 crit, 1 imp fixed/);
+});
+
+test('formatJournalEntry omits the review field when absent', () => {
+  const out = formatJournalEntry({ itemId: 'BUG-009' });
+  assert.ok(!out.includes('**review:**'));
+});

@@ -50,3 +50,9 @@ test('degrades an id-only item to em-dashes (no "undefined")', () => {
   assert.match(out, /NONEXISTENT-999 · —\/— · "—"/);
   assert.doesNotMatch(out, /undefined/);
 });
+
+test('renders the review line, defaulting to an em-dash', () => {
+  assert.match(renderCheckpoint({ ...base, review: '🟢 5 rev · 0 crit · 1 imp (fixed)' }),
+    /review\s+🟢 5 rev · 0 crit · 1 imp \(fixed\)/);
+  assert.match(renderCheckpoint(base), /review\s+—/); // base has no review field
+});

@@ -16,12 +16,13 @@ const line = (label, value) =>
 
 /** Render one iteration as a markdown block. Missing optional fields are skipped. */
 export function formatJournalEntry(entry) {
-  const { time, itemId, type, title, gate, decision, action, commit, pr, deploy, notes } = entry;
+  const { time, itemId, type, title, gate, review, decision, action, commit, pr, deploy, notes } = entry;
   const heading = `### ${time ? `${time} · ` : ''}${itemId ?? '(no-item)'}${title ? ` — ${title}` : ''}\n`;
   return (
     heading +
     line('type', type) +
     line('gate', gate) +
+    line('review', review) +
     line('decision', decision) +
     line('action', action) +
     line('commit', commit) +
