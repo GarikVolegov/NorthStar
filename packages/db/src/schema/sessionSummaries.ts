@@ -25,6 +25,7 @@ import {
   jsonb,
   timestamp,
   pgEnum,
+  index,
 } from "drizzle-orm/pg-core";
 import { coachSessionsTable } from "./coachSessions";
 import { usersTable } from "./users";
@@ -47,6 +48,10 @@ export const sessionSummariesTable = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
   },
+  (t) => ({
+    // Per-user lookup of the latest N summaries (coach session start, account export).
+    userCreatedIdx: index("session_summaries_user_created_idx").on(t.userId, t.createdAt),
+  }),
 );
 
 export type SessionSummary    = typeof sessionSummariesTable.$inferSelect;
