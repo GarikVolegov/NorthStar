@@ -90,6 +90,7 @@ switch (cmd) {
         next: selectNextItem(items),
         byStatus: s.byStatus,
         mode: config.mode,
+        review: opt('review') ?? null,
       }),
     );
     break;

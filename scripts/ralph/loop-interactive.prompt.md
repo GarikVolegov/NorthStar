@@ -20,10 +20,11 @@ For each cycle N:
 
 2. **Run one cycle.** Execute the full protocol in `scripts/ralph/iterate.prompt.md` for a
    single item — live, showing your work (selection, pre-flight gate, area rules, TDD,
-   verify, commit/push, the deterministic `decide`, recording, retro). Capture for the
-   checkpoint: item id, the emitted sentinel (ITERATION_DONE / NO_WORK / BLOCKED / STOP),
-   gate (green/red), the `decide` decision, the commit short-sha (if any), and whether you
-   pushed (yes/no).
+   verify, commit (local), multi-agent review (Step 6.5), the deterministic `decide --review`,
+   recording, retro). Capture for the checkpoint: item id, the emitted sentinel
+   (ITERATION_DONE / NO_WORK / BLOCKED / STOP), gate (green/red), the `decide` decision,
+   the commit short-sha (if any), whether you pushed (yes/no), and the review result + a
+   short review summary (panel size, crit/imp/minor counts).
 
 3. **React to the sentinel** (mirrors `loop.sh`):
    - `ITERATION_DONE` → set F=0.
@@ -38,7 +39,8 @@ For each cycle N:
    node scripts/ralph/ralph-cli.mjs checkpoint \
      --iter N --max MAX --item <ID> --result <SENTINEL> \
      --gate <green|red> --decision <decision> --commit <sha> --push <yes|no> \
-     --failures F --max-failures MAX_FAILURES
+     --failures F --max-failures MAX_FAILURES \
+     --review "<summary>"
    ```
    Update the todo counters (N, F) so they stay visible.
 

@@ -57,6 +57,7 @@ Review the WORK commit before integrating (not the Step 8 bookkeeping commit).
 1. Determine the panel deterministically:
    `node scripts/ralph/ralph-cli.mjs review-panel --type <type> --area <area> --code <true|false>`
    (`--code false` only when the work commit touched no `.ts/.tsx/.js/.jsx/.mjs/.sql`).
+   Compute it: `git diff --name-only <base>..HEAD | grep -qE '\.(ts|tsx|js|jsx|mjs|sql)$' && echo true || echo false`.
 2. Generate a diff package for the work commit (e.g. `git show` / `git diff <base>..HEAD`).
 3. Dispatch the listed reviewers as subagents IN PARALLEL, each with its prompt file
    (`scripts/ralph/review/<id>.md`), the diff package, the item brief, and the relevant
