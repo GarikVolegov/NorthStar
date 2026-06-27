@@ -23,7 +23,8 @@
       "entry": ["src/index.ts"],
       "project": ["src/**/*.ts"],
       "ignore": [
-        "src/vendor.d.ts"
+        "src/vendor.d.ts",
+        "src/services/compass/_e2e-env.ts"
       ]
     },
     "packages/*": {
@@ -40,6 +41,7 @@
     "**/node_modules/**",
     "**/build/**",
     "**/.turbo/**",
+    ".design-sync/**",
     "e2e/**",
     "docs/eval-wendy/**",
     "apps/web/src/components/dashboard/DashboardCalendar.tsx",

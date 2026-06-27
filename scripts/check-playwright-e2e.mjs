@@ -43,9 +43,13 @@ function ensureCiAndVercelUseScopedLint() {
   }
 
   const buildCommand = String(vercel.buildCommand ?? "");
-  if (!buildCommand.includes("pnpm run quality:required")) {
+  // memoria.md §7 (US-003): the quality gate must NOT run inside the Vercel
+  // buildCommand — any gate step (ratchet/knip/db-types/test infra) aborts the
+  // production deploy in the DB-less Vercel sandbox. The gate lives in CI
+  // (asserted separately below); the Vercel build only produces the artifacts.
+  if (buildCommand.includes("pnpm run quality:required")) {
     failures.push(
-      "vercel.json: buildCommand must gate with `pnpm run quality:required`",
+      "vercel.json: buildCommand must NOT run `pnpm run quality:required` (fragile in the Vercel sandbox; the gate lives in CI — see memoria.md §7 US-003)",
     );
   }
   if (/\bpnpm run lint(?:\s|&&|$)/.test(buildCommand)) {
@@ -127,38 +131,33 @@ function ensureVitestUsesRunnerConfigLoader() {
 
 ensureVitestUsesRunnerConfigLoader();
 
-function ensureDeploymentMigrationsAreVersioned() {
+function ensureDeploymentMigrationsUseDrizzlePush() {
+  // memoria.md §8 decision (2026-06-24, founder-approved): the SQL migration chain
+  // is structurally incomplete — several tables exist ONLY via `drizzle-kit push`
+  // (no CREATE TABLE in any .sql), so `db:migrate` cannot build a fresh DB. Staging
+  // and production therefore apply the schema with `db:push` (the single source of
+  // truth), NOT the retired journal-driven `db:migrate`. This guard locks in that
+  // decision so a future change can't silently regress to the broken chain.
   for (const workflow of [
     ".github/workflows/staging.yml",
     ".github/workflows/production.yml",
   ]) {
     const text = read(workflow);
-    if (/drizzle-kit\s+push/.test(text)) {
+    if (!/pnpm run db:push/.test(text)) {
       failures.push(
-        `${workflow}: staging/production deploys must use versioned migrations, not drizzle-kit push`,
+        `${workflow}: staging/production must apply the schema with \`pnpm run db:push\` (drizzle-kit push) — see memoria.md §8`,
+      );
+    }
+    // Forbid the actual invocation (not bare mentions in comments).
+    if (/pnpm run db:migrate(?::dry-run)?\b/.test(text)) {
+      failures.push(
+        `${workflow}: must not invoke the retired journal-driven \`pnpm run db:migrate\` (chain is incomplete; use db:push) — see memoria.md §8`,
       );
     }
   }
-
-  const production = read(".github/workflows/production.yml");
-  if (!/pnpm run db:migrate:dry-run/.test(production)) {
-    failures.push(
-      ".github/workflows/production.yml: production must run db:migrate:dry-run before db:migrate",
-    );
-  }
-  if (!/pnpm run db:migrate/.test(production)) {
-    failures.push(
-      ".github/workflows/production.yml: production must run db:migrate",
-    );
-  }
-
-  const staging = read(".github/workflows/staging.yml");
-  if (!/pnpm run db:migrate/.test(staging)) {
-    failures.push(".github/workflows/staging.yml: staging must run db:migrate");
-  }
 }
 
-ensureDeploymentMigrationsAreVersioned();
+ensureDeploymentMigrationsUseDrizzlePush();
 
 const config = read("playwright.config.ts");
 const retryMatch = config.match(/\bretries\s*:\s*([^,\n]+)/);

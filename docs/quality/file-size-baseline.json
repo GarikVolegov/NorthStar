@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-06-16T21:13:53.572Z",
+  "updatedAt": "2026-06-27T00:00:00.000Z",
   "limits": {
     "apps": 600,
     "packages": 400
@@ -17,11 +17,15 @@
       },
       {
         "file": "apps/server/src/routes/ai-wendy.ts",
-        "lines": 665
+        "lines": 670
       },
       {
         "file": "apps/web/src/components/admin/console/types.ts",
         "lines": 640
+      },
+      {
+        "file": "apps/web/src/pages/colloquio.tsx",
+        "lines": 628
       },
       {
         "file": "apps/web/src/hooks/useWendyChat.ts",
