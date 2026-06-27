@@ -188,7 +188,7 @@
       "id": "IMP-003",
       "type": "improvement",
       "priority": "P2",
-      "status": "todo",
+      "status": "done",
       "title": "Add DB index on session_summaries (userId, createdAt) for per-user lookup",
       "rationale": "sessionSummaries.ts comments say it is 'keyed for fast lookup by userId to find the latest N summaries' but declares no index → sequential scan on every session load and on /account/export. Add a composite index on (userId, createdAt).",
       "acceptance": [
