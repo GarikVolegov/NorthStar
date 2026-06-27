@@ -138,7 +138,7 @@
       "id": "IMP-002",
       "type": "improvement",
       "priority": "P1",
-      "status": "todo",
+      "status": "done",
       "title": "Fix N+1 in account.ts getUserRelatedData (+ FK indexes on messages/conversations)",
       "rationale": "apps/server/src/routes/account.ts fetches all conversations then fires one SELECT per conversationId (N+1) on the /account/export path. messages.conversationId and conversations.userId are query hot-paths with no DB index. Replace the loop with a single inArray() and add the two indexes.",
       "acceptance": [
