@@ -154,9 +154,10 @@
       "id": "FEAT-003",
       "type": "feature",
       "priority": "P2",
-      "status": "todo",
+      "status": "blocked",
+      "blockedReason": "Discovery design is FK-invalid: linkedRagChunkId has a hard FK to rag_chunks.id, so a news-article id cannot be stored there for dedup (would crash on insert — verified in proactiveInsight.ts). Needs a design decision (add a linkedNewsArticleId column + FK, or dedup heuristically on userId+type+recent-window) AND a real-DB integration test (no DATABASE_URL in the loop env). Also requires a sector ID→name join (users have preferredSectorIds:int[], news has sectorNames:text[]). Founder/design call — do not one-shot.",
       "title": "Add 'news' proactive-insight type to the nightly generator",
-      "rationale": "Vision (AaaS 'signal-when-it-matters'): proactive-insight-generator.ts handles weak_signal and skill_gap but stubs 'news — non ancora implementato'. The schema already declares insightType 'news' + linkedRagChunkId, and newsArticlesTable has sectorNames[] for persona matching. No new DB schema, no infra dependency — closes the loop without waiting for staging.",
+      "rationale": "Vision (AaaS 'signal-when-it-matters'): proactive-insight-generator.ts handles weak_signal (skill_gap/news are stubs). insightType enum already has 'news'. BUT the discovery's dedup-via-linkedRagChunkId is wrong (that column FK-references rag_chunks, not news_articles). Build deferred until the link/dedup design is chosen and a non-prod DB is reachable for the integration test.",
       "acceptance": [
         "generateNewsInsights() added and called in runProactiveInsightGenerator()",
         "Matches news published in last 7 days to user.preferredSectorIds via sectorNames[] overlap; ≤1 news insight/user/run; respects MAX_UNREAD_PER_USER",
