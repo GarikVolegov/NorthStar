@@ -220,7 +220,7 @@
       "id": "CHORE-004",
       "type": "chore",
       "priority": "P3",
-      "status": "todo",
+      "status": "done",
       "title": "Add unit tests for stripe-webhook-helpers.ts (critical payment path, 0 coverage)",
       "rationale": "stripe-webhook-helpers.ts (207 lines) handles webhook signature verification + subscription state transitions — the most financially critical code — with zero tests. The helpers are pure functions over Stripe event objects → testable with fixtures, no real Stripe/DB.",
       "acceptance": [
