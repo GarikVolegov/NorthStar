@@ -304,6 +304,18 @@ per-iterazione (`iterate.prompt.md`); aggiunge il cervello `loop-interactive.pro
 renderer deterministico `lib/checkpoint.mjs` (subcomando `ralph-cli.mjs checkpoint`, unit-test).
 Spec: [docs/superpowers/specs/2026-06-27-interactive-ralph-loop-design.md](docs/superpowers/specs/2026-06-27-interactive-ralph-loop-design.md).
 
+**Review multi-agente per iterazione — Sub-1 "a 360°" (2026-06-27).** Ogni iterazione ora
+revisiona la modifica con un **panel di reviewer specialisti in parallelo** PRIMA dell'integrazione
+(nuovo **Step 6.5** in `iterate.prompt.md`): triage **deterministico** scalato al rischio
+(`ralph-cli.mjs review-panel` → fasce FULL/STANDARD/LIGHT/MINIMAL; sicurezza sempre se tocca codice;
+consistenza server solo in FULL) → 5 angoli (`scripts/ralph/review/*.md`: correttezza · sicurezza ·
+test · design/regole · consistenza API) → **fix-loop** (max 2 giri) → la review diventa un **gate
+oggettivo**: `decideIntegration` ora fa `hold` su `!gateGreen || !reviewGreen` (`decide --review`).
+Lo Step 6 committa **in locale**, il push avviene nello Step 7 solo se `decide` lo consente. Esito
+review visibile nel checkpoint e nel journal. Logica critica deterministica + testata (`lib/review-panel.mjs`,
+`deploy-gate` esteso, **52 unit `pnpm ralph:test`**). **Sub-2 (esecuzione parallela di più item in
+worktree) = spec successivo.** Spec: [docs/superpowers/specs/2026-06-27-loop-multiagent-review-design.md](docs/superpowers/specs/2026-06-27-loop-multiagent-review-design.md).
+
 ### Pipeline interne (`.brain/20_Product/Pipelines/`)
 
 development (esterna, manuale via `gsd:ns-step`) · security · quality · compliance · infra-health · eval-wendy · performance · analytics · tech-debt. Lanciabili via `gsd:ns-pipeline`.
@@ -381,6 +393,7 @@ Aggiungi una riga ad ogni revisione significativa. Più recente in alto.
 
 | Data | Modello/AI | Cosa è cambiato |
 | --- | --- | --- |
+| 2026-06-27 | Opus 4.8 | **Loop "a 360°" Sub-1 — pipeline di review multi-agente per iterazione.** Brainstorm + spec ([…/2026-06-27-loop-multiagent-review-design.md](docs/superpowers/specs/2026-06-27-loop-multiagent-review-design.md)) + piano + build **subagent-driven** (5 task, review per-task + whole-branch su Opus, 1 wave di fix). Colma il gap della run "a oltranza" (le modifiche passavano con sola self-review). Ora ogni iterazione, dopo gate verde + commit **locale**, lancia un **panel di reviewer in parallelo** (correttezza/sicurezza/test/design/consistenza-API) scalato al rischio via **triage deterministico** (`lib/review-panel.mjs`, fasce FULL/STANDARD/LIGHT/MINIMAL); fix-loop a 2 giri; **review = gate oggettivo** → `decideIntegration` fa `hold` su `!gateGreen || !reviewGreen` (retrocompatibile, default true). Esito nel checkpoint+journal. **52 unit verdi** (`pnpm ralph:test`). Commit `e19394e…5848796`. Final review: nessun Critical; 2 Important di wiring observability + 2 minor corretti. **Sub-2 (parallelo tra item) = prossimo spec.** Branch `feat/ralph-autonomous-loop`; PR su `main` a mano. |
 | 2026-06-27 | Opus 4.8 (loop) | **FEAT-003 + FEAT-004 (9°/10° giro `/ralph-loop`) — BLOCCATE per premesse discovery errate (verify-first).** **FEAT-003** (news proactive-insights): il design della discovery è **FK-invalid** — `proactiveInsight.linkedRagChunkId` ha FK a `rag_chunks.id`, quindi non ci si può mettere un `news_articles.id` per la dedup (crash all'insert; solo un DB reale lo rivela). Serve una decisione di design (colonna `linkedNewsArticleId`+FK, o dedup euristica) + integration test su DB non-prod. **FEAT-004** (wire DashboardCalendar in /calendar): **premessa falsa** — `pages/calendar.tsx` ha **già** una `MonthView` completa (+ week/day); `DashboardCalendar` è un widget separato per la **dashboard** (non /calendar), cablarlo lì sarebbe una regressione. Entrambe → `blocked` con la motivazione precisa. **Fine run `/ralph-loop`** (founder "continua a oltranza"): **7 item shipped + verdi + pushati** (CHORE-001, IMP-001, BUG-002, IMP-002, IMP-003, CHORE-003, CHORE-004) + 1 discovery; loop fermato al confine todo-vuoto (resto founder-gated). PR su `main` da aprire a mano (`gh` assente). |
 | 2026-06-27 | Opus 4.8 (loop) | **CHORE-004 (8° giro live di `/ralph-loop`, pr-only) — test sui parser di `stripe-webhook-helpers`.** Aggiunti 11 test ermetici (mock solo degli import DB/logger) sui parser puri (`normalizeStripeEvent`/`readSubscriptionId`/`readSubscriptionPriceId`/`readMetadata`) — il file critico dei pagamenti era a 0 coverage. Criterio "signature rejection" della discovery adattato alla realtà: la verifica firma vive nella route, non qui. Logica commissioni DB-bound → integration-gated. Commit `c4170b1`; PR a mano. |
 | 2026-06-27 | Opus 4.8 (loop) | **CHORE-003 (7° giro live di `/ralph-loop`, pr-only) — patchato il DoS di `qs`.** Premessa della discovery imprecisa: `express` era già 4.22.2 e il suo range `qs ~6.15.1` ammette la versione patchata, ma `qs` restava 6.15.1. Fix reale = override pnpm `qs@>=6.11.1 <=6.15.1 → >=6.15.2 <7` → risolve `qs` 6.15.3; GHSA-q8mj-m7cp-5q26 sparito da `pnpm audit --prod` (3→2 moderate; restano brace-expansion devDep + opentelemetry, deferiti). Pinnato anche il floor di `express` a ^4.22.2. Verde: typecheck server, lint, 166 unit server. Commit `bebccd7`; PR a mano. |
