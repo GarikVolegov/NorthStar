@@ -17,6 +17,7 @@ import { selectNextItem, summarize } from './lib/backlog.mjs';
 import { decideIntegration } from './lib/deploy-gate.mjs';
 import { isStopped } from './lib/safety.mjs';
 import { journalPathFor } from './lib/journal.mjs';
+import { renderCheckpoint } from './lib/checkpoint.mjs';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 const readJson = (p, fallback) => (existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : fallback);
@@ -68,6 +69,29 @@ switch (cmd) {
     console.log(journalPathFor(new Date(), DIR));
     break;
   }
+  case 'checkpoint': {
+    const findItem = (id) => items.find((i) => i.id === id) ?? (id ? { id } : null);
+    const s = summarize(items);
+    const pushOpt = opt('push');
+    console.log(
+      renderCheckpoint({
+        iter: Number(opt('iter') ?? 0),
+        max: Number(opt('max') ?? config.maxIterations ?? 12),
+        item: findItem(opt('item')),
+        result: opt('result') ?? '—',
+        gate: opt('gate') ?? null,
+        decision: opt('decision') ?? null,
+        commit: opt('commit') ?? null,
+        pushed: pushOpt == null ? null : pushOpt === 'yes',
+        failures: Number(opt('failures') ?? 0),
+        maxFailures: Number(opt('max-failures') ?? config.maxFailures ?? 3),
+        next: selectNextItem(items),
+        byStatus: s.byStatus,
+        mode: config.mode,
+      }),
+    );
+    break;
+  }
   case 'config': {
     const key = process.argv[3];
     const val = config[key];
@@ -77,6 +101,6 @@ switch (cmd) {
   }
   default:
     console.error(`Unknown command: ${cmd ?? '(none)'}`);
-    console.error(`Commands: status | next | mode | decide | journal-path`);
+    console.error(`Commands: status | next | mode | decide | journal-path | checkpoint | config`);
     process.exit(2);
 }
